@@ -28,8 +28,16 @@ cd %WEREAD_DIR%
 node src/index.js plan          # 今天该读多久
 node src/index.js run --force   # 立刻跑一次(手动,不受安静时段限制)
 node src/index.js status        # 状态 + 官方统计
+node src/index.js auth          # 凭据体检(失效时自动续期)
+node src/index.js auth --force  # 强制续期,把服务端有效期窗口往后推
 node src/index.js pause         # 暂停自动运行(恢复用 resume)
 ```
+
+## 登录会过期吗
+
+会,但程序会自己续。实测续期接口返回的有效期:`wr_skey` 1.5 小时、`wr_rt` / `wr_vid` / `wr_pf` 360 天,都是**滚动刷新**的。每次运行前会做一次凭据体检(`GET /web/user?userVid=…`),失效就先续期、仍失效就推企业微信「需要重新登录」并跳过。续期若返回新的 cookie 值会原子回写进 `secretsead-request.curl`。
+
+只有一种情况需要你手动介入:长期不开机(超过 360 天)导致长期凭证作废,或你在别处主动退出了登录。那时收到提醒后重新抓一次 `read` 请求的 cURL 覆盖 `secretsead-request.curl` 即可。
 
 ## 计划任务
 
