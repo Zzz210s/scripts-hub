@@ -1,0 +1,93 @@
+--- a/src/browser/BrowserFunc.ts
++++ b/src/browser/BrowserFunc.ts
+@@ -270,10 +270,61 @@
+         }
+     }
+ 
++    /**
++     * Navigate to a rewards route while tolerating the silent re-authentication dance.
++     *
++     * Microsoft sometimes answers a rewards request with a redirect to
++     * login.live.com/...?siwg=1&siwa=1 and re-authenticates with the cookies that are
++     * already in the context. Playwright reports that as "Navigation ... is interrupted
++     * by another navigation", which used to abort the whole account run. Here the
++     * interruption is tolerated, the redirect is allowed to settle, and the navigation
++     * is retried; a navigation that keeps landing on a login page finally throws.
++     */
++    private async gotoRewardsRoute(page: Page, url: string, route: string): Promise<void> {
++        const maxAttempts = 3
++
++        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++            try {
++                await page.goto(url, { waitUntil: 'domcontentloaded' })
++            } catch (error) {
++                const message = error instanceof Error ? error.message : String(error)
++                const interrupted = /interrupted by another navigation|ERR_ABORTED|has been closed/i.test(message)
++
++                if (!interrupted) throw error
++
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    'BOOTSTRAP',
++                    `${route} navigation was interrupted by a redirect, letting it settle | attempt=${attempt}/${maxAttempts}`
++                )
++            }
++
++            // give a silent SSO round trip time to finish before inspecting the page
++            await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {})
++            await this.bot.utils.wait(2500)
++
++            const currentUrl = page.url()
++            if (/login\.live\.com|login\.microsoftonline\.com|account\.live\.com/i.test(currentUrl)) {
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    'BOOTSTRAP',
++                    `${route} landed on a login page, waiting for the silent sign-in to finish | attempt=${attempt}/${maxAttempts}`
++                )
++
++                await this.bot.utils.wait(3000)
++                continue
++            }
++
++            return
++        }
++
++        throw new Error(`${route} kept redirecting to a login page after ${maxAttempts} attempts (session not accepted)`)
++    }
++
+     async bootstrap(page: Page): Promise<void> {
+         try {
+             // /earn is the offers page
+-            await page.goto(URLs.rewards.earn, { waitUntil: 'domcontentloaded' })
++            await this.gotoRewardsRoute(page, URLs.rewards.earn, '/earn')
+ 
+             const earnDom = await page.content()
+             const earnRaw = await this.fetchBootstrapHtml(page, URLs.rewards.earn, '/earn')
+--- a/src/browser/auth/Login.ts
++++ b/src/browser/auth/Login.ts
+@@ -974,7 +974,24 @@
+         this.bot.logger.info(this.bot.isMobile, 'GET-REWARD-SESSION', 'Bootstrapping rewards context')
+ 
+         try {
+-            await this.bot.browser.func.bootstrap(page)
++            try {
++                await this.bot.browser.func.bootstrap(page)
++            } catch (firstError) {
++                // A silent re-authentication right after login can abort the first
++                // navigation to /earn. Give SSO a moment, then try once more before
++                // declaring the account dead for this run.
++                const firstMessage = firstError instanceof Error ? firstError.message : String(firstError)
++
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    'GET-REWARD-SESSION',
++                    `Bootstrap failed, retrying once after a settle delay | error=${firstMessage}`
++                )
++
++                await page.goto(URLs.rewards.dashboard, { waitUntil: 'domcontentloaded' }).catch(() => {})
++                await this.bot.utils.wait(8000)
++                await this.bot.browser.func.bootstrap(page)
++            }
+ 
+             const actionsCount = Object.keys(this.bot.nextActions).length
+             const snapshot = this.bot.reactSnapshot

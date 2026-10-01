@@ -1,0 +1,115 @@
+{
+    "sessionPath": "sessions",
+    "headless": true,
+    "clusters": 2,
+    "errorDiagnostics": true,
+    "ensureStreakProtection": true,
+    "autoClaimPunchcardRewards": true,
+    "contintueOnBotWarning": false,
+    "skipNonPointTasks": true,
+    "accountDelay": {
+        "min": "30sec",
+        "max": "1min"
+    },
+    "workers": {
+        "doDailySet": true,
+        "doClaimBonusPoints": true,
+        "doMorePromotions": true,
+        "doPunchCards": true,
+        "doAppPromotions": true,
+        "doDesktopSearch": true,
+        "doMobileSearch": true,
+        "doBonusSearches": false,
+        "doDailyCheckIn": true,
+        "doReadToEarn": true,
+        "doActivateSearchPerk": true,
+        "doVisualSearch": true
+    },
+    "activities": {
+        "urlReward": true,
+        "searchOnBing": true
+    },
+    "searchOnBingLocalQueries": true,
+    "globalTimeout": "30sec",
+    "searchSettings": {
+        "scrollRandomResults": true,
+        "clickRandomResults": true,
+        "runOnZeroPoints": false,
+        "maxBonusSearches": 30,
+        "parallelSearching": true,
+        "clusterSearch": true,
+        "queryEngines": [
+            "local"
+        ],
+        "searchResultVisitTime": "10sec",
+        "searchDelay": {
+            "min": "20sec",
+            "max": "40sec"
+        },
+        "readDelay": {
+            "min": "15sec",
+            "max": "30sec"
+        }
+    },
+    "experimental": {
+        "apiSearch": false,
+        "apiSearchOnBing": false,
+        "blockMedia": false,
+        "edgeBrowsing": false
+    },
+    "debugLogs": true,
+    "consoleLogFilter": {
+        "enabled": false,
+        "mode": "whitelist",
+        "levels": [
+            "error",
+            "warn"
+        ],
+        "keywords": [
+            "starting account",
+            "Fraud_UserWarning_BotScore_UX"
+        ],
+        "regexPatterns": []
+    },
+    "proxy": {
+        "queryEngine": false,
+        "ignoreCertificateErrors": false
+    },
+    "webhook": {
+        "discord": {
+            "enabled": false,
+            "url": ""
+        },
+        "telegram": {
+            "enabled": false,
+            "botToken": "",
+            "chatId": ""
+        },
+        "ntfy": {
+            "enabled": false,
+            "url": "",
+            "topic": "",
+            "token": "",
+            "title": "Microsoft-Rewards-Script",
+            "tags": [
+                "bot",
+                "notify"
+            ],
+            "priority": 3
+        },
+        "webhookLogFilter": {
+            "enabled": false,
+            "mode": "whitelist",
+            "levels": [
+                "error"
+            ],
+            "keywords": [
+                "starting account",
+                "select number",
+                "collected",
+                "Fraud_UserWarning_BotScore_UX"
+            ],
+            "regexPatterns": []
+        }
+    }
+}

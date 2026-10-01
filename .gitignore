@@ -1,0 +1,25 @@
+# 真实凭据与运行数据:即使私有仓也不入库
+.env
+.env.*
+!.env.example
+secrets/*
+!secrets/README.md
+*.webhook
+*webhook*.txt
+wecom-webhook.txt
+sessions/
+logs/
+data/
+*.log
+cookie*
+*.session
+# AI 文件
+AGENTS.md
+CLAUDE.md
+.claude/
+.pi/
+.codegraph/
+docs/superpowers/
+# 杂项
+Thumbs.db
+.DS_Store

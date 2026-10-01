@@ -1,0 +1,137 @@
+diff --git a/src/browser/BrowserFunc.ts b/src/browser/BrowserFunc.ts
+index 3e4662f..2342dea 100644
+--- a/src/browser/BrowserFunc.ts
++++ b/src/browser/BrowserFunc.ts
+@@ -1,4 +1,6 @@
+ import { URLs } from '../constants/urls'
++import fs from 'node:fs'
++import path from 'node:path'
+ import { BING_APP_USER_AGENT } from '../constants/userAgents'
+ import type { BrowserContext, Cookie, Page } from 'patchright'
+ import type { HttpRequestConfig } from '../util/Http'
+@@ -391,21 +393,25 @@ export default class BrowserFunc {
+     }
+ 
+     private async fetchBootstrapHtml(page: Page, url: string, route: string): Promise<string> {
+-        try {
+-            const res = await page.request.get(url, { timeout: 20000 })
+-            if (res.ok()) return await res.text()
++        for (let attempt = 1; attempt <= 2; attempt++) {
++            try {
++                const res = await page.request.get(url, { timeout: 20000 })
++                if (res.ok()) return await res.text()
+ 
+-            this.bot.logger.warn(
+-                this.bot.isMobile,
+-                'BOOTSTRAP',
+-                `Failed to fetch ${route} HTML | status=${res.status()} - snapshot and action discovery may be incomplete`
+-            )
+-        } catch (error) {
+-            this.bot.logger.warn(
+-                this.bot.isMobile,
+-                'BOOTSTRAP',
+-                `Failed to fetch ${route} HTML | error=${error instanceof Error ? error.message : String(error)} - snapshot and action discovery may be incomplete`
+-            )
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    'BOOTSTRAP',
++                    `Failed to fetch ${route} HTML | status=${res.status()}${attempt === 1 ? ' - retrying once' : ' - snapshot and action discovery may be incomplete'}`
++                )
++            } catch (error) {
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    'BOOTSTRAP',
++                    `Failed to fetch ${route} HTML | error=${error instanceof Error ? error.message : String(error)}${attempt === 1 ? ' - retrying once' : ' - snapshot and action discovery may be incomplete'}`
++                )
++            }
++
++            if (attempt === 1) await this.bot.utils.wait(1500)
+         }
+ 
+         return ''
+@@ -626,6 +632,39 @@ export default class BrowserFunc {
+         return null
+     }
+ 
++    /**
++     * 诊断:记录每个快照来源的体量与内容特征。
++     * 重点看 dailySetItems/offers:每日集(约 30 分/账号/天)能否被提交,完全取决于
++     * /earn 页面的 flight 数据里有没有带 hash 的 dailySetItems。
++     */
++    private reportSnapshotSource(route: string, how: string, body: string): void {
++        const offerCount = (body.match(/"offerId"/g) ?? []).length
++        const hasDailyItems = body.includes('dailySetItems')
++        const dailyIds = (body.match(/Gamification_DailySet_[A-Za-z0-9_]+/g) ?? []).length
++
++        this.bot.logger.debug(
++            this.bot.isMobile,
++            'EARN-SNAPSHOT',
++            `Source ${route} via ${how} | bytes=${body.length} | offers=${offerCount} | dailySetItems=${hasDailyItems ? 'yes' : 'NO'} | dailyIds=${dailyIds}`
++        )
++
++        if (!hasDailyItems) {
++            try {
++                const dir = path.join(process.cwd(), 'logs')
++                fs.mkdirSync(dir, { recursive: true })
++                const safeRoute = route.replace(/[^a-z0-9]/gi, '_')
++                fs.writeFileSync(path.join(dir, `diag-snapshot-${safeRoute}.html`), body, 'utf8')
++                this.bot.logger.debug(
++                    this.bot.isMobile,
++                    'EARN-SNAPSHOT',
++                    `Source ${route} lacks dailySetItems - saved to logs/diag-snapshot-${safeRoute}.html`
++                )
++            } catch {
++                // 诊断落盘失败不影响主流程
++            }
++        }
++    }
++
+     private getCachedCookies(explicitCookies?: Cookie[], targetUrl?: string): Cookie[] {
+         const cookies = explicitCookies ?? (this.bot.isMobile ? this.bot.cookies.mobile : this.bot.cookies.desktop)
+         return targetUrl ? this.filterCookiesForUrl(cookies, targetUrl) : cookies
+@@ -987,6 +1026,16 @@ export default class BrowserFunc {
+     }
+ 
+     private async fetchRewardsHtml(url: string, route: string): Promise<string | null> {
++        for (let attempt = 1; attempt <= 2; attempt++) {
++            const body = await this.tryFetchRewardsHtml(url, route)
++            if (body !== null) return body
++            if (attempt === 1) await this.bot.utils.wait(1000)
++        }
++
++        return null
++    }
++
++    private async tryFetchRewardsHtml(url: string, route: string): Promise<string | null> {
+         try {
+             const headers = { ...(this.bot.fingerprint?.headers ?? {}) }
+             delete headers['Cookie']
+@@ -1005,7 +1054,9 @@ export default class BrowserFunc {
+             })
+ 
+             await this.applyResponseCookies(url, response.headers['set-cookie'])
+-            return typeof response.data === 'string' ? response.data : null
++            const body = typeof response.data === 'string' ? response.data : null
++            if (body) this.reportSnapshotSource(route, 'http', body)
++            return body
+         } catch (error) {
+             this.bot.logger.debug(
+                 this.bot.isMobile,
+@@ -1026,7 +1077,16 @@ export default class BrowserFunc {
+             `${offerId} absent from the cached snapshot (offers=${this.bot.reactSnapshot?.offers.length ?? 0}) - refetching /earn and /dashboard`
+         )
+ 
+-        const refreshed = await this.refreshEarnSnapshot()
++        let refreshed = await this.refreshEarnSnapshot()
++
++        // 首次刷新可能因瞬时网络错误(socket hang up)丢掉 /earn 源,而带 hash 的每日集
++        // 条目只存在于 /earn 的 flight 数据里 —— 再试一次,避免白丢 30 分/账号/天。
++        if (!refreshed?.offers.some(o => o.offerId === offerId)) {
++            await this.bot.utils.wait(1200)
++            const second = await this.refreshEarnSnapshot()
++            if (second && (!refreshed || second.offers.length >= refreshed.offers.length)) refreshed = second
++        }
++
+         if (!refreshed) return null
+ 
+         if (!this.bot.reactSnapshot || refreshed.offers.length >= this.bot.reactSnapshot.offers.length) {
