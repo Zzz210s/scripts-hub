@@ -1,0 +1,53 @@
+# 微信读书每日签到:底座 weread-bot 的配置
+# 凭据与 cURL 都在 secrets/(已 gitignore);本文件只含非敏感的阅读参数与通知地址。
+app:
+  # 由 Windows 计划任务触发,所以用 immediate(立即执行一次就退出)
+  startup_mode: "immediate"
+  startup_delay: "10-30"
+  max_concurrent_users: 1
+
+curl_config:
+  # 单用户模式:直接用我们抓到的 read 请求 cURL
+  file_path: "secrets/read-request.curl"
+
+reading:
+  mode: "smart_random"
+  # 每天目标 60-72 分钟(挑战要求 30 小时/29 天 ≈ 62 分钟,留统计漏数余量)
+  target_duration: "3-9"
+  reading_interval: "30-48"
+  # 优先用 cURL 里的书籍/章节(即《三体》),缺失时回退到下面的 books
+  use_curl_data_first: true
+  fallback_to_config: true
+  books:
+    - name: "三体全集(全三册)"
+      book_id: "ce032b305a9bc1ce0b0dd2a"
+
+human_simulation:
+  enabled: true
+  reading_speed_variation: true
+  break_probability: 0.1
+  break_duration: "5-20"
+  rotate_user_agent: false
+
+network:
+  timeout: 30
+  retry_times: 3
+  retry_delay: "5-15"
+  rate_limit: 10
+
+notification:
+  enabled: true
+  include_statistics: true
+  only_on_failure: false
+  triggers:
+    session_success: true
+    session_failure: true
+    multi_user_summary: false
+    runtime_error: true
+    general: true
+  channels:
+    - name: "wework"
+      enabled: true
+      config:
+        webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=your_webhook_key"
+        msg_type: "text"

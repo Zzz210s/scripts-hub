@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | `MicrosoftRewardsScript` | Ready | 登录后 3 分钟(其后 1 小时内每 10 分钟重复)+ 每天 08:00 起每 2 小时一次(14 小时窗口) | 跑微软积分脚本,一天最多 3 次尝试,完成当天即锁 | `Disable-ScheduledTask -TaskName MicrosoftRewardsScript` / `Unregister-ScheduledTask -TaskName MicrosoftRewardsScript` |
 | `AutoShutdown0200` | Ready | 每天 02:00(WakeToRun=True) | 无条件真关机:`shutdown /s /f /t 60`(60 秒内 `shutdown /a` 可撤销) | `Disable-ScheduledTask -TaskName AutoShutdown0200` / `Unregister-ScheduledTask -TaskName AutoShutdown0200` |
-| (待建) 微信读书签到 | - | 未定 | 每天按缺口跑阅读上报 | - |
+| `WeReadSignIn` | Ready | 登录后 3 分钟(1 小时内每 10 分钟重试)+ 每天 08:00 起每 60 分钟一次(14 小时窗口) | 跑微信读书阅读会话,并用官方 API 校验是否计入 | `Disable-ScheduledTask -TaskName WeReadSignIn` / `Unregister-ScheduledTask -TaskName WeReadSignIn` |
 
 ## 查看与操作命令
 
@@ -18,6 +18,10 @@ Start-ScheduledTask -TaskName MicrosoftRewardsScript
 # 看今天是否已经跑过(9 = 已完成)
 Get-Content %REWARDS_DIR%\logs\last-run.state
 ```
+
+## 微信读书签到的守卫
+
+每次触发要过:已达标(`data\state.json` 的 done)/ 安静时段(20:00-23:00)/ 距 02:00 关机不足 30 分钟 / 可用内存低于 600MB / 官方统计读不到。手动运行用 `node src/index.js run --force` 可跳过安静时段。
 
 ## 说明
 

@@ -1,65 +1,55 @@
-# 微信读书签到(配置方案 / 项目规划)
+# 微信读书每日签到:配置说明
 
-目标:每天自动完成微信读书**阅读挑战的打卡**(当天有效阅读 ≥5 分钟即算一个有效日),并确认"这几分钟真的被计入"。
+程序本体在 `%WEREAD_DIR%`(私有仓库 `Zzz210s/weread-signin`)。本目录只放配置模板与说明。
 
-计划位置:`%WEREAD_DIR%`(程序本体),配置模板在本目录。开发状态:**规划完成,等待实现**。
+## 这个程序做什么
 
-## 术语先对齐
+自动完成微信读书阅读挑战的每日打卡(当天有效阅读 > 5 分钟),跑完用腾讯官方只读 API 校验时长是否真的被计入。
 
-生态里的"签到"= **挑战赛打卡**,即当天读满 5 分钟(自动判定,无需点按钮)。App 内的"福利/书币领取/翻一翻抽奖"**没有任何现成开源方案**,官方 API 也不开放这类动作,本方案不做。
+- 底座:`funnyzak/weread-bot`(MIT),在 `%WEREAD_DIR%\vendor\weread-bot`,固定 commit `0cc9b5c3`
+- 本项目补的三块:读回校验、按剩余进度算每日目标、Windows 无人值守调度
 
-挑战规则(社区多来源一致):付费 5 元 → 30 日内打卡 29 天 + 累计 30 小时 → 返 30 天会员 + 30 书币;第 29 天打卡后即可开始下一轮(当天既算上一轮也算下一轮);统计会漏数,故每天按 **68 分钟**跑(30h/29d≈62 分钟,留余量)。
+## 需要的配置(真值只放在本机)
 
-## 技术选型(复用优先)
-
-| 部分 | 选择 | 理由 |
+| 文件 | 内容 | 去哪拿 |
 | --- | --- | --- |
-| 上报引擎 | **funnyzak/weread-bot**(MIT) 作底座 | 心跳上报已写好,含立即/定时/守护三模式、多账号、执行历史、dry-run、原生企业微信通知;MIT 可放心二次开发 |
-| 读回校验 | **腾讯官方 API**(`POST https://i.weread.qq.com/api/agent/gateway`,Header `Authorization: Bearer wrk-xxxx`) | 官方只读接口含"阅读时长、天数、排行",能当唯一真值来源;Key 从 https://weread.qq.com/r/weread-skills 领取 |
-| 调度 | 照搬微软积分那套(计划任务 + 单实例锁 + 看门狗 + 配额守卫 + 补跑) | 本机已验证稳定运行 |
-| 通知 | 企业微信群机器人 | 已装好、无会话窗口限制 |
+| `%WEREAD_DIR%\.env` | 挑战起止日期、目标与守卫参数 | 复制本目录的 `env.example` |
+| `%WEREAD_DIR%\config.yaml` | 底座的配置(书籍、目标时长区间、通知) | 复制本目录的 `config.yaml.example` |
+| `%WEREAD_DIR%\secrets\read-request.curl` | 网页版 `read` 请求的 cURL | 浏览器对 `https://weread.qq.com/web/book/read` 请求 Copy as cURL (bash) |
+| `%WEREAD_DIR%\secrets\weread-api-key.txt` | 官方 API Key(读回统计用) | https://weread.qq.com/r/weread-skills |
+| `%WEREAD_DIR%\secrets\wecom-webhook.txt` | 企业微信群机器人 webhook | 企业微信群 → 添加群机器人 |
 
-**不用** `findmover/wxread`(805★,最流行)与 `jqknono/weread-challenge-selenium`(182★)的代码:两者**都没有许可证**,只能参考思路;签名公式我们已自行验证(`sg = sha256(ts + rn + salt)`)。
+`config.yaml` 里的 `target_duration` 由程序每次运行时自动改写(按剩余进度算),不用手工维护。
 
-## 架构
+## 常用命令
 
+```powershell
+cd %WEREAD_DIR%
+node src/index.js plan          # 今天该读多久
+node src/index.js run --force   # 立刻跑一次(手动,不受安静时段限制)
+node src/index.js status        # 状态 + 官方统计
+node src/index.js pause         # 暂停自动运行(恢复用 resume)
 ```
-调度层  计划任务(登录后触发 + 白天每 60 分钟一次机会 + 补跑)、单实例锁、看门狗、配额守卫
-   ↓
-执行层  weread-bot 按当天缺口跑 1-2 段,每段约 30 分钟(心跳上报)
-   ↓
-校验层  官方 API 读回今日/累计分钟与天数 → 判定本次是否被计入 → 继续 / 降速重试 / 告警
-   ↓
-通知层  企业微信:今日分钟、累计小时、剩余天数、还能失败几天;异常(登录失效、上报不被承认)单独告警
+
+## 计划任务
+
+`WeReadSignIn`:登录后 3 分钟触发(1 小时内每 10 分钟重试)+ 每天 08:00 起每 60 分钟一次、持续 14 小时。
+
+```powershell
+# 重新注册(换机器或任务丢失时)
+powershell -ExecutionPolicy Bypass -File %WEREAD_DIR%\scripts\windows\install-autostart.ps1
+# 卸载
+Unregister-ScheduledTask -TaskName WeReadSignIn
 ```
 
-## MVP 范围
+每次触发都要过守卫:已达标 / 安静时段(20:00-23:00)/ 距 02:00 关机不足 30 分钟 / 可用内存低于 600MB / 官方统计读不到 —— 任一不满足就安静退出。细节见程序目录里的 `scripts\windows\README-autostart.md`。
 
-单账号、心跳路线、每天 2 段、目标 68 分钟、官方 API 读回校验、企业微信日报与告警、计划任务与补跑。
-不做:App 内福利领取、多账号、浏览器路线(留作兜底)。
+## 日志与状态
 
-## 开发顺序
-
-1. 领官方 API Key 并验证 `/readdata/detail` 能读到今日与累计分钟(决定校验层能否落地)
-2. 克隆 weread-bot 到 `%WEREAD_DIR%\vendor\weread-bot`(保留其 LICENSE,不改核心)
-3. 写校验包装(运行 → 读回 → 判定)
-4. 企业微信日报与告警
-5. 计划任务 + 单实例 + 看门狗 + 配额守卫
-6. 可选:按剩余进度动态调整目标时长
-
-## 需要手动填的值
-
-| 值 | 去哪拿 |
+| 路径 | 内容 |
 | --- | --- |
-| `WEREAD_API_KEY` | https://weread.qq.com/r/weread-skills |
-| 微信读书网页版 cookie(或抓包 cURL) | 网页版抓包,格式见 weread-bot 文档 |
-
-## 参考(调研结论)
-
-| 项目 | 星 | 许可证 | 用途 |
-| --- | --- | --- | --- |
-| funnyzak/weread-bot | 203 | MIT | **底座** |
-| findmover/wxread | 805 | 无 | 仅参考签名思路 |
-| jqknono/weread-challenge-selenium | 182 | 无 | 仅参考浏览器路线与规则整理 |
-| finlater/weread.koplugin | 839 | AGPL | 协议文档(1281 行) |
-| Tencent/WeChatReading | 248 | Apache-2.0 | **官方 API 文档**与 Key 领取入口 |
+| `logs\last-run.log` | 最近一次运行输出(上一次在 `previous-run.log`) |
+| `logs\weread.log` | 底座日志(请求进度、成功/失败) |
+| `data\state.json` | 当日状态(今日分钟、目标、尝试次数、是否达标) |
+| `data\history.json` | 最近 200 次运行记录 |
+| `data\paused` | 存在即暂停 |
