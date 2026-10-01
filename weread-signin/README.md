@@ -35,13 +35,15 @@ node src/index.js pause         # 暂停自动运行(恢复用 resume)
 
 ## 登录会过期吗
 
-会,但程序会自己续。实测续期接口返回的有效期:`wr_skey` 1.5 小时、`wr_rt` / `wr_vid` / `wr_pf` 360 天,都是**滚动刷新**的。每次运行前会做一次凭据体检(`GET /web/user?userVid=…`),失效就先续期、仍失效就推企业微信「需要重新登录」并跳过。续期若返回新的 cookie 值会原子回写进 `secretsead-request.curl`。
+会,但程序会自己续。实测续期接口返回的有效期:`wr_skey` 1.5 小时、`wr_rt` / `wr_vid` / `wr_pf` 360 天,都是**滚动刷新**的。每次运行前会做一次凭据体检(`GET /web/user?userVid=…`),失效就先续期、仍失效就推企业微信「需要重新登录」并跳过。续期若返回新的 cookie 值会原子回写进 `secrets
+ead-request.curl`。
 
-只有一种情况需要你手动介入:长期不开机(超过 360 天)导致长期凭证作废,或你在别处主动退出了登录。那时收到提醒后重新抓一次 `read` 请求的 cURL 覆盖 `secretsead-request.curl` 即可。
+只有一种情况需要你手动介入:长期不开机(超过 360 天)导致长期凭证作废,或你在别处主动退出了登录。那时收到提醒后重新抓一次 `read` 请求的 cURL 覆盖 `secrets
+ead-request.curl` 即可。
 
 ## 计划任务
 
-`WeReadSignIn`:登录后 3 分钟触发(1 小时内每 10 分钟重试)+ 每天 08:00 起每 60 分钟一次、持续 14 小时。
+`WeReadSignIn`:登录后 10 分钟触发(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次、持续 14 小时。与微软积分错峰(它 08:00 / 登录后 3 分钟),见 `tasks/scheduling-convention.md`。
 
 ```powershell
 # 重新注册(换机器或任务丢失时)
@@ -50,7 +52,7 @@ powershell -ExecutionPolicy Bypass -File %WEREAD_DIR%\scripts\windows\install-au
 Unregister-ScheduledTask -TaskName WeReadSignIn
 ```
 
-每次触发都要过守卫:已达标 / 安静时段(20:00-23:00)/ 距 02:00 关机不足 30 分钟 / 可用内存低于 600MB / 官方统计读不到 —— 任一不满足就安静退出。细节见程序目录里的 `scripts\windows\README-autostart.md`。
+每次触发都要过守卫:同伴程序在跑(微软积分)/ 已达标 / 安静时段(20:00-23:00)/ 距 02:00 关机不足 30 分钟 / 可用内存低于 600MB / 凭据失效 / 官方统计读不到 —— 任一不满足就安静退出。细节见程序目录里的 `scripts\windows\README-autostart.md`。
 
 ## 日志与状态
 

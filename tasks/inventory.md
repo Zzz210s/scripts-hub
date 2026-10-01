@@ -6,7 +6,11 @@
 | --- | --- | --- | --- | --- |
 | `MicrosoftRewardsScript` | Ready | 登录后 3 分钟(其后 1 小时内每 10 分钟重复)+ 每天 08:00 起每 2 小时一次(14 小时窗口) | 跑微软积分脚本,一天最多 3 次尝试,完成当天即锁 | `Disable-ScheduledTask -TaskName MicrosoftRewardsScript` / `Unregister-ScheduledTask -TaskName MicrosoftRewardsScript` |
 | `AutoShutdown0200` | Ready | 每天 02:00(WakeToRun=True) | 无条件真关机:`shutdown /s /f /t 60`(60 秒内 `shutdown /a` 可撤销) | `Disable-ScheduledTask -TaskName AutoShutdown0200` / `Unregister-ScheduledTask -TaskName AutoShutdown0200` |
-| `WeReadSignIn` | Ready | 登录后 3 分钟(1 小时内每 10 分钟重试)+ 每天 08:00 起每 60 分钟一次(14 小时窗口) | 跑微信读书阅读会话,并用官方 API 校验是否计入 | `Disable-ScheduledTask -TaskName WeReadSignIn` / `Unregister-ScheduledTask -TaskName WeReadSignIn` |
+| `WeReadSignIn` | Ready | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次(14 小时窗口) | 跑微信读书阅读会话,并用官方 API 校验是否计入 | `Disable-ScheduledTask -TaskName WeReadSignIn` / `Unregister-ScheduledTask -TaskName WeReadSignIn` |
+
+## 错峰
+
+两个任务按 `scheduling-convention.md` 错开:微软积分 08:00 起、登录后 3 分钟;微信读书 08:30 起、登录后 10 分钟。每个程序运行前还会检查同伴的锁文件,任一在跑就跳过本次。
 
 ## 查看与操作命令
 
