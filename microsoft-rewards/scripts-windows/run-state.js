@@ -43,11 +43,13 @@ const PS_PIDS =
     'Select-Object -ExpandProperty ProcessId'
 
 /**
- * 进程匹配串。默认只认 dist\index.js —— 但可用 REWARDS_RUN_MATCH 覆盖,
- * 便于在"真的有运行在跑"时对看门狗做隔离测试(不去碰真实运行的进程)。
+ * 进程匹配串。默认要求整条命令里同时出现项目目录名与 dist\index.js —— 只写
+ * dist[\\/]index\.js 会误判:机器上任何跑 dist\index.js 的 node 进程(例如 MCP 服务)
+ * 都会被算成"奖励脚本在跑",导致当天所有触发被误挡(2026-10-01 实测 count=10 全属误报)。
+ * 仍可用 REWARDS_RUN_MATCH 覆盖,便于隔离测试看门狗。
  */
 function matchPattern() {
-    const pattern = process.env.REWARDS_RUN_MATCH || 'dist[\\\\/]index\\.js'
+    const pattern = process.env.REWARDS_RUN_MATCH || 'Microsoft-Rewards-Script[^"\\s]*[\\\\/]dist[\\\\/]index\\.js'
     return pattern.replace(/'/g, "''")
 }
 

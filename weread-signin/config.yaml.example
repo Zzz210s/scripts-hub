@@ -7,13 +7,17 @@ app:
   max_concurrent_users: 1
 
 curl_config:
-  # 单用户模式:直接用我们抓到的 read 请求 cURL
-  file_path: "secrets/read-request.curl"
+  # 用多用户模式承载单个用户:底座的日志与通知里只有这种模式会显示真实用户名,
+  # 单用户模式固定显示 "default"(实测 2026-10-01)。名字由 run.js 按官方接口自动改写。
+  users:
+    - name: "TestReader"
+      file_path: "secrets/read-request.curl"
+      cookie_refresh_ql: false
 
 reading:
   mode: "smart_random"
   # 每天目标 60-72 分钟(挑战要求 30 小时/29 天 ≈ 62 分钟,留统计漏数余量)
-  target_duration: "3-9"
+  target_duration: "1-6"
   reading_interval: "30-48"
   # 优先用 cURL 里的书籍/章节(即《三体》),缺失时回退到下面的 books
   use_curl_data_first: true
@@ -38,7 +42,7 @@ network:
 notification:
   enabled: true
   include_statistics: true
-  only_on_failure: false
+  only_on_failure: true
   triggers:
     session_success: true
     session_failure: true

@@ -13,12 +13,16 @@
 ## 目录说明
 
 ```
-microsoft-rewards/   微软积分:账号模板、config.json、运行器脚本、调度说明、补丁存档
+microsoft-rewards/   微软积分:config.json 快照、运行器脚本、补丁存档、企业微信通知层(wechat-bridge)
 autovisor/           智慧树:configs.ini(含课程链接,不含账号密码)
-weread-signin/       微信读书:选型结论、架构与开发顺序(项目未落地)
+weread-signin/       微信读书:配置示例、调度脚本、用法与凭据续期说明
 tasks/inventory.md   本机计划任务清单:名称、触发、作用、怎么停用
+tasks/scheduling-convention.md  错峰调度约定(新程序按它接入)
 secrets/README.md    哪些值要填、去哪里拿(只写说明,不写值)
 ```
+
+**这同时是一份恢复包**:把 `microsoft-rewards/` 与 `weread-signin/` 下的脚本、通知层、配置示例覆盖回各自程序目录,
+再按 `secrets/README.md` 填凭据、跑一次 `install-autostart` 注册计划任务,就能在换机器后恢复。
 
 ## 通用规则
 
