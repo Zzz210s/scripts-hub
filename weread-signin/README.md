@@ -52,7 +52,9 @@ powershell -ExecutionPolicy Bypass -File %WEREAD_DIR%\scripts\windows\install-au
 Unregister-ScheduledTask -TaskName WeReadSignIn
 ```
 
-每次触发都要过守卫:同伴程序在跑(微软积分)/ 已达标 / 安静时段(20:00-23:00)/ 距 02:00 关机不足 30 分钟 / 可用内存低于 600MB / 凭据失效 / 官方统计读不到 —— 任一不满足就安静退出。细节见程序目录里的 `scripts\windows\README-autostart.md`。
+每次触发都要过守卫,分两段:**本地段**(不联网、约 0.7 秒)—— 已达标 / 尝试次数 / 同伴在跑 / 安静时段 / 距关机不足 30 分钟 / 内存不足;**联网段** —— 凭据体检(失效自动续期)与官方统计读取。本地段不满足时不会访问网络。
+
+通知:真跑一次发"开始 + 结束"两条;跳过类同一天同一种原因最多一条,文案说明发生了什么/为什么/接下来会怎样;凭据失效每次提醒。细节见程序目录里的 `scripts\windows\README-autostart.md`。
 
 ## 日志与状态
 

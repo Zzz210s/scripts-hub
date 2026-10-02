@@ -13,7 +13,11 @@ if /i "!QUOTA!"=="MET" exit /b 0
 
 rem memory guard: too little free RAM -> skip, next trigger will retry
 for /f "usebackq delims=" %%m in (`node "scripts\windows\run-state.js" free-mem`) do set "FREEMEM=%%m"
-if !FREEMEM! LSS 600 exit /b 0
+if !FREEMEM! LSS 600 (
+  node "src
+otify-skip.js" low-memory !FREEMEM! >> "logsunner.log" 2>&1
+  exit /b 0
+)
 
 if exist "logs\last-run.log" move /y "logs\last-run.log" "logs\previous-run.log" >nul
 
