@@ -57,6 +57,8 @@ function clusterCount() {
 }
 
 async function main() {
+    // --dry:只预览文案,不真的发送
+    const dryRun = process.argv.includes('--dry')
     const noteIndex = process.argv.indexOf('--note')
     const note = noteIndex >= 0 ? process.argv[noteIndex + 1]?.trim() : null
     const retry = process.argv.includes('--retry')
@@ -84,7 +86,8 @@ async function main() {
     if (retry) lines.push('上次运行异常中断(未推送结果),本次为自动重试')
     if (note) lines.push(`触发方式: ${note}`)
 
-    for (const line of await broadcast(lines.join('\n'))) console.log(line)
+    if (dryRun) console.log(lines.join(String.fromCharCode(10)))
+    for (const line of await broadcast(lines.join(String.fromCharCode(10)), { dryRun })) console.log(line)
 }
 
 main().catch(error => {

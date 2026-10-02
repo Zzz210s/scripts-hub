@@ -54,6 +54,8 @@ function handledMessage(day) {
 }
 
 async function main() {
+    // --dry:只预览文案,不真的发送
+    const dryRun = process.argv.includes('--dry')
     const mode = (process.argv[2] ?? 'memory').toLowerCase()
 
     const status = channelStatus()
@@ -62,12 +64,15 @@ async function main() {
         return
     }
 
+    // 位置参数里排除 --dry 这类开关
+    const positional = process.argv.slice(3).filter(arg => !arg.startsWith('--'))
     const lines =
         mode === 'handled'
-            ? handledMessage(process.argv[3]?.trim() || localDay(new Date()))
-            : memoryMessage(process.argv[3]?.trim() || '未知')
+            ? handledMessage(positional[0]?.trim() || localDay(new Date()))
+            : memoryMessage(positional[0]?.trim() || '未知')
 
-    for (const line of await broadcast(lines.join('\n'))) console.log(line)
+    if (dryRun) console.log(lines.join(String.fromCharCode(10)))
+    for (const line of await broadcast(lines.join(String.fromCharCode(10)), { dryRun })) console.log(line)
 }
 
 main().catch(error => {
