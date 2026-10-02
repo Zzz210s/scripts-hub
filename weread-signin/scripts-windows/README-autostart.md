@@ -101,6 +101,19 @@ node src/index.js run --dry
 
 `.env` 里的 `CHALLENGE_START` / `CHALLENGE_ENDS_ON` 决定"每天该读多久"。没配时按"今天起 30 天"兜底,并在企业微信日报里提醒核对。
 
+## 日报格式
+
+```
+微信读书签到 · <账号名> · <日期> · 运行成功
+
+阅读:今日 X 分钟(目标 Y,已达标 / 还差 Z)
+本次:上报 X 分钟 · N 次请求 · 成功
+挑战:累计 X / 30.0 小时 · 剩 N 天 · 有效 X/29(还可漏 N 天)
+福利:本周 8 档(已领 5,未达成 3)
+```
+
+`福利` 行常驻:无可领时显示 `福利:暂无可领`,领到时把领取明细接在同一行。
+
 ## 福利书币
 
 阅读器里的「福利书币」入口在每次阅读会话结束后顺带处理一次:先查询(`action=query`),有可领的书币才领取(`action=recv`),领完再查一次自证。
@@ -109,9 +122,9 @@ node src/index.js run --dry
 - 依赖:`secrets/app-credentials.json` 由 `node src/app-login.js qr` 生成二维码、`node src/app-login.js wait` 扫码换取,缺它本步不执行(历史记 `reason=no-credentials`,并在运行日志里带上换取失败的原因)
 - `chapterUid` 目前恒传 0:网页请求体里的 `ci`(chapter_index)/ `co`(page_number)/ `ct`(时间戳)/ `c`(十六进制 chapter_id)都不是 App 需要的整数 `chapterUid`,映射不确定就不猜(见设计文档第 8 节)
 - 每次**真跑**写一行运行日志(经 `run-daily.bat` 启动时落在 `logs\last-run.log`,手工 `node src/index.js run` 则打在控制台):`[WELFARE] reason=... coin=... claimed=... verified=...`;拿不到凭据时另带一段脱敏截断的 `error=`;`--dry` 与被守卫跳过的那几次不写
-- 领到:日报里出现 `福利书币:本次领取 +N 书币`;领取后再查一次自证,若书币没归零则文案变成 `福利书币:本次领取 +N 书币(未自证,建议核对)`
+- 领到:日报里出现 `福利:阅读器书币 +N`;领取后再查一次自证,若书币没归零则文案变成 `福利:阅读器书币 +N(未自证)`
 - 没有可领:不推送,只写日志与 `data/history.json` 的 `welfare` 字段
-- 领取失败:日报里出现 `福利书币:领取失败,下次运行重试`(每天最多一条,频率键 `welfare-claim-failed`)
+- 领取失败:日报里出现 `福利:阅读器书币领取失败,下次运行重试`(每天最多一条,频率键 `welfare-claim-failed`)
 - 拿不到 App 凭据时本次不查询,该条历史记录的 `welfare` 记为 `{reason: "no-credentials", ...}`(不再是 `null`)
 - 接口与实测依据见 `docs/superpowers/specs/2026-10-02-welfare-coin-design.md`(本机文档,不进仓库)
 
@@ -125,8 +138,8 @@ node src/index.js run --dry
   - 客户端标识 `pf = wechat_wx-2001-android-100-weread`(沿用抓到的值)
 - 档位:时长档 5 个(5 分钟 / 30 分钟 / 1 小时 / 3 小时 / 5 小时)+ 天数档 3 个(2 / 4 / 7 天),合计 8 档;`awardStatus` 2 = 已领取、0 = 未达成(`awardStatusDesc` 说明差多少),这两个之外的未知状态一律试领一次,失败只记日志 —— 便于将来校准
 - 领取偏好:**书币优先**,书币不可选时退回体验卡
-- 领到:日报出现 `阅读福利:领取「读 1 小时」+2 书币`(体验卡档写作 `+N 天体验卡`);领取后再查一次自证,没自证上会带 `(未自证,建议核对)`
+- 领到:日报出现 `福利:领取「读 1 小时」+2 书币`(体验卡档写作 `+N 天体验卡`);领取后再查一次自证,没自证上会带 `(未自证)`
 - 无档位可领:不推送,只写运行日志(`[WEEKLY] read=...s days=... claimable=N claimed=[...] failed=[...]`)与 `data/history.json` 的 `weekly` 字段;`--dry` 与被守卫跳过的那几次都不写
-- 领取失败:日报出现 `阅读福利:领取失败,下次运行重试`(每天最多一条,频率键 `weekly-claim-failed`);同一批里一档领到一档失败时两行都出;已领过(`errcode=-2664`)不算失败,既不报领取也不报失败
+- 领取失败:日报出现 `福利:档位领取失败,下次运行重试`(每天最多一条,频率键 `weekly-claim-failed`);同一批里一档领到一档失败时两行都出;已领过(`errcode=-2664`)不算失败,既不报领取也不报失败
 - 凭据失效:本步只写运行日志(`[WEEKLY] reason=query-failed`),不推送 —— 凭据问题统一由运行前体检负责,不重复报
 - 接口依据:2026-10-02 手机抓包(该路径在 APK 里是动态拼接的,枚举与反编译都命中不了);2026-10-02 实测查询 200、8 档、`readingTime=11161` / `readingDay=3`
