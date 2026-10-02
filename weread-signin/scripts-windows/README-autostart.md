@@ -101,28 +101,44 @@ node src/index.js run --dry
 
 `.env` 里的 `CHALLENGE_START` / `CHALLENGE_ENDS_ON` 决定"每天该读多久"。没配时按"今天起 30 天"兜底,并在企业微信日报里提醒核对。
 
+## 开始提醒格式
+
+运行前发一条,并在运行前预览一次挑战与余额(拿不到就不显示对应行):
+
+```
+微信读书签到 · <账号名> · <日期> · 开始自动阅读
+
+今天:目标 5 分钟 · 已完成 X 分钟
+计划:分 2 段 · 共 5 分钟 · 结束后推送本次结果与官方读回数字
+挑战:付费 30 天 · X / 30.0 小时 · 已读 X/29 天 · 剩 N 天 · 还可漏 N 天 · 达标奖 30 书币 + 30 天体验卡 · 超额奖 10 书币 + 5 天体验卡
+免费 21 天 · X / 10.0 小时 · 已读 X/21 天 · 剩 N 天 · 不能再漏天数
+福利:书币余额 X.XX · 即将过期 X.XX
+```
+
 ## 日报格式
 
 ```
 微信读书签到 · <账号名> · <日期> · 运行成功
 
-阅读:今日 X 分钟(目标 Y,已达标 / 还差 Z)
-本次:上报 X 分钟 · N 次请求 · 成功
-挑战:付费 30 天 · X / 30.0 小时 · 已读 X/29 天 · 剩 N 天(还可漏 N 天) · 奖 30 书币
-     免费 21 天 · X / 10.0 小时 · 已读 X/21 天 · 剩 N 天
-福利:书币余额 X.XX · 本周 8 档(已领 5,未达成 3)
+阅读:今日 X 分钟 · 目标 Y 分钟 · 已达标 / 还差 Z 分钟
+本次:上报 X 分钟 · N 次请求 · 成功 · 官方计入约 X 分钟
+挑战:付费 30 天 · X / 30.0 小时 · 已读 X/29 天 · 剩 N 天 · 还可漏 N 天 · 达标奖 30 书币 + 30 天体验卡 · 超额奖 10 书币 + 5 天体验卡
+免费 21 天 · X / 10.0 小时 · 已读 X/21 天 · 剩 N 天 · 不能再漏天数
+福利:书币余额 X.XX · 即将过期 X.XX · 本周 8 档 · 已领 5 · 未达成 3
 ```
 
-- 挑战行来自官方接口,一条挑战一行(第一条 `挑战:` 开头,其余 5 空格缩进);接口读不到时回落到 `挑战:累计 X / Y 小时 · 剩 N 天 · 有效 X/29` 的旧形态
-- `canMiss` 为 0 时括号内写 `不能再漏天数`
-- `福利` 行常驻:无可领时显示 `福利:暂无可领`,领到时把领取明细接在同一行;余额读不到时省略 `书币余额` 那一段
+- 文案里不用圆括号,所有补充说明一律用 ` · ` 分隔(开始提醒、日报、跳过提醒都适用)
+- 挑战行来自官方接口,一条挑战一行,两条都**顶格**(第一条 `挑战:` 开头);接口读不到时回落到 `挑战:累计 X / Y 小时 · 剩 N 天 · 有效 X/29 · 还可漏 N 天`
+- `canMiss` 为 0 时写 `不能再漏天数`
+- 付费挑战奖励写全:`达标奖 N 书币 + N 天体验卡 · 超额奖 N 书币 + N 天体验卡`(为 0 的那一项不显示)
+- `福利` 行常驻:无可领时显示 `福利:暂无可领`,领到时把领取明细接在同一行;余额读到才显示 `书币余额` 与 `即将过期` 两段
 
 ## 挑战与余额接口
 
 两个接口都用 App 凭据(vid + accessToken),实测于 2026-10-02:
 
-- `GET /challenge/detail?version=v3&scene=2` —— 挑战详情,返回 `challengeList`。字段:`readTime` 单位是**秒**,`readDateList.length` 是已读天数,`challenge.targetTime`/`targetDay` 是完成条件,`challenge.challengeDay` 是总天数,`price > 0` 表示付费挑战,`reachRewardCoin` 是完赛奖励
-- `POST /pay/balance`,body 必须是 `{"pf":"wechat_wx-2001-android-100-weread"}` —— **`pf` 是必填**,缺了会返回 `499 -2003 参数格式错误`;返回 `balance`(总余额)与 `giftBalance`(赠币)
+- `GET /challenge/detail?version=v3&scene=2` —— 挑战详情,返回 `challengeList`。字段:`readTime` 单位是**秒**,`readDateList.length` 是已读天数,`challenge.targetTime`/`targetDay` 是完成条件,`challenge.challengeDay` 是总天数,`price > 0` 表示付费挑战;奖励四件套 `reachRewardCoin`/`reachRewardCard`(达标奖书币/体验卡天)与 `extraRewardCoin`/`extraRewardCard`(超额奖书币/体验卡天)
+- `POST /pay/balance`,body 必须是 `{"pf":"wechat_wx-2001-android-100-weread"}` —— **`pf` 是必填**,缺了会返回 `499 -2003 参数格式错误`;返回 `balance`(总余额)、`giftBalance`(赠币)与 `expiryBalance`(即将过期)
 
 两者失败都只记日志与 `data/history.json`,不影响运行结果与退出码。
 
@@ -134,7 +150,7 @@ node src/index.js run --dry
 - 依赖:`secrets/app-credentials.json` 由 `node src/app-login.js qr` 生成二维码、`node src/app-login.js wait` 扫码换取,缺它本步不执行(历史记 `reason=no-credentials`,并在运行日志里带上换取失败的原因)
 - `chapterUid` 目前恒传 0:网页请求体里的 `ci`(chapter_index)/ `co`(page_number)/ `ct`(时间戳)/ `c`(十六进制 chapter_id)都不是 App 需要的整数 `chapterUid`,映射不确定就不猜(见设计文档第 8 节)
 - 每次**真跑**写一行运行日志(经 `run-daily.bat` 启动时落在 `logs\last-run.log`,手工 `node src/index.js run` 则打在控制台):`[WELFARE] reason=... coin=... claimed=... verified=...`;拿不到凭据时另带一段脱敏截断的 `error=`;`--dry` 与被守卫跳过的那几次不写
-- 领到:日报里出现 `福利:阅读器书币 +N`;领取后再查一次自证,若书币没归零则文案变成 `福利:阅读器书币 +N(未自证)`
+- 领到:日报里出现 `福利:阅读器书币 +N`;领取后再查一次自证,若书币没归零则文案变成 `福利:阅读器书币 +N · 未自证`
 - 没有可领:不推送,只写日志与 `data/history.json` 的 `welfare` 字段
 - 领取失败:日报里出现 `福利:阅读器书币领取失败,下次运行重试`(每天最多一条,频率键 `welfare-claim-failed`)
 - 拿不到 App 凭据时本次不查询,该条历史记录的 `welfare` 记为 `{reason: "no-credentials", ...}`(不再是 `null`)
@@ -150,7 +166,7 @@ node src/index.js run --dry
   - 客户端标识 `pf = wechat_wx-2001-android-100-weread`(沿用抓到的值)
 - 档位:时长档 5 个(5 分钟 / 30 分钟 / 1 小时 / 3 小时 / 5 小时)+ 天数档 3 个(2 / 4 / 7 天),合计 8 档;`awardStatus` 2 = 已领取、0 = 未达成(`awardStatusDesc` 说明差多少),这两个之外的未知状态一律试领一次,失败只记日志 —— 便于将来校准
 - 领取偏好:**书币优先**,书币不可选时退回体验卡
-- 领到:日报出现 `福利:领取「读 1 小时」+2 书币`(体验卡档写作 `+N 天体验卡`);领取后再查一次自证,没自证上会带 `(未自证)`
+- 领到:日报出现 `福利:领取「读 1 小时」+2 书币`(体验卡档写作 `+N 天体验卡`);领取后再查一次自证,没自证上会带 ` · 未自证`
 - 无档位可领:不推送,只写运行日志(`[WEEKLY] read=...s days=... claimable=N claimed=[...] failed=[...]`)与 `data/history.json` 的 `weekly` 字段;`--dry` 与被守卫跳过的那几次都不写
 - 领取失败:日报出现 `福利:档位领取失败,下次运行重试`(每天最多一条,频率键 `weekly-claim-failed`);同一批里一档领到一档失败时两行都出;已领过(`errcode=-2664`)不算失败,既不报领取也不报失败
 - 凭据失效:本步只写运行日志(`[WEEKLY] reason=query-failed`),不推送 —— 凭据问题统一由运行前体检负责,不重复报
