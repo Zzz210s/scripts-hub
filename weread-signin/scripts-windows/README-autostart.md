@@ -108,11 +108,23 @@ node src/index.js run --dry
 
 阅读:今日 X 分钟(目标 Y,已达标 / 还差 Z)
 本次:上报 X 分钟 · N 次请求 · 成功
-挑战:累计 X / 30.0 小时 · 剩 N 天 · 有效 X/29(还可漏 N 天)
-福利:本周 8 档(已领 5,未达成 3)
+挑战:付费 30 天 · X / 30.0 小时 · 已读 X/29 天 · 剩 N 天(还可漏 N 天) · 奖 30 书币
+     免费 21 天 · X / 10.0 小时 · 已读 X/21 天 · 剩 N 天
+福利:书币余额 X.XX · 本周 8 档(已领 5,未达成 3)
 ```
 
-`福利` 行常驻:无可领时显示 `福利:暂无可领`,领到时把领取明细接在同一行。
+- 挑战行来自官方接口,一条挑战一行(第一条 `挑战:` 开头,其余 5 空格缩进);接口读不到时回落到 `挑战:累计 X / Y 小时 · 剩 N 天 · 有效 X/29` 的旧形态
+- `canMiss` 为 0 时括号内写 `不能再漏天数`
+- `福利` 行常驻:无可领时显示 `福利:暂无可领`,领到时把领取明细接在同一行;余额读不到时省略 `书币余额` 那一段
+
+## 挑战与余额接口
+
+两个接口都用 App 凭据(vid + accessToken),实测于 2026-10-02:
+
+- `GET /challenge/detail?version=v3&scene=2` —— 挑战详情,返回 `challengeList`。字段:`readTime` 单位是**秒**,`readDateList.length` 是已读天数,`challenge.targetTime`/`targetDay` 是完成条件,`challenge.challengeDay` 是总天数,`price > 0` 表示付费挑战,`reachRewardCoin` 是完赛奖励
+- `POST /pay/balance`,body 必须是 `{"pf":"wechat_wx-2001-android-100-weread"}` —— **`pf` 是必填**,缺了会返回 `499 -2003 参数格式错误`;返回 `balance`(总余额)与 `giftBalance`(赠币)
+
+两者失败都只记日志与 `data/history.json`,不影响运行结果与退出码。
 
 ## 福利书币
 
