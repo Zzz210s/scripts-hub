@@ -20,6 +20,7 @@ CLAUDE.md
 .pi/
 .codegraph/
 docs/superpowers/
+docs/*-report.md
 # 杂项
 Thumbs.db
 .DS_Store
