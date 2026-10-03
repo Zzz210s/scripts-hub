@@ -1,0 +1,19 @@
+{
+  "name": "weread-signin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automate the WeRead (微信读书) daily reading challenge and verify the counted minutes against the official read-only API.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Zzz210s",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzz210s/weread-signin.git"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

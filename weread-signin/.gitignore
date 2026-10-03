@@ -1,0 +1,33 @@
+# 第三方底座:不入库,按 README 的克隆命令获取并固定 commit
+vendor/
+
+# 配置与凭据
+config.yaml
+.env
+.env.*
+!.env.example
+secrets/
+app-login-qr*.png
+cookies/
+*.cookie
+
+# 运行数据
+data/
+logs/
+*.log
+
+# AI 文件
+docs/
+AGENTS.md
+CLAUDE.md
+.claude/
+.pi/
+.codegraph/
+
+# 杂项
+__pycache__/
+*.pyc
+Thumbs.db
+.DS_Store
+.capture/
+.superpowers/

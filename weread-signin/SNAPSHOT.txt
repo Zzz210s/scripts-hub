@@ -1,0 +1,6 @@
+source repository: Zzz210s/weread-signin (https://github.com/Zzz210s/weread-signin)
+source commit: 20eeefec6664725fa1b825ace227faa17b0117f1
+source commit date: 2026-10-03T21:02:13+08:00
+synced file count: 75
+notes: test/*.js 里写死的本机盘符已替换为 /tmp/(源仓库是公开仓,避免快照带个人盘符)
+synced at: 2026-10-04T00:19:31+08:00

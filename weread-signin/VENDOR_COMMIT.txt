@@ -1,0 +1,21 @@
+weread-bot 固定底座
+======================
+
+本项目的 Python 上报底座来自 funnyzak/weread-bot(MIT),以 vendor/ 子目录克隆,
+不随本仓库提交(见 .gitignore)。README 的安装步骤会克隆它,请 checkout 到下面这个 commit,
+以保证行为与测试/文档一致。
+
+仓库:   https://github.com/funnyzak/weread-bot.git
+commit: 0cc9b5c309d1ede76b60f7fd453f6eb403b6307b
+日期:   2026-09-30
+说明:   fix: add cookie renewal ql fallback (#51)
+
+复现:
+
+    mkdir -p vendor && cd vendor
+    git clone https://github.com/funnyzak/weread-bot.git
+    cd weread-bot && git checkout 0cc9b5c309d1ede76b60f7fd453f6eb403b6307b
+
+校验:
+
+    git rev-parse HEAD   # 应输出 0cc9b5c309d1ede76b60f7fd453f6eb403b6307b
