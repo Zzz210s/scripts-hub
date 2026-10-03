@@ -20,7 +20,7 @@ Get-ScheduledTask -TaskName MicrosoftRewardsScript | Get-ScheduledTaskInfo
 # 立刻手动触发一次
 Start-ScheduledTask -TaskName MicrosoftRewardsScript
 # 看今天是否已经跑过(9 = 已完成)
-Get-Content %REWARDS_DIR%\logs\last-run.state
+Get-Content $env:REWARDS_DIR\logs\last-run.state
 ```
 
 ## 微信读书签到的守卫

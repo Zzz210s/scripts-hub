@@ -1,7 +1,9 @@
 # 智慧树刷课(配置方案)
 
 程序本体:Autovisor v3.17.3(`github.com/CXRunfree/Autovisor`,MIT,Playwright + 内嵌 Python 3.10)
-位置:`%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`,桌面快捷方式 `Autovisor.lnk`)
+位置:`%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`)
+
+> 路径约定:`%AUTOVISOR_DIR%` 指 Autovisor 的安装目录,详见仓库根 README。
 
 ## 本目录内容
 

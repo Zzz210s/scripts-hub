@@ -1,7 +1,7 @@
 # 微软积分自动化(配置方案)
 
-程序本体:上游 `TheNetsky/Microsoft-Rewards-Script` v4.3.2 + 本地补丁
-位置:`%REWARDS_DIR%`
+程序本体:上游 `TheNetsky/Microsoft-Rewards-Script` v4.3.2(**GPL-3.0**,见根目录 README 的「许可与来源」)+ 本地补丁
+位置:`%REWARDS_DIR%`(本仓库不绑定具体盘符,下文所有 `%REWARDS_DIR%` 都指这条路径)
 
 ## 本目录内容
 
@@ -10,10 +10,11 @@
 | `env.example` | 账号配置模板(上游原版),复制成 `.env` 后填邮箱与密码 |
 | `config.json` | 实际使用的程序配置(不含凭据) |
 | `scripts-windows/` | 运行器:触发入口、单实例与配额判定、内存闸门、看门狗、关机任务、安装脚本 |
-| `README-autostart.md` | 运行器的详细说明(任务、状态文件、日志、命令、升级步骤) |
+| `scripts-windows/README-autostart.md` | 运行器的详细说明(任务、状态文件、日志、命令、升级步骤) |
+| `wechat-bridge/` | 企业微信通知层(开始/结束/跳过文案、低分归因、当日合并汇总) |
 | `patches/` | 对上游源码的补丁存档,升级上游后按序 `git apply` |
 
-## 需要在本机手动填的内容(不入库)
+## 需要手动填的内容(不入库)
 
 - `%REWARDS_DIR%\.env`:每个账号的邮箱与密码(`ACCOUNT_N_EMAIL` / `ACCOUNT_N_PASSWORD`),以及可选的 `_GEO_LOCALE`、`_LANG_CODE`、`_SAVE_FINGERPRINT_*`
 - `%REWARDS_DIR%\wechat-bridge\data\wecom-webhook.txt`:企业微信群机器人 webhook
@@ -66,7 +67,7 @@
 ## 升级上游
 
 ```bash
-cd /e/Microsoft-Rewards-Script-4.3.2
+cd %REWARDS_DIR%
 git fetch upstream && git merge upstream/main      # 或重下 release 覆盖
 git apply patches/*.patch                          # 按文件名顺序
 npm install && npm run build
