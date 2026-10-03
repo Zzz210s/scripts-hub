@@ -217,7 +217,7 @@ ENV_FILE="${TMPDIR:-/tmp}/public-reset-wizard.env"
 
 # 重建后的仓库元信息(与删库前一致,取自 2026-10-03 的线上值;topics 后来按新结构补齐)
 HAC_DESC="Configuration, deployment wizards, and machine-migration notes for three Windows automation programs: Microsoft Rewards, Zhihuishu course playback, and WeRead check-in."
-HAC_TOPICS=(automation configuration docs microsoft-rewards operations playwright self-hosted wecom windows-task-scheduler weread windows zzz-automation autovisor backup-restore oracle-cloud systemd gpl-3.0)
+HAC_TOPICS=(automation configuration docs microsoft-rewards operations playwright self-hosted wecom windows-task-scheduler weread windows zzz-automation autovisor backup-restore oracle-cloud systemd gplv3)
 
 # 个人标识黑名单:默认只查通用 Key 形状;本机私有文件里一行一个额外模式,
 # 真实姓名/邮箱/旧 handle 这些**绝不写进仓库**(文件默认在 ~/.config/automation-suite/ 下)。
