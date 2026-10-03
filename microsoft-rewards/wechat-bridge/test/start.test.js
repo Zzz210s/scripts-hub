@@ -1,6 +1,6 @@
 // 开始运行消息的测试(node --test 运行)。
 //
-//   cd E:\Microsoft-Rewards-Script-4.3.2
+//   cd %REWARDS_DIR%
 //   node --test wechat-bridge\test\start.test.js
 //
 // 与微信读书签到共用同一套排版:一行说明哪个程序开始跑;分隔符统一 · ;禁止圆括号。

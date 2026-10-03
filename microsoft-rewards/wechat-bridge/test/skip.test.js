@@ -1,6 +1,6 @@
 // skip 与 action 两类消息的文案测试(node --test 运行)。
 //
-//   cd E:\Microsoft-Rewards-Script-4.3.2
+//   cd %REWARDS_DIR%
 //   node --test wechat-bridge\test\skip.test.js
 //
 // 2026-10-03 用户反馈:两类消息原本几乎一样。现在 skip 标题写「正常跳过」,

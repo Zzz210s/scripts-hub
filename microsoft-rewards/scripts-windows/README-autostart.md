@@ -11,7 +11,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 任务名 | `MicrosoftRewardsScript` |
-| 动作 | `wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.vbs"` |
+| 动作 | `wscript.exe "%REWARDS_DIR%\scripts\windows\run-daily.vbs"` |
 | 触发 1 | 用户登录后 3 分钟(等网络就绪);**并在其后 1 小时内每 10 分钟重复一次** |
 | 触发 2 | 每天 08:00,并在其后 14 小时内每 2 小时重复一次 |
 | 窗口 | 隐藏(无黑框弹出) |
@@ -27,7 +27,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 任务名 | `AutoShutdown0200` |
-| 动作 | `wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-shutdown.vbs"` |
+| 动作 | `wscript.exe "%REWARDS_DIR%\scripts\windows\run-shutdown.vbs"` |
 | 触发 | 每天 02:00(**唤醒计算机执行**,错过不再补跑) |
 | 脚本 | `scripts\windows\auto-shutdown.bat`(隐藏运行),日志 `logs\shutdown.log` |
 | 行为 | **无条件真关机**:`shutdown /s /f /t 60` —— 不等奖励脚本,但保留 60 秒缓冲(期间 `shutdown /a` 可撤销) |
@@ -211,17 +211,17 @@ node "wechat-bridge\push.js" "任意内容"
 
 ```bat
 :: 立刻手动跑一次(可见窗口,便于观察)
-E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.bat
+%REWARDS_DIR%\scripts\windows\run-daily.bat
 
 :: 静默跑一次(与开机时完全一致的隐藏方式)
-wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.vbs"
+wscript.exe "%REWARDS_DIR%\scripts\windows\run-daily.vbs"
 
 :: 只验证脚本链路,不登录任何账号
-E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.bat dry
+%REWARDS_DIR%\scripts\windows\run-daily.bat dry
 
 :: 重新注册 / 删除开机自启动
-E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\install-autostart.bat
-E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\uninstall-autostart.bat
+%REWARDS_DIR%\scripts\windows\install-autostart.bat
+%REWARDS_DIR%\scripts\windows\uninstall-autostart.bat
 
 :: 查看任务详情
 schtasks /query /tn "MicrosoftRewardsScript" /v /fo LIST

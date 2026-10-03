@@ -1,6 +1,6 @@
 // 运行结果消息的构建与排版(notify-run.js 的正文全在这里,便于直接单测)。
 //
-// 排版约定见 automation-suite/docs/notification-convention.md:
+// 排版约定见 docs/notification-convention.md:
 //   标题行 / 空行 / 汇总行 / 逐账号行 / 失败段
 // 逐账号行按"今日得分"从高到低;低分原因缩进跟在对应账号行后面,不再堆到末尾一大段;
 // 不用圆括号,补充说明一律用 · 分隔。

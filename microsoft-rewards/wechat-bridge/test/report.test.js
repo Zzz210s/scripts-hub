@@ -1,9 +1,9 @@
 // 结果消息排版的测试(node --test 运行)。
 //
-//   cd E:\Microsoft-Rewards-Script-4.3.2
+//   cd %REWARDS_DIR%
 //   node --test wechat-bridge\test\report.test.js
 //
-// 排版约定见 automation-suite/docs/notification-convention.md。这里的断言锁住的是
+// 排版约定见 docs/notification-convention.md。这里的断言锁住的是
 // 用户 2026-10-03 提的那几个问题:标题行统一、汇总行一眼可扫、逐账号按今日得分降序、
 // 低分原因跟在账号行后面、失败段能看出阶段、不再有重复的「今日累计」整行。
 import assert from 'node:assert/strict'
