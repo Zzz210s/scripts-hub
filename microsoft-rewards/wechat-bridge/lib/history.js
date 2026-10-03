@@ -23,6 +23,17 @@ export function lastKnown(account) {
     return null
 }
 
+/** 上一次运行的结果摘要(notify-run.js 落盘),用于开始消息里的「上次」块。 */
+export function readLastRun() {
+    const data = readStore('last-run', null)
+    return data && typeof data === 'object' ? data : null
+}
+
+export function writeLastRun(info) {
+    writeStore('last-run', { at: new Date().toISOString(), ...info })
+    return info
+}
+
 export function recordRun(entries) {
     const list = readHistory()
     const seen = new Set(list.map(fingerprint))

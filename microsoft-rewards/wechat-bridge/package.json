@@ -1,0 +1,10 @@
+{
+    "name": "rewards-notify",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Microsoft Rewards 运行通知(企业微信群机器人 webhook,零依赖)",
+    "engines": {
+        "node": ">=18"
+    }
+}

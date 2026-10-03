@@ -11,7 +11,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 任务名 | `MicrosoftRewardsScript` |
-| 动作 | `wscript.exe "%REWARDS_DIR%\scripts\windows\run-daily.vbs"` |
+| 动作 | `wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.vbs"` |
 | 触发 1 | 用户登录后 3 分钟(等网络就绪);**并在其后 1 小时内每 10 分钟重复一次** |
 | 触发 2 | 每天 08:00,并在其后 14 小时内每 2 小时重复一次 |
 | 窗口 | 隐藏(无黑框弹出) |
@@ -27,7 +27,7 @@
 | 项目 | 值 |
 | --- | --- |
 | 任务名 | `AutoShutdown0200` |
-| 动作 | `wscript.exe "%REWARDS_DIR%\scripts\windows\run-shutdown.vbs"` |
+| 动作 | `wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-shutdown.vbs"` |
 | 触发 | 每天 02:00(**唤醒计算机执行**,错过不再补跑) |
 | 脚本 | `scripts\windows\auto-shutdown.bat`(隐藏运行),日志 `logs\shutdown.log` |
 | 行为 | **无条件真关机**:`shutdown /s /f /t 60` —— 不等奖励脚本,但保留 60 秒缓冲(期间 `shutdown /a` 可撤销) |
@@ -189,7 +189,6 @@
 | --- | --- | --- |
 | 运行开始(真正跑奖励脚本之前) | `wechat-bridge\notify-start.js` | 开始时间 + 当天第几次尝试 + 账号数 + 预计耗时 |
 | 运行结束 | `wechat-bridge\notify-run.js` | 每个账号本次得分与累计积分 + 总耗时;当天跑过多次时逐账号行改为“今日 +X 分(本次 +Y)”;失败时给出失败原因与失败条目数 |
-| 手工补推某一天 | `wechat-bridge\notify-day.js [日期] [--dry]` | 把当天多次运行按积分历史合并:逐账号“今日 +X 分 | 累计 Y 分”+ 当天总分 |
 
 - 通道:**企业微信群机器人 webhook**(腾讯官方,无 24 小时窗口、无条数上限)。
   webhook 地址写在 `wechat-bridge\data\wecom-webhook.txt`(位于 .gitignore 覆盖目录,不入版本库)。
@@ -205,8 +204,6 @@
 node "wechat-bridge\notify-start.js" --note "手工测试"
 node "wechat-bridge\notify-run.js" "logs\previous-run.log"
 node "wechat-bridge\notify-run.js" --dry                     (只预览,不发送)
-node "wechat-bridge\notify-day.js" --dry                     (今天的合并汇总预览)
-node "wechat-bridge\notify-day.js" 2026-09-25                (补推指定日期)
 node "wechat-bridge\push.js" "任意内容"
 ```
 
@@ -214,17 +211,17 @@ node "wechat-bridge\push.js" "任意内容"
 
 ```bat
 :: 立刻手动跑一次(可见窗口,便于观察)
-%REWARDS_DIR%\scripts\windows\run-daily.bat
+E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.bat
 
 :: 静默跑一次(与开机时完全一致的隐藏方式)
-wscript.exe "%REWARDS_DIR%\scripts\windows\run-daily.vbs"
+wscript.exe "E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.vbs"
 
 :: 只验证脚本链路,不登录任何账号
-%REWARDS_DIR%\scripts\windows\run-daily.bat dry
+E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\run-daily.bat dry
 
 :: 重新注册 / 删除开机自启动
-%REWARDS_DIR%\scripts\windows\install-autostart.bat
-%REWARDS_DIR%\scripts\windows\uninstall-autostart.bat
+E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\install-autostart.bat
+E:\Microsoft-Rewards-Script-4.3.2\scripts\windows\uninstall-autostart.bat
 
 :: 查看任务详情
 schtasks /query /tn "MicrosoftRewardsScript" /v /fo LIST

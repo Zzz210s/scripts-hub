@@ -19,11 +19,14 @@ const HEALTHY_ACCOUNT = [
     '[2026/9/27 11:13:18] [MAIN] [INFO] MAIN [RUN-END] Completed all accounts | accountsProcessed=2 | pointsGained=265 | previousBalance=1200 | currentBalance=1465 | runtimeMinutes=47.5'
 ]
 
-test('低分账号能读出原因:桌面搜索无可赚分 + App 仅剩少量 + 搜索被跳过', () => {
+test('低分账号能读出原因:桌面搜索无可赚分 + App 仅剩少量,且同义表述合并成一句', () => {
     const reason = explainLowScore('sample@example.com', LOW_ACCOUNT)
-    assert.match(reason, /桌面搜索已无可赚积分/)
+    assert.match(reason, /桌面搜索运行前已领完/)
+    assert.match(reason, /已完成跳过/)
     assert.match(reason, /App 侧可赚积分仅剩 5 分/)
-    assert.match(reason, /搜索阶段被判定为已完成而跳过/)
+    // 同义不重复:不能同时出现"已领完"和"已完成跳过"两个独立分句
+    assert.equal(reason.split(' · ').filter(part => /已完成跳过/.test(part)).length, 1)
+    assert.doesNotMatch(reason, /[()]/)
 })
 
 test('正常账号不产生原因', () => {
@@ -34,13 +37,18 @@ test('阈值是 50 分(正常日单账号 195-250,低于此值才归因)', () =>
     assert.equal(LOW_SCORE_THRESHOLD, 50)
 })
 
-test('推送里会为低分账号附上原因行', () => {
-    const { text } = buildSummary([...LOW_ACCOUNT, ...HEALTHY_ACCOUNT])
-    assert.match(text, /低分原因/)
-    assert.match(text, /桌面搜索已无可赚积分/)
+test('推送里低分原因缩进跟在对应账号行后面', () => {
+    const { text } = buildSummary([...LOW_ACCOUNT, ...HEALTHY_ACCOUNT], { past: [] })
+    const lines = text.split('\n')
+    const reason = lines.findIndex(line => line.startsWith('  原因:'))
+    assert.ok(reason > 0, '应有缩进的原因行')
+    assert.match(lines[reason - 1], /^账号 sample@example\.com · /)
+    assert.match(lines[reason], /桌面搜索运行前已领完/)
+    // 原因不再堆成末尾一大段
+    assert.ok(!lines.slice(0, reason).some(line => /低分原因/.test(line)))
 })
 
 test('全员正常时推送里没有原因行', () => {
-    const { text } = buildSummary(HEALTHY_ACCOUNT)
-    assert.ok(!/低分原因/.test(text))
+    const { text } = buildSummary(HEALTHY_ACCOUNT, { past: [] })
+    assert.ok(!/原因:/.test(text))
 })

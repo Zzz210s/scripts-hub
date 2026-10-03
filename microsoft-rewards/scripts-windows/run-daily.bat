@@ -99,6 +99,15 @@ goto creds_ok
 
 :no_creds
 echo [%REALDAY% %CLOCK%] .env has no real account configured yet, run skipped >> "%LOG%"
+
+rem 需要人工处理的情况必须说一声,否则用户只看到"什么都没跑"。同一天只提醒一次。
+set "NOTIFIED=0"
+if exist "logs\no-cred.notified" findstr /c:"%TODAY%" "logs\no-cred.notified" >nul 2>&1 && set "NOTIFIED=1"
+if "!NOTIFIED!"=="1" goto no_creds_done
+>"logs\no-cred.notified" echo %TODAY%
+node "wechat-bridge\notify-skip.js" nocreds >> "%RLOG%" 2>&1
+
+:no_creds_done
 del /q "logs\run.lock" >nul 2>&1
 popd
 exit /b 0

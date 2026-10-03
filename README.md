@@ -22,7 +22,7 @@ This repository is **not runnable software**. The programs themselves come from 
 | Content | Location | Nature |
 | --- | --- | --- |
 | Runner scripts: guards, single-instance lock, watchdog, memory gate, shutdown task, task registration | `microsoft-rewards/scripts-windows/` | Original to this repo, usable as-is |
-| WeCom notification layer: start / end / skip / daily roll-up / low-score attribution | `microsoft-rewards/wechat-bridge/` | Original to this repo |
+| WeCom notification layer: start / end / skip / action-needed, plus low-score attribution and result layout | `microsoft-rewards/wechat-bridge/` | Original to this repo |
 | Microsoft Rewards configuration | `microsoft-rewards/config.json`, `microsoft-rewards/env.example` | Actual config + upstream template |
 | Patch archive for the upstream source (apply in order after upgrading upstream) | `microsoft-rewards/patches/` | Original to this repo |
 | Zhihuishu configuration (course URLs, **no account or password**) | `autovisor/configs.ini` | Upstream template with local values |

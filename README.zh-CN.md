@@ -22,7 +22,7 @@
 | 内容 | 位置 | 性质 |
 | --- | --- | --- |
 | 运行器脚本:守卫、单实例锁、看门狗、内存闸门、关机任务、任务注册 | `microsoft-rewards/scripts-windows/` | 本项目自研,可原样使用 |
-| 企业微信通知层:开始 / 结束 / 跳过 / 当日合并汇总 / 低分归因 | `microsoft-rewards/wechat-bridge/` | 本项目自研 |
+| 企业微信通知层:开始 / 结束 / 跳过 / 需要你处理四类消息,含低分归因与结果排版 | `microsoft-rewards/wechat-bridge/` | 本项目自研(同步副本,权威在程序目录) |
 | 微软积分程序配置 | `microsoft-rewards/config.json`、`microsoft-rewards/env.example` | 实际配置 + 上游模板 |
 | 上游源码补丁存档(升级上游后按序 `git apply`) | `microsoft-rewards/patches/` | 本项目自研补丁 |
 | 智慧树刷课配置(课程链接,**不含账号密码**) | `autovisor/configs.ini` | 上游模板 + 本机取值 |

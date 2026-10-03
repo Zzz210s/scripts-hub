@@ -1,5 +1,6 @@
-// 运行开始提醒:由 run-daily.bat 在真正执行奖励脚本之前调用。
-// 用法: node wechat-bridge/notify-start.js [--note "触发方式"] [--retry]
+// 运行开始提醒:由 run-daily.bat 在真正执行奖励脚本之前调用(排版在 lib/start.js)。
+// 消息只有一行:哪个程序开始跑;第几次尝试 / 并行度 / 触发方式 / 上次结果只进运行日志。
+// 用法: node wechat-bridge/notify-start.js [--note "触发方式"] [--retry] [--day YYYY-MM-DD] [--dry]
 // 注意:提示文字都写在这里(UTF-8),不要让 bat 传中文参数 ——
 // 批处理文件是 UTF-8 而 cmd 按 GBK 解析,中文参数会变成乱码甚至吃掉引号。
 import fs from 'node:fs'
@@ -7,6 +8,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { broadcast, channelStatus } from './lib/channels.js'
+import { readLastRun } from './lib/history.js'
+import { buildStartMessage, MAX_ATTEMPTS } from './lib/start.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const ENV_FILE = path.join(root, '.env')
@@ -16,10 +19,6 @@ const pad = value => String(value).padStart(2, '0')
 
 function localDay(date) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-}
-
-function localStamp(date) {
-    return `${localDay(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 /** 统计 .env 中已配置的账号数;只数数量,不读取或输出任何账号内容。 */
@@ -57,7 +56,6 @@ function clusterCount() {
 }
 
 async function main() {
-    // --dry:只预览文案,不真的发送
     const dryRun = process.argv.includes('--dry')
     const noteIndex = process.argv.indexOf('--note')
     const note = noteIndex >= 0 ? process.argv[noteIndex + 1]?.trim() : null
@@ -67,27 +65,26 @@ async function main() {
     const dayIndex = process.argv.indexOf('--day')
     const providedDay = dayIndex >= 0 ? process.argv[dayIndex + 1]?.trim() : null
 
-    const status = channelStatus()
-    if (!status.wecom) {
+    if (!channelStatus().wecom) {
         console.log('未配置通知通道,跳过开始提醒')
         return
     }
 
-    const now = new Date()
+    const day = providedDay || localDay(new Date())
+    const attempt = Math.min(attemptNumber(day), MAX_ATTEMPTS)
     const accounts = countAccounts()
     const clusters = clusterCount()
-    const day = providedDay || localDay(now)
+    const lastRun = readLastRun()
+    // 消息只有一行;第几次尝试 / 并行度 / 触发方式 / 上次结果只进运行日志(2026-10-03)
+    const detail = [`第 ${attempt} 次尝试 · 当天最多 ${MAX_ATTEMPTS} 次`, `并行 ${clusters}`]
+    if (note) detail.push(`触发 ${note}`)
+    if (lastRun?.day) detail.push(`上次 ${lastRun.day} ${lastRun.status === 'failed' ? '运行有失败' : '运行成功'} · 当日 +${lastRun.dayGained ?? lastRun.gained ?? 0} 分`)
+    console.log(`本次口径:${detail.join(' · ')}`)
 
-    const lines = [
-        `[Microsoft Rewards] ${localStamp(now)} 开始运行`,
-        `今天第 ${attemptNumber(day)} 次尝试 | 账号数 ${accounts}${accounts ? `(${clusters > 1 ? `每批 ${clusters} 个并行` : '逐个串行'})` : ''}`,
-        '预计 60-100 分钟,结束后推送结果'
-    ]
-    if (retry) lines.push('上次运行异常中断(未推送结果),本次为自动重试')
-    if (note) lines.push(`触发方式: ${note}`)
+    const text = buildStartMessage({ day, accounts, retry })
 
-    if (dryRun) console.log(lines.join(String.fromCharCode(10)))
-    for (const line of await broadcast(lines.join(String.fromCharCode(10)), { dryRun })) console.log(line)
+    if (dryRun) console.log(text)
+    for (const line of await broadcast(text, { dryRun })) console.log(line)
 }
 
 main().catch(error => {

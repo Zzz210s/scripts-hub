@@ -11,8 +11,10 @@
 | `config.json` | 实际使用的程序配置(不含凭据) |
 | `scripts-windows/` | 运行器:触发入口、单实例与配额判定、内存闸门、看门狗、关机任务、安装脚本 |
 | `scripts-windows/README-autostart.md` | 运行器的详细说明(任务、状态文件、日志、命令、升级步骤) |
-| `wechat-bridge/` | 企业微信通知层(开始/结束/跳过文案、低分归因、当日合并汇总) |
+| `wechat-bridge/` | 企业微信通知层(开始/结束/跳过/需要你处理四类消息、低分归因、结果排版) |
 | `patches/` | 对上游源码的补丁存档,升级上游后按序 `git apply` |
+
+`wechat-bridge/` 是开发目录 `%REWARDS_DIR%\wechat-bridge\` 的**同步副本**(2026-10-03 对齐):改动先落在开发目录,再整体覆盖回来 —— 两处都改会分叉。副本带 `package.json`(`type: module`),可以直接在仓库里 `node --test test/*.test.js` 跑那套测试(19 条)。`%REWARDS_DIR%\wechat-bridge\data\` 里的运行数据不入库。
 
 ## 需要手动填的内容(不入库)
 
