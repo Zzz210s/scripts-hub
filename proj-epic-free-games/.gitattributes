@@ -1,0 +1,5 @@
+# Windows 脚本必须 CRLF:cmd 对 LF 结尾的 .bat 在 goto 标签与块语句上会出错
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf

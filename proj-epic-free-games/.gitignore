@@ -1,0 +1,13 @@
+# 运行数据、日志、凭据与依赖都不入库
+data/
+logs/
+secrets/
+node_modules/
+
+# 上游引擎自己会写这里(lowdb 结果 + 浏览器 profile)
+vendor/free-games-claimer/data/
+vendor/free-games-claimer/node_modules/
+vendor/free-games-claimer/nopecha/
+
+# 本机私有覆盖
+*.local

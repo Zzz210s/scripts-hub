@@ -1,0 +1,29 @@
+{
+  "name": "epic-free-games",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Claim the weekly Epic Games Store free games unattended, with a WeCom notification layer and a link fallback when hCaptcha blocks checkout.",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "author": "Zzz210s",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzz210s/scripts-hub.git",
+    "directory": "proj-epic-free-games"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "dotenv": "^17.2.0",
+    "enquirer": "^2.4.1",
+    "fingerprint-injector": "^2.1.69",
+    "lowdb": "^7.0.1",
+    "otplib": "^12.0.1",
+    "patchright": "^1.52.5"
+  }
+}
