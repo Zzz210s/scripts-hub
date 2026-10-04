@@ -2,7 +2,6 @@
 # 本机系统 git config 默认 core.autocrlf=true(Git for Windows 的 /etc/gitconfig),
 # 会让工作区变成 CRLF、并随编辑来回转换;这里用显式属性固定下来,
 # 并在本仓库本地把 core.autocrlf 设为 input(只改本仓库,不动全局)。
-# 原文件只覆盖 *.js/*.mjs/*.sh/*.template,其余文件仍随 core.autocrlf 抖动。
 * text=auto eol=lf
 *.bat text eol=crlf
 *.cmd text eol=crlf
