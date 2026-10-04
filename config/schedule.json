@@ -12,6 +12,16 @@
     "logonBaseMinutes": 3,
     "logonStepMinutes": 7
   },
+  "linux": {
+    "unit": "automation-suite",
+    "times": [
+      "08:00",
+      "12:00"
+    ],
+    "persistent": true,
+    "suiteDir": "/srv/apps/automation",
+    "user": "ubuntu"
+  },
   "programs": {
     "microsoft-rewards": {
       "taskName": "MicrosoftRewardsScript",

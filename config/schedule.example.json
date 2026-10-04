@@ -1,7 +1,8 @@
 {
   "_readme": {
     "用途": "所有自动化程序的『什么时候跑』都由这份配置决定:计划任务的触发器、systemd timer 的 OnCalendar 都从它生成,不再写死在注册脚本里。",
-    "怎么改": "改本机实际配置 config/schedule.json(本文件只是默认值文档 + 缺失时的回退),改完跑 bash scripts/apply-schedule.sh --dry-run 看生成的触发器,满意再加 --apply --yes 注册。",
+    "平台": "Windows 与 Linux 是两套模型:Windows 每个程序一个计划任务(programs.* 的 startTime/intervalMinutes/windowHours);Linux/容器是单套件 automation-suite.timer(见 linux 段),08:00 与 12:00 各触发一次、Persistent=true,套件脚本按 order 顺序跑完所有启用的程序。Linux 侧权威实现在 scripts/linux/。",
+    "怎么改": "改本机实际配置 config/schedule.json(本文件只是默认值文档 + 缺失时的回退),改完跑 node scripts/apply-schedule.mjs --dry-run 看生成的触发器,满意再加 --apply --yes 注册。",
     "时区": "timezone 供云端 systemd timer 参考;Windows 计划任务一律按主机本地时区。",
     "顺序": "order = 错峰顺序(谁先跑)。下标 0 最先,起始时间与登录延迟都按 stagger 依次顺延。",
     "节假日": "Epic 限免在 12 月中旬至 1 月初的 Holiday Sale 期间每天换一批;那时把 epic-free-games.intervalMinutes 改成 360 再跑 apply-schedule.mjs。",
@@ -19,9 +20,14 @@
       "programs.<id>.logonDelayMinutes": "登录后延迟几分钟触发;整数或 \"auto\"(0 = 登录即触发)。",
       "programs.<id>.logonRetryMinutes": "登录触发器的重复间隔(分钟)。",
       "programs.<id>.logonRetryWindowMinutes": "登录触发器的重复总时长(分钟)。",
-      "programs.<id>.runScript": "云端 systemd service 的 ExecStart;留空则由部署脚本填。",
+      "programs.<id>.runScript": "历史字段:Linux 改单套件后不再逐程序用;套件 service 的 ExecStart 固定是 suiteDir/run-all.sh。保留只为兼容旧配置。",
       "programs.<id>.enabled": "false 表示不注册它的触发(仍会列在报告里)。",
-      "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% / %EPIC_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。"
+      "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% / %EPIC_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。",
+      "linux.unit": "Linux 单套件 systemd unit 名(默认 automation-suite);权威实现在 scripts/linux/。",
+      "linux.times": "Linux 套件触发时刻(HH:MM 数组),默认 [\"08:00\", \"12:00\"]。",
+      "linux.persistent": "true = 关机/重启错过的触发在开机后补跑一次。",
+      "linux.suiteDir": "云主机套件根目录(unit 的 WorkingDirectory 与 ExecStart 前缀)。",
+      "linux.user": "套件 service 的 User(默认 ubuntu)。"
     }
   },
   "version": 1,
@@ -36,6 +42,16 @@
     "slotMinutes": 30,
     "logonBaseMinutes": 3,
     "logonStepMinutes": 7
+  },
+  "linux": {
+    "unit": "automation-suite",
+    "times": [
+      "08:00",
+      "12:00"
+    ],
+    "persistent": true,
+    "suiteDir": "/srv/apps/automation",
+    "user": "ubuntu"
   },
   "programs": {
     "microsoft-rewards": {

@@ -6,10 +6,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { normalizeLinux } from './schedule-linux.mjs'
 
 export const REPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
-// 连示例文件都读不到时的兜底:照旧 08:00/08:30 错峰。
 const HARD_DEFAULTS = {
     version: 1,
     timezone: 'Asia/Shanghai',
@@ -29,7 +29,6 @@ const PROGRAM_DEFAULTS = { intervalMinutes: 60, windowHours: 14, maxAttemptsPerD
 export const scheduleFile = () => process.env.HAC_SCHEDULE_FILE || path.join(REPO_DIR, 'config', 'schedule.json')
 export const exampleFile = () => path.join(REPO_DIR, 'config', 'schedule.example.json')
 
-// 去掉 _readme 之类的说明键,免得它们参与合并与校验。
 function stripMeta(value) {
     if (Array.isArray(value)) return value.map(stripMeta)
     if (!value || typeof value !== 'object') return value
@@ -48,7 +47,7 @@ function readJson(file) {
 }
 
 function shallowMerge(base, over) {
-    const out = { ...base, ...over, stagger: { ...base.stagger, ...over.stagger }, programs: {} }
+    const out = { ...base, ...over, stagger: { ...base.stagger, ...over.stagger }, linux: { ...base.linux, ...over.linux }, programs: {} }
     for (const id of new Set([...Object.keys(base.programs || {}), ...Object.keys(over.programs || {})])) {
         out.programs[id] = { ...PROGRAM_DEFAULTS, ...(base.programs?.[id] || {}), ...(over.programs?.[id] || {}) }
     }
@@ -160,9 +159,10 @@ export function normalize(raw) {
             opportunities
         }
     }
+    const linux = normalizeLinux(raw.linux, errors)
     if (errors.length) throw new ScheduleError(`调度配置有 ${errors.length} 处问题:\n  - ${errors.join('\n  - ')}`)
     const timezone = String(raw.timezone || HARD_DEFAULTS.timezone)
-    return { version: raw.version ?? 1, timezone, order: Object.keys(resolved).sort((a, b) => resolved[a].order - resolved[b].order), stagger, programs: resolved, notes }
+    return { version: raw.version ?? 1, timezone, linux, order: Object.keys(resolved).sort((a, b) => resolved[a].order - resolved[b].order), stagger, programs: resolved, notes }
 }
 
 /** 一行话,给人和报告看。 */

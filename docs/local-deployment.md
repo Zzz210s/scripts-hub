@@ -87,7 +87,10 @@
 - 白天的周期重复只为「给多次机会」:开机晚、机器忙、关机,错过的那次直接丢失(计划任务不补跑),
   靠窗口内的下一次补上;程序自己的幂等守卫保证重复触发无害。
 - 智慧树刷课**没有**计划任务,手动运行。
-- 本机计划任务与 `docs/scheduling-convention.md` 里的云主机 systemd timer 是一一对应的两套外壳。
+- 本机计划任务是**每个程序一个任务**(登录触发 + 每日窗口);云主机/容器是**单套件**
+  `automation-suite.timer`(08:00 与 12:00、`Persistent=true`、`run-all.sh` 顺序跑完所有程序)。
+  两套外壳不同,运维同一套约定(单实例锁、一天一次幂等、看门狗、通知)—— 见
+  [`scheduling-convention.md`](scheduling-convention.md) 第 1 节与 [`docker-deployment.md`](docker-deployment.md)。
 
 查看与操作:
 

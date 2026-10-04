@@ -1,4 +1,5 @@
-// 触发器的生成物(Windows 任务 XML / systemd unit)与动作路径解析 —— apply-schedule.mjs 的纯函数部分。
+// Windows 计划任务触发器的生成物(task XML)与动作路径解析 —— apply-schedule.mjs 的纯函数部分。
+// Linux 侧的单套件 systemd unit 在 scripts/lib/schedule-linux.mjs。
 //
 // 只把归一化后的 program 对象变成字符串,不读写任何本机文件,便于干跑与测试。
 import fs from 'node:fs'
@@ -89,13 +90,3 @@ export function windowsXml(p, { user, action }) {
 export const windowsRegisterPs1 = (p) =>
     `# 注册 ${p.taskName}:任务名与触发器都来自 config/schedule.json(生成物,别手改)\n` +
     `Register-ScheduledTask -TaskName '${p.taskName}' -Xml (Get-Content -Raw '${p.taskName}.xml') -Force | Out-Null\n`
-
-export const systemdTimer = (p, timezone) =>
-    `# 由 scripts/apply-schedule.mjs 从 config/schedule.json 生成;时区 ${timezone}(systemd 按主机本地时区解析)\n` +
-    `[Unit]\nDescription=自动化套件 ${p.id} 每日触发窗口\n\n` +
-    `[Timer]\nOnCalendar=*-*-* ${p.startTime}:00\nPersistent=false\nUnit=${p.id}.service\n\n[Install]\nWantedBy=timers.target\n`
-
-export const systemdService = (p, dir) =>
-    `[Unit]\nDescription=自动化套件 ${p.id}(一次性运行,跑完退出)\n\n` +
-    `[Service]\nType=oneshot\nWorkingDirectory=${dir}/${p.id}\n` +
-    `ExecStart=${p.runScript || `/bin/false  # 部署时改成 ${p.id} 的运行器路径`}\n`

@@ -65,9 +65,10 @@
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `apply-schedule.mjs` | 按配置生成 Windows 任务 XML 与 systemd timer;`--apply --yes` 真注册(Windows) | 改完时间、换机恢复、加新程序 | 默认 `--dry-run` 只打印;`--dest=<目录>` 落盘生成物,`--emit=windows\|systemd\|both`、`--only=<程序id>` 收窄;动作路径的 `%REWARDS_DIR%` 类占位符从机器私有的 `local-paths.env` 展开,填不了时 `--apply` 直接拒绝 |
+| `apply-schedule.mjs` | 按配置生成**两类**目标:Windows 每程序任务 XML + Linux 单套件 systemd unit;`--apply --yes` 真注册(只 Windows) | 改完时间、换机恢复、加新程序 | 默认 `--dry-run` 只打印;`--dest=<目录>` 落盘生成物,`--emit=windows\|systemd\|both`、`--only=<程序id>` 收窄;动作路径的 `%REWARDS_DIR%` 类占位符从机器私有的 `local-paths.env` 展开,填不了时 `--apply` 直接拒绝;Linux 侧权威实现在 `scripts/linux/` |
 | `lib/schedule.mjs` | 读 + 校验 + 归一化配置;库,兼一个只读小 CLI(`show` / `expect` / `json`) | 被 `apply-schedule.mjs` 与 `deploy-*.sh` 调用 | `startTime` / `logonDelayMinutes` 写 `auto` 就在这按 `order` 与 `stagger` 推导 |
-| `lib/schedule-targets.mjs` | 生成物(XML / unit)与动作路径解析 —— 纯函数 | 同上 | 不读写任何本机文件,便于干跑与测试 |
+| `lib/schedule-targets.mjs` | Windows 任务 XML 生成与动作路径解析 —— 纯函数 | 同上 | 不读写任何本机文件,便于干跑与测试 |
+| `lib/schedule-linux.mjs` | Linux 单套件 unit(`automation-suite.{timer,service}`)的配置归一化与文本生成 | 同上 | 形态对齐 `scripts/linux/systemd/`(权威);不读写任何本机文件 |
 
 `deploy-*.sh` 第 6 步会拿 `expect` 的输出与**本机任务的实际触发器**逐项比对,不一致报 `[缺]`。
 
