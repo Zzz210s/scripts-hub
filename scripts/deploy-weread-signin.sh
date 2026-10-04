@@ -43,6 +43,7 @@ done
 TARGET="${DEST:-$SOURCE}"
 
 BLOCK=0
+SAME_SOURCE=0
 ok() { printf '[通过] %s\n' "$*"; }
 info() { printf '[提示] %s\n' "$*"; }
 miss() { printf '[缺]   %s\n' "$*"; }
@@ -97,15 +98,22 @@ if [[ -d "$TARGET/.git" ]]; then
   ok '目标是一个 git 仓库'
   snap_commit=$(sed -n 's/^source commit: //p' "$SNAP/SNAPSHOT.txt" 2>/dev/null | head -1)
   have_commit=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || echo '')
-  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" != "$have_commit" ]]; then
-    miss "工作区 HEAD($have_commit) 与快照源提交($snap_commit)不一致 —— 先用 scripts/sync-weread-signin.sh 同步;确要用快照覆盖工作区加 --force"
-    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖:工作区比快照新,先同步再部署(--force 可跳过)'; fi
+  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" == "$have_commit" ]]; then
+    SAME_SOURCE=1
+    info "工作区与快照同源($have_commit)—— 它是权威工作区,快照里的占位符不应写回去"
+    info '要更新仓库请用 scripts/sync-weread-signin.sh;确要用快照覆盖加 --force'
+    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖与快照同源的工作区(--force 可跳过)'; fi
+  elif [[ -n "$snap_commit" && -n "$have_commit" ]]; then
+    info "工作区在 $have_commit,快照源提交 $snap_commit —— 按恢复流程刷新"
   fi
 else
   info '目标不是 git 仓库(工作区可以是普通目录;从上游装的本体通常带 .git)'
 fi
 
 step '3/6 刷新快照文件'
+if ((SAME_SOURCE)) && ((!FORCE)); then
+  info '跳过文件刷新:工作区与快照同源,它是权威副本;恢复时才用快照覆盖(--force 可强制)'
+else
 changed=0
 added=0
 same=0
@@ -133,6 +141,7 @@ for rel in "${files[@]}"; do
 done
 info "共 $total 个文件:未变 $same,更新 $changed,新增 $added"
 if ((APPLY)); then info '已写入目标'; else info 'dry-run 未写任何文件'; fi
+fi
 
 step '4/6 凭据与配置'
 for f in read-request.curl weread-api-key.txt; do
