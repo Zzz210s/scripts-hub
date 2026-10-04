@@ -4,8 +4,9 @@
 # 默认 --dry-run(只报告差异与缺项,不写任何文件);--apply 才写入。
 # 不碰计划任务 —— 只检查 MicrosoftRewardsScript / AutoShutdown0200;缺了给出注册命令。
 #
-# 用法:bash scripts/deploy-microsoft-rewards.sh [--dry-run|--apply] [--dest=<目录>]
+# 用法:bash scripts/deploy-microsoft-rewards.sh [--dry-run|--apply] [--dest=<目录>] [--force]
 #   --dest=<目录>  写到别处(验证用临时目录);默认写回权威工作区 %REWARDS_DIR%
+#   --apply 写文件;工作区 HEAD 与快照源提交不一致时拒绝覆盖,--force 可跳过
 # 退出码:--dry-run 恒为 0;--apply 有阻塞项时为 1。“缺什么”都以 [缺] 行给出下一步。
 #
 # 只回写源仓库本来就有的文件:快照里由合集层维护的 README.md / QUICKSTART.md / SNAPSHOT.txt
@@ -30,11 +31,13 @@ KEEP=(README.md SNAPSHOT.txt QUICKSTART.md)
 PROTECT=(config.json)
 
 APPLY=0
+FORCE=0
 DEST=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run) APPLY=0 ;;
     --apply) APPLY=1 ;;
+    --force) FORCE=1 ;;
     --dest=*) DEST="${arg#*=}" ;;
     -h | --help) sed -n '2,13p' "$0"; exit 0 ;;
     *) printf '未知参数:%s\n' "$arg" >&2; exit 2 ;;
@@ -91,7 +94,17 @@ elif ((APPLY)); then
 else
   info "目标目录不存在,apply 时会创建"
 fi
-if [[ -d "$TARGET/.git" ]]; then ok '目标是一个 git 仓库(权威工作区)'; else info '目标不是 git 仓库'; fi
+if [[ -d "$TARGET/.git" ]]; then
+  ok '目标是一个 git 仓库(权威工作区)'
+  snap_commit=$(sed -n 's/^source commit: //p' "$SNAP/SNAPSHOT.txt" 2>/dev/null | head -1)
+  have_commit=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || echo '')
+  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" != "$have_commit" ]]; then
+    miss "工作区 HEAD($have_commit) 与快照源提交($snap_commit)不一致 —— 先用 scripts/sync-microsoft-rewards.sh 同步;确要用快照覆盖工作区加 --force"
+    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖:工作区比快照新,先同步再部署(--force 可跳过)'; fi
+  fi
+else
+  info '目标不是 git 仓库'
+fi
 if [[ -d "$TARGET/patches" ]]; then info '工作区 patches/ 保留(补丁不在快照里,合集层统一存档)'; fi
 
 step '3/6 刷新快照文件'

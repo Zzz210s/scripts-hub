@@ -4,8 +4,9 @@
 # 默认 --dry-run(只报告差异与缺项,不写任何文件);--apply 才写入。
 # 不碰计划任务 —— 只检查 WeReadSignIn 是否存在、触发器是否符合约定;缺了给出注册命令。
 #
-# 用法:bash scripts/deploy-weread-signin.sh [--dry-run|--apply] [--dest=<目录>]
+# 用法:bash scripts/deploy-weread-signin.sh [--dry-run|--apply] [--dest=<目录>] [--force]
 #   --dest=<目录>  写到别处(验证用临时目录);默认写回权威工作区 %WEREAD_DIR%
+#   --apply 写文件;工作区 HEAD 与快照源提交不一致时拒绝覆盖,--force 可跳过
 # 退出码:--dry-run 恒为 0;--apply 有阻塞项时为 1。“缺什么”都以 [缺] 行给出下一步。
 set -euo pipefail
 
@@ -23,12 +24,17 @@ if [[ -f "$LOCAL_PATHS_FILE" ]]; then
 fi
 SOURCE="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 
+# 合集层维护、不部署的文件(不是源仓库里的文件)
+KEEP=(SNAPSHOT.txt QUICKSTART.md)
+
 APPLY=0
+FORCE=0
 DEST=""
 for arg in "$@"; do
   case "$arg" in
     --dry-run) APPLY=0 ;;
     --apply) APPLY=1 ;;
+    --force) FORCE=1 ;;
     --dest=*) DEST="${arg#*=}" ;;
     -h | --help) sed -n '2,10p' "$0"; exit 0 ;;
     *) printf '未知参数:%s\n' "$arg" >&2; exit 2 ;;
@@ -45,6 +51,13 @@ bad() {
   BLOCK=1
 }
 step() { printf '\n== %s ==\n' "$*"; }
+in_list() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do [[ "$item" == "$needle" ]] && return 0; done
+  return 1
+}
 
 # "Ready MSFT_TaskLogonTrigger,MSFT_TaskDailyTrigger" 或空(不存在/不可查)
 task_line() {
@@ -82,6 +95,12 @@ else
 fi
 if [[ -d "$TARGET/.git" ]]; then
   ok '目标是一个 git 仓库'
+  snap_commit=$(sed -n 's/^source commit: //p' "$SNAP/SNAPSHOT.txt" 2>/dev/null | head -1)
+  have_commit=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || echo '')
+  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" != "$have_commit" ]]; then
+    miss "工作区 HEAD($have_commit) 与快照源提交($snap_commit)不一致 —— 先用 scripts/sync-weread-signin.sh 同步;确要用快照覆盖工作区加 --force"
+    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖:工作区比快照新,先同步再部署(--force 可跳过)'; fi
+  fi
 else
   info '目标不是 git 仓库(工作区可以是普通目录;从上游装的本体通常带 .git)'
 fi
@@ -93,7 +112,7 @@ same=0
 total=0
 mapfile -t files < <(git -C "$REPO_DIR" ls-files -- "$SNAP_REL" | sed "s|^$SNAP_REL/||")
 for rel in "${files[@]}"; do
-  [[ "$rel" == SNAPSHOT.txt ]] && continue
+  in_list "$rel" "${KEEP[@]}" && continue
   total=$((total + 1))
   src="$SNAP/$rel"
   dst="$TARGET/$rel"
