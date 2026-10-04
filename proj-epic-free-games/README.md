@@ -76,8 +76,26 @@ diffs it against the local state, and only then starts the browser engine.
 
 ## Install
 
+Every command below runs **from this directory** (`proj-epic-free-games/`). Starting from nothing:
+
 ```bash
-# 1. Engine dependencies (tests do not need them)
+git clone https://github.com/Zzz210s/scripts-hub.git
+cd scripts-hub/proj-epic-free-games
+```
+
+On this machine the repository is already cloned:
+
+```bash
+cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"
+```
+
+Skipping that `cd` is the most common failure: `node src/cli.js ...` from `~` resolves to
+`C:\Users\<you>\src\cli.js` and dies with `Cannot find module`. The CLI itself resolves all paths
+relative to the **project root**, not the current directory, so an absolute-path invocation works
+from anywhere.
+
+```bash
+# 1. Engine dependencies (tests do not need them; run inside the project directory)
 npm install
 npx patchright install chromium
 
@@ -94,11 +112,19 @@ mkdir -p secrets
 node scripts/apply-schedule.mjs --apply --yes
 ```
 
+On Windows, `scripts/windows/epic-status.bat`, `epic-login.bat` and `epic-run.bat` are
+convenience wrappers that `cd` to the project root themselves, so they work from cmd and Git Bash
+without any setup. `node src/cli.js --help` prints the same command list.
+
 `config/schedule.json` ships `epic-free-games.enabled: false`; turn it on after the manual login.
 
 ## Usage
 
+Run these from the project directory (or use the `scripts/windows/*.bat` wrappers, which handle
+that themselves):
+
 ```bash
+node src/cli.js --help           # command list
 node src/cli.js probe            # what is free now and what is coming, no login
 node src/cli.js status           # local state and today's attempt count
 node src/cli.js link 1           # prefilled checkout link for the first current game
@@ -153,6 +179,10 @@ game are pushed once per reason per day. When hCaptcha or an expired login gets 
 `scripts/windows/run-daily.bat` is the entry point: single-instance lock, daily quota, memory
 gate, then `node src/cli.js run`. It is launched hidden by `run-daily.vbs`. Registration goes
 through `config/schedule.json` (see `scripts/windows/README-autostart.md` for the guards table).
+
+For manual use there are three smaller wrappers that only `cd` to the project root and delegate to
+the CLI: `scripts/windows/epic-status.bat` (status / probe / auth), `epic-login.bat`, and
+`epic-run.bat` (accepts `--dry-run`).
 
 ## Testing
 

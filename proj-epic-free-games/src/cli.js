@@ -31,6 +31,26 @@ const config = loadConfig({ ...process.env, EPIC_DRY_RUN: flag('--dry-run') ? '1
 const log = (line) => process.stdout.write(`${line}\n`)
 const fail = (line) => process.stderr.write(`${line}\n`)
 
+// 所有路径都以项目根为基准(config.js 的 ROOT 取自 import.meta.dirname),
+// 因此从任何目录执行 `node <这里>/src/cli.js ...` 结果一致。
+const USAGE = `用法:node src/cli.js <命令> [选项]
+
+  probe              只看当期与预告的免费游戏(不登录)
+  status             本地状态与今日尝试次数
+  link <slug|序号>   打印某款游戏的预置结账链接
+  login [--browser]  设备授权登录一次(默认);--browser 走浏览器人工登录
+  auth               看 token 状态与到期时间
+  run [--dry-run]    探测 + 按需领取(计划任务入口)
+  report             打印状态摘要
+  pause | resume     暂停 / 恢复无人值守运行
+  help               显示本帮助
+
+  --dry-run          不联网、不起浏览器,只打印会发什么
+  -h, --help         显示本帮助
+
+从仓库外执行时用绝对路径,例如:
+  node C:/Users/<你>/home-automation-configs/proj-epic-free-games/src/cli.js status`
+
 const formatWindow = (game) => `${formatLocal(game.startAt)} - ${formatLocal(game.endAt)}`
 
 async function printProbe() {
@@ -84,7 +104,14 @@ async function printLink(query) {
 }
 
 async function main() {
+    if (flag('-h') || flag('--help')) {
+        log(USAGE)
+        return 0
+    }
     switch (command) {
+        case 'help':
+            log(USAGE)
+            return 0
         case 'probe':
             return printProbe()
         case 'status':
@@ -159,7 +186,7 @@ async function main() {
             return result.code
         }
         default:
-            fail('用法:node src/cli.js run|probe|status|link <slug|序号>|login [--browser]|auth|report|pause|resume [--dry-run]')
+            fail(USAGE)
             return 2
     }
 }

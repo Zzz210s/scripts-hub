@@ -67,8 +67,25 @@ vendor/free-games-claimer/  上游引擎,未改一行
 
 ## 安装
 
+下面每条命令都在**本目录**(`proj-epic-free-games/`)里跑。从零开始:
+
 ```bash
-# 1. 引擎依赖(测试不需要)
+git clone https://github.com/Zzz210s/scripts-hub.git
+cd scripts-hub/proj-epic-free-games
+```
+
+本机已经克隆过的话,直接用绝对路径进目录:
+
+```bash
+cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"
+```
+
+漏掉这一步是最常见的坑:在 `~` 里跑 `node src/cli.js ...` 会去解析 `C:\Users\<你>\src\cli.js`,
+报 `Cannot find module`。CLI 自身的路径解析以**项目根**为基准(不是当前目录),
+所以用绝对路径调用它,在哪个目录都能跑通。
+
+```bash
+# 1. 引擎依赖(测试不需要;必须在项目目录里跑)
 npm install
 npx patchright install chromium
 
@@ -85,11 +102,17 @@ mkdir -p secrets
 node scripts/apply-schedule.mjs --apply --yes
 ```
 
+Windows 下 `scripts/windows/epic-status.bat`、`epic-login.bat`、`epic-run.bat` 是自带 `cd` 的
+快捷入口,cmd 与 Git Bash 都能直接调,不用先跳目录。`node src/cli.js --help` 会打印同样的命令表。
+
 `config/schedule.json` 里 `epic-free-games.enabled` 默认是 `false`,人工登录过之后再打开。
 
 ## 用法
 
+在项目目录里跑(或直接用 `scripts/windows/*.bat` 快捷入口,它自己会 `cd`):
+
 ```bash
+node src/cli.js --help           # 命令表
 node src/cli.js probe            # 看当期与预告的免费游戏,不登录
 node src/cli.js status           # 本地状态与今日尝试次数
 node src/cli.js link 1           # 第 1 款游戏的预置结账链接
@@ -141,6 +164,10 @@ npm test                         # 离线单测
 `scripts/windows/run-daily.bat` 是入口:单实例锁 -> 当日配额 -> 内存闸门 -> `node src/cli.js run`;
 由 `run-daily.vbs` 隐藏窗口启动。注册走 `config/schedule.json`
 (守卫表见 `scripts/windows/README-autostart.md`)。
+
+手动用的话还有三个更小的入口,只做「`cd` 到项目根 + 转给 CLI」:
+`scripts/windows/epic-status.bat`(status / probe / auth)、`epic-login.bat`、
+`epic-run.bat`(可带 `--dry-run`)。
 
 ## 测试
 
