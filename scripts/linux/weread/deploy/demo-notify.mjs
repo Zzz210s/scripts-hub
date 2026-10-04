@@ -32,11 +32,9 @@ const send = async (label, text) => {
     console.log(`${label}: ${result.ok ? '已发送' : `失败(${result.error})`}`)
 }
 
-// 1) 开始自动阅读
-await send('开始自动阅读', buildStartMessage({ date, accountName }))
-
-// 2) 运行成功
-await send('运行成功', buildReport({
+const texts = {}
+texts['开始自动阅读'] = buildStartMessage({ date, accountName })
+texts['运行成功'] = buildReport({
     date, accountName, plan, config,
     run: { ok: true, minutes: 60, renewal: '凭据已续期 wr_skey', alert: null },
     data: {
@@ -46,10 +44,9 @@ await send('运行成功', buildReport({
         balance: null,
         memberCard: null
     }
-}))
+})
 
-// 3) 运行有失败
-await send('运行有失败', buildReport({
+texts['运行有失败'] = buildReport({
     date, accountName, plan, config,
     run: { ok: false, minutes: 12, renewal: null, alert: '读回校验失败:官方统计里没有本次分钟数' },
     data: {
@@ -59,7 +56,8 @@ await send('运行有失败', buildReport({
         balance: null,
         memberCard: null
     }
-}))
+})
 
-// 4) 需要你处理(唯一还会推送的跳过类)
-await send('需要你处理', buildSkipMessage({ reason: 'credential-invalid', detail: 'HTTP 401', plan, config, date, accountName }))
+texts['需要你处理'] = buildSkipMessage({ reason: 'credential-invalid', detail: 'HTTP 401', plan, config, date, accountName })
+
+for (const [label, text] of Object.entries(texts)) await send(label, text)
