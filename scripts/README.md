@@ -91,8 +91,10 @@
   自维护、不写不删的文件,`SKIP` 是源仓库里不发布的路径前缀,`EXTRA` 是源仓库未跟踪但要发布的文件,
   `RENAMES` 是路径改名。脱敏标识从不写进脚本,而是运行时从机器私有 `sensitive-patterns.txt` 读;
   **找不到该文件或脱敏规则自检失败时脚本会拒绝同步**,不要为了省事跳过这个防线。
-- `wizard-public-reset.sh` 与 `wizard-oracle.sh` 顶部是跨向导共用的库段(`# ───` 之上),
-  改行为改库段,改步骤在 `STAGES` 之下。
+- `wizard-*.sh` 只留流程编排与阶段跳转(阶段在 `STAGES` 标记之下)。输出/交互/值持久化在
+  `lib/wizard-common.sh`(两个向导共用);`wizard-public-reset.sh` 的路径与敏感模式配置在
+  `lib/reset-common.sh`、备份/SHA/topics 校验在 `lib/reset-verify.sh`、GitHub 动作与推送后校验在
+  `lib/reset-gh.sh`。改向导通用行为改库段,不要在单个向导里另写一份。
 - `scripts/lib/` 是 `deploy-*.sh` 共用的片段:`deploy-common.sh` 管输出/参数/同源检测/授权闸门,
   `deploy-plan.sh` 管文件计划/备份/二次确认/落盘。改部署行为改这两处,不要在单个 `deploy-*.sh` 里另写一份。
 - 提交前 `bash -n scripts/*.sh scripts/lib/*.sh` 与 `shellcheck scripts/*.sh scripts/lib/*.sh` 都应无输出;
