@@ -5,14 +5,14 @@
 | | |
 | --- | --- |
 | 程序本体 | 上游 [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2(GPL-3.0)+ `../patches/microsoft-rewards/` 的三个补丁 |
-| 权威工作区 | `E:\Microsoft-Rewards-Script-4.3.2`(本机本地 git 仓库,只有 upstream 远端,没有自己的 origin) |
+| 权威工作区 | `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端,没有自己的 origin) |
 | 本目录 | 那个工作区已跟踪文件的**同步快照**(`../scripts/sync-microsoft-rewards.sh` 生成),本仓库就是它的远程落点 |
 | 装在哪 | `%REWARDS_DIR%`(路径约定见仓库根 README) |
 | 跑在哪台机器 | 本机 Windows |
 | 什么时候跑 | 计划任务 `MicrosoftRewardsScript`:登录后 3 分钟(其后 1 小时内每 10 分钟重试)+ 每天 08:00 起每 2 小时一次(14 小时窗口),一天最多 3 次尝试 |
 | 许可 | GPL-3.0(上游 `LICENSE` 一并同步;本仓库整体也是 GPL-3.0) |
 
-**不要直接改这个目录里的代码。** 它是生成快照:改动先落在权威工作区 `E:\Microsoft-Rewards-Script-4.3.2`
+**不要直接改这个目录里的代码。** 它是生成快照:改动先落在权威工作区 `%REWARDS_DIR%`
 (在那提交),再跑 `bash scripts/sync-microsoft-rewards.sh`,然后在本仓库提交推送。取快照的源提交记录在
 `SNAPSHOT.txt`;上游原版 README 同步为 `README.upstream.md`。完整工作模型见
 [`../docs/workspace-model.md`](../docs/workspace-model.md)。

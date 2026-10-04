@@ -9,8 +9,8 @@
 
 | 项目 | 权威工作区(改代码的地方) | 本仓库落点 | 怎么进仓库 |
 | --- | --- | --- | --- |
-| 微软积分 | `E:\Microsoft-Rewards-Script-4.3.2` = `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端) | `microsoft-rewards/` | `bash scripts/sync-microsoft-rewards.sh` |
-| 微信读书签到 | `E:\weread-signin` = `%WEREAD_DIR%`(本机本地克隆,无远端) | `weread-signin/` | `bash scripts/sync-weread-signin.sh` |
+| 微软积分 | `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端) | `microsoft-rewards/` | `bash scripts/sync-microsoft-rewards.sh` |
+| 微信读书签到 | `%WEREAD_DIR%`(本机本地克隆,无远端) | `weread-signin/` | `bash scripts/sync-weread-signin.sh` |
 | 企业微信通知 | 就是本仓库 `wecom-notify/`(原独立私有仓库已删除,这里现在是唯一副本) | `wecom-notify/` | 直接在本仓库改 |
 | 智慧树刷课 | 无代码可改:程序本体是上游 Windows 打包程序,本仓库只存配置 | `autovisor/`(只有 `configs.ini` 与 README) | 直接改配置 |
 
