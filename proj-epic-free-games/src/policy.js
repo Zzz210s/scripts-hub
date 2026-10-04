@@ -21,9 +21,14 @@ export const ACTION_KINDS = {
         consequence: '验证通过前领不到,这个周期结束后不能补领'
     },
     login: {
-        please: '请你:重跑一次带界面的登录并完成登录',
-        reason: '浏览器登录态已失效',
-        consequence: '登录态恢复前无法自动领取,这个周期结束后不能补领'
+        please: '请你:在本机跑 node src/cli.js login,打开它给出的链接完成一次登录',
+        reason: 'Epic 登录令牌已失效或被吊销',
+        consequence: '不重新登录就无法自动领取,这个周期结束后不能补领'
+    },
+    'auth-network': {
+        please: '请你:无需操作,程序会在下一次触发时自动重试;若一直失败就跑 node src/cli.js login',
+        reason: '续期登录令牌时网络失败',
+        consequence: '本轮没领到,下一次触发会再试,这个周期结束后不能补领'
     },
     blocked: {
         please: '请你:手动去商店页看看这款游戏',

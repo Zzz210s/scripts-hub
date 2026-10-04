@@ -69,6 +69,16 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         return { code: 0, skipped: 'nothing-new', upcoming: probed.upcoming }
     }
 
+    // 先保证有可用登录态:有 token 就续期并注入 profile;都没有才退回 profile 既有会话。
+    const ensure = deps.ensureSession ?? (async () => ({ ok: true, mode: 'none' }))
+    const session = await ensure({ config, now, log })
+    if (session.warn) log(`[警告] ${session.warn}`)
+    if (!session.ok) {
+        log(`[跳过] auth-failed · ${session.error}`)
+        await deps.send(buildActionMessage({ date, account, kind: session.needsLogin ? 'login' : 'auth-network', items: [] }))
+        return { code: 1, error: session.error, session }
+    }
+
     recordAttempt(state, now)
     saveState(config.stateFile, state, now)
     log(`[领取] ${pending.map((game) => game.title).join(', ')}`)

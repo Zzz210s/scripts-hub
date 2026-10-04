@@ -82,7 +82,7 @@ test('action 正文首句是 请你:,并逐条给结账链接', () => {
 
 test('login 型 action 不给结账链接', () => {
     const text = buildActionMessage({ date: DATE, kind: 'login', items: [{ title: 'TerraScape' }] })
-    assert.match(text, /登录态已失效/)
+    assert.match(text, /登录令牌已失效/)
     assert.doesNotMatch(text, /结账链接/)
 })
 

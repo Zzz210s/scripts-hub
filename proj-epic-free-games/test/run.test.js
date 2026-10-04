@@ -84,7 +84,7 @@ test('登录态失效:发需要你处理且不给结账链接', async () => {
         readDb: () => ({})
     })
     await runOnce({ config, deps, now: NOW })
-    assert.match(calls.sent[1], /登录态已失效/)
+    assert.match(calls.sent[1], /登录令牌已失效/)
     assert.doesNotMatch(calls.sent[1], /结账链接/)
 })
 
@@ -149,4 +149,33 @@ test('状态可注入以便复用(不落盘也能算)', async () => {
     saveState(config.stateFile, state)
     await runOnce({ config, deps, now: NOW })
     assert.equal(loadState(config.stateFile).state.account, 'TestUser')
+})
+
+test('登录令牌被吊销:发需要你处理的登录提示,不启动引擎', async () => {
+    const { config, deps, calls } = setup({ ensureSession: async () => ({ ok: false, needsLogin: true, error: 'refresh_token 已失效' }) })
+    const result = await runOnce({ config, deps, now: NOW })
+    assert.equal(result.code, 1)
+    assert.equal(calls.engine, 0)
+    assert.equal(calls.sent.length, 1)
+    assert.match(calls.sent[0], /需要你处理/)
+    assert.match(calls.sent[0], /node src\/cli\.js login/)
+})
+
+test('续期网络失败:发可重试的提示,不启动引擎也不给结账链接', async () => {
+    const { config, deps, calls } = setup({ ensureSession: async () => ({ ok: false, network: true, error: 'HTTP 503' }) })
+    const result = await runOnce({ config, deps, now: NOW })
+    assert.equal(result.code, 1)
+    assert.equal(calls.engine, 0)
+    assert.match(calls.sent[0], /下一次触发时自动重试/)
+    assert.doesNotMatch(calls.sent[0], /结账链接/)
+})
+
+test('会话就绪:注入成功后照常发 start 并跑引擎', async () => {
+    let called = 0
+    const { config, deps, calls } = setup({ ensureSession: async () => { called++; return { ok: true, mode: 'refreshed', injected: true } } })
+    const result = await runOnce({ config, deps, now: NOW })
+    assert.equal(result.code, 0)
+    assert.equal(called, 1)
+    assert.equal(calls.engine, 1)
+    assert.match(calls.sent[0], /开始领取/)
 })
