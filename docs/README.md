@@ -12,6 +12,7 @@
 | [notification-convention.md](notification-convention.md) | 会发哪几种企业微信消息,每种长什么样,文案有哪些硬规则 | 改消息内容或新增消息类型 |
 | [wecom-rules.md](wecom-rules.md) | 企业微信 webhook 的共享约束:接口形态、字节上限与截断、超时与重试、errcode 处理、发送频率,以及各项目实现的位置 | 改发送层、调消息长度或排查发送失败 |
 | [cloud-vm.md](cloud-vm.md) | 为什么要一台云主机、评估过哪些替代方案、代价是什么 | 考虑云迁移,或想知道现在为什么还没上云 |
+| [docker-deployment.md](docker-deployment.md) | 云主机上的容器化部署:分层与布局、systemd 顺序编排、守卫与看门狗、启动时间优化、构建坑、凭据与运维 | 部署/升级云主机上的自动化程序,或排查「今天没跑」 |
 | [credentials.md](credentials.md) | 哪个文件要填什么、去哪拿、有效期多久、失效后怎么恢复 | 初次部署、凭据失效、换机恢复 |
 
 不在 `docs/` 里的:
