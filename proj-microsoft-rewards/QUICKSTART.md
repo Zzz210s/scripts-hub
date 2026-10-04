@@ -12,7 +12,7 @@
 ## 三条命令
 
 ```bash
-cd microsoft-rewards
+cd proj-microsoft-rewards
 npm ci && npx patchright install chromium   # 依赖 + 浏览器
 cp env.example .env                          # 再填 ACCOUNT_1_EMAIL / ACCOUNT_1_PASSWORD
 npm run build && node --test wechat-bridge/test/*.test.js

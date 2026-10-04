@@ -9,10 +9,12 @@
 
 | 项目 | 权威工作区(改代码的地方) | 本仓库落点 | 怎么进仓库 |
 | --- | --- | --- | --- |
-| 微软积分 | `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端) | `microsoft-rewards/` | `bash scripts/sync-microsoft-rewards.sh` |
-| 微信读书签到 | `%WEREAD_DIR%`(本机本地克隆,无远端) | `weread-signin/` | `bash scripts/sync-weread-signin.sh` |
-| 企业微信通知 | 就是本仓库 `wecom-notify/`(原独立私有仓库已删除,这里现在是唯一副本) | `wecom-notify/` | 直接在本仓库改 |
-| 智慧树刷课 | 无代码可改:程序本体是上游 Windows 打包程序,本仓库只存配置 | `autovisor/`(只有 `configs.ini` 与 README) | 直接改配置 |
+| 微软积分 | `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端) | `proj-microsoft-rewards/` | `bash scripts/sync-microsoft-rewards.sh` |
+| 微信读书签到 | `%WEREAD_DIR%`(本机本地克隆,无远端) | `proj-weread-signin/` | `bash scripts/sync-weread-signin.sh` |
+| 智慧树刷课 | 无代码可改:程序本体是上游 Windows 打包程序,本仓库只存配置 | `proj-autovisor/`(只有 `configs.ini` 与 README) | 直接改配置 |
+
+企业微信发送不再是独立项目:实现分散在各项目内,共享约束与规则见
+[`docs/wecom-rules.md`](wecom-rules.md),一致性由 `scripts/check-wecom-drift.mjs` 守住。
 
 ***换机后,`%REWARDS_DIR%` 与 `%WEREAD_DIR%` 就是要从本仓库恢复出来的目录。***
 
@@ -27,13 +29,13 @@ git add <显式路径> && git commit
 
 cd <hub>                     # 2. 发布成本仓库的快照
 bash scripts/sync-microsoft-rewards.sh        # 先 --dry-run 看差异也行
-git add microsoft-rewards && git status        # 3. 复核后提交推送
+git add proj-microsoft-rewards && git status     # 3. 复核后提交推送
 git commit && git push
 ```
 
-微信读书把脚本换成 `scripts/sync-weread-signin.sh`,落点换成 `weread-signin/`,流程一样。
+微信读书把脚本换成 `scripts/sync-weread-signin.sh`,落点换成 `proj-weread-signin/`,流程一样。
 
-**不要直接改 `microsoft-rewards/` 或 `weread-signin/` 里的文件** —— 它们是生成快照,下次同步会
+**不要直接改 `proj-microsoft-rewards/` 或 `proj-weread-signin/` 里的文件** —— 它们是生成快照,下次同步会
 覆盖回去。要改的说明文档、约定、补丁不进快照:
 
 - 跨项目约定 → `docs/`
@@ -57,8 +59,8 @@ git commit && git push
 
 | 脚本 | 权威工作区 | 落点 | 关键行为 |
 | --- | --- | --- | --- |
-| `scripts/sync-microsoft-rewards.sh` | `%REWARDS_DIR%` | `microsoft-rewards/` | 发布 `git ls-files` + 白名单 `config.json`;跳过 `patches/` 与测试垃圾;`README.md` 发布为 `README.upstream.md`;去本机化 + 脱敏(缺机器私有清单直接报错) |
-| `scripts/sync-weread-signin.sh` | `%WEREAD_DIR%` | `weread-signin/` | 发布 `git ls-files`;README 顶部重写快照说明;机器相关的 `WORKSPACE.md` 不发布 |
+| `scripts/sync-microsoft-rewards.sh` | `%REWARDS_DIR%` | `proj-microsoft-rewards/` | 发布 `git ls-files` + 白名单 `config.json`;跳过 `patches/` 与测试垃圾;`README.md` 发布为 `README.upstream.md`;去本机化 + 脱敏(缺机器私有清单直接报错) |
+| `scripts/sync-weread-signin.sh` | `%WEREAD_DIR%` | `proj-weread-signin/` | 发布 `git ls-files`;README 顶部重写快照说明;机器相关的 `WORKSPACE.md` 不发布 |
 
 两个脚本都带 `--dry-run`(只报告差异)、都写 `SNAPSHOT.txt`(记录源提交),都可重复运行(幂等)。
 

@@ -1,5 +1,5 @@
 source: local development clone %WEREAD_DIR%, tracked files only
-published in: Zzz210s/scripts-hub -> weread-signin/
+published in: Zzz210s/scripts-hub -> proj-weread-signin/
 source commit: e0cad7300e0d258d30bcec859bfec7e50cb27e26
 source commit date: 2026-10-04T15:30:03+08:00
 synced file count: 75

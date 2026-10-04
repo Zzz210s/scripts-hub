@@ -22,8 +22,8 @@
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `sync-weread-signin.sh` | 把本机开发克隆 `%WEREAD_DIR%` 的已跟踪文件同步成仓库 `weread-signin/` 的快照 | 每次改完微信读书代码、准备提交前 | 只复制 `git ls-files` 列出的文件;`KEEP` 里的 `QUICKSTART.md` 不被触碰;README 顶部快照说明每次重写 |
-| `sync-microsoft-rewards.sh` | 把权威工作区 `%REWARDS_DIR%` 的已跟踪文件同步成仓库 `microsoft-rewards/` 的快照 | 每次改完微软积分代码或运行器、准备提交前 | 只复制 `git ls-files` + 白名单 `config.json`;跳过 `patches/`;去本机化 + 按机器私有清单脱敏;`--dry-run` 只报告差异 |
+| `sync-weread-signin.sh` | 把本机开发克隆 `%WEREAD_DIR%` 的已跟踪文件同步成仓库 `proj-weread-signin/` 的快照 | 每次改完微信读书代码、准备提交前 | 只复制 `git ls-files` 列出的文件;`KEEP` 里的 `QUICKSTART.md` 不被触碰;README 顶部快照说明每次重写 |
+| `sync-microsoft-rewards.sh` | 把权威工作区 `%REWARDS_DIR%` 的已跟踪文件同步成仓库 `proj-microsoft-rewards/` 的快照 | 每次改完微软积分代码或运行器、准备提交前 | 只复制 `git ls-files` + 白名单 `config.json`;跳过 `patches/`;去本机化 + 按机器私有清单脱敏;`--dry-run` 只报告差异 |
 
 ## 自检引导(全新克隆到能跑)
 
@@ -33,14 +33,13 @@
 | --- | --- | --- |
 | `setup-weread-signin.sh` | Node >= 20.11、Python、`.env`/`config.yaml` 模板、`secrets/` 凭据、底座 vendor、218 条离线测试、本地 `status` 干跑 | 默认不联网;`--vendor` 才克隆底座 |
 | `setup-microsoft-rewards.sh` | Node >= 24、`npm ci`、patchright chromium、`.env` 模板、`npm run build`、26 条离线测试 | 默认联网(依赖与浏览器);`--no-install --no-browser --no-build` 可只跑离线测试 |
-| `setup-wecom-notify.sh` | Node >= 18、8 条离线测试、webhook 就位情况、CLI `--dry-run` 干跑 | 不联网;`--install` 才注册全局命令 |
 | `setup-autovisor.sh` | `configs.ini` 是否存在、课程链接是否受支持、账号密码是否留空、程序本体是否解压 | 不联网 |
 
 ## 检查
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `check-wecom-drift.mjs` | 比对三份企业微信发送实现里 `wecom-core` 核心块是否逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印块大小;权威是 `wecom-notify/src/wecom.js` |
+| `check-wecom-drift.mjs` | 比对两份企业微信发送实现(`proj-microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `proj-weread-signin/src/notify.js`)里 `wecom-core` 核心块是否彼此逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印各块大小与差异位置;规则见 `../docs/wecom-rules.md` |
 | `check-privacy.mjs` | 扫 `git ls-files` 的每个文件:本机路径、真实邮箱、`wrk-` 真 key、webhook 真 key、手机号、机器私有标识清单里的词 | 提交前、发布前,或定期体检 | `node scripts/check-privacy.mjs` 命中退出 1;`--verbose` 打印规则数;私有清单读 `SENSITIVE_PATTERNS_FILE`(默认 `~/.config/automation-suite/sensitive-patterns.txt`),读不到只跑通用规则 |
 
 ## 路径与凭据
@@ -62,7 +61,7 @@
 ## 改动这些脚本时
 
 - `sync-weread-signin.sh` 的 `KEEP` 列表决定快照目录里哪些文件不被同步触碰(现在只有 `SNAPSHOT.txt`
-  与 `QUICKSTART.md`)。往 `weread-signin/` 放手写文件会让快照目录不再「纯生成」,应改放到 `machine/`
+  与 `QUICKSTART.md`)。往 `proj-weread-signin/` 放手写文件会让快照目录不再「纯生成」,应改放到 `machine/`
   或 `docs/`。
 - `sync-microsoft-rewards.sh` 的 `KEEP`/`SKIP`/`EXTRA`/`RENAMES` 是一张显式清单:`KEEP` 是本目录
   自维护、不写不删的文件,`SKIP` 是源仓库里不发布的路径前缀,`EXTRA` 是源仓库未跟踪但要发布的文件,

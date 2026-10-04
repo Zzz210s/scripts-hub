@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Zzz210s/scripts-hub.git",
-    "directory": "weread-signin"
+    "directory": "proj-weread-signin"
   },
   "engines": {
     "node": ">=20.11.0"

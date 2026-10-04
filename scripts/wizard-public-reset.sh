@@ -9,7 +9,7 @@
 # 本地目录名沿用 home-automation-configs(只改远程仓库名,免得带偏本机计划任务)。
 # 备份镜像:优先新名 scripts-hub-backup-*.git,同时接受更名前的旧名
 # home-automation-configs-backup-*.git —— 两种名字都算合格备份。
-# weread-signin 已并入本仓库的 weread-signin/ 快照,不再有独立仓库要处理。
+# weread-signin 已并入本仓库的 proj-weread-signin/ 快照,不再有独立仓库要处理。
 #
 # 不重领微信读书 API Key:Key 片段进过 git 历史,但仓库当时是私有的、旧 SHA 从未公开,
 # 用户判断不必轮换。本向导只读取现有 Key,推送后用它跑一次只读校验。
@@ -479,9 +479,9 @@ say "备份按新名 scripts-hub-backup-*.git 查找,同时接受旧名 home-aut
 check_backup "scripts-hub / home-automation-configs" HAC_BACKUP "${HAC_BACKUP_GLOBS[@]}"
 [[ -d "$HAC_DIR/.git" ]] || wsh_die "找不到本地仓库:$HAC_DIR" "重建后要推的就是它,缺了先克隆一份。"
 wsh_ok "旧名 $OLD_SLUG · 本地克隆在 $HAC_DIR($(git -C "$HAC_DIR" rev-list --count main) 个提交,工作区 $(git -C "$HAC_DIR" status --porcelain | wc -l) 处改动)"
-[[ -f "$HAC_DIR/weread-signin/README.md" ]] || wsh_die "$HAC_DIR/weread-signin 里没有快照。" \
-  "先跑 bash scripts/sync-weread-signin.sh 把 weread-signin 代码同步进来,再重跑本向导。"
-wsh_ok "weread-signin 快照已就位($(git -C "$HAC_DIR" ls-files weread-signin | wc -l) 个已入库文件)"
+[[ -f "$HAC_DIR/proj-weread-signin/README.md" ]] || wsh_die "$HAC_DIR/proj-weread-signin 里没有快照。" \
+  "先跑 bash scripts/sync-weread-signin.sh 把 proj-weread-signin 代码同步进来,再重跑本向导。"
+wsh_ok "proj-weread-signin 快照已就位($(git -C "$HAC_DIR" ls-files proj-weread-signin | wc -l) 个已入库文件)"
 [[ -d "$WEREAD_DIR/.git" ]] || warn "找不到本机开发克隆 $WEREAD_DIR,最后一步的只读校验会跳过"
 pause "备份与本地仓库都就绪,按回车进入授权"
 
@@ -507,7 +507,7 @@ fi
 stage "删除旧名 home-automation-configs"
 say "force push 之后旧对象仍能按旧 SHA 取到,只有删库重建才会真正消失。"
 say "本轮顺带更名:删掉旧名,再以 scripts-hub 重建为 PUBLIC —— 旧对象随旧库一起消失。"
-say "weread-signin 已并入本仓库的 weread-signin/ 快照,不再有独立仓库要处理。"
+say "weread-signin 已并入本仓库的 proj-weread-signin/ 快照,不再有独立仓库要处理。"
 step "先记下删除前的 ref 与备份里的旧提交,重建后逐个探测,确认取不回。"
 capture_old_shas
 step "再把旧仓库的 topics 抄下来,新仓库重建后照抄回去。"
@@ -522,7 +522,7 @@ create_repo "$NEW_SLUG" "$HAC_DESC"
 say "写回话题标签(用上一步从旧仓库抄下来的那一组,整组覆盖):"
 load_topics
 set_topics "$NEW_SLUG" "${HAC_TOPICS[@]}"
-note "许可不用设:GitHub 从仓库里的 LICENSE 识别(根目录 GPL-3.0;weread-signin/ 自带 MIT)。"
+note "许可不用设:GitHub 从仓库里的 LICENSE 识别(根目录 GPL-3.0;proj-weread-signin/ 自带 MIT)。"
 pause "空库在、话题也回来了,按回车开始推送"
 
 # ── Stage 5 ───────────────────────────────────────────────────────────────
@@ -536,7 +536,7 @@ say "验证旧对象(删除前记下的那批 SHA 在新仓库里也应该一个
 check_no_old_objects "$NEW_SLUG" "$HAC_DIR" "$SHA_FILE"
 say "最后确认删库重建没弄坏本机凭据:用现有 Key 跑一次只读统计(读官方数据,不上报、不改数据)。"
 note "不重领 Key:Key 片段进过 git 历史,但仓库当时是私有的、旧 SHA 从未公开,故不轮换。"
-note "weread-signin 没有 GitHub Actions workflow,这把 Key 不需要设成 repo secret。"
+note "proj-weread-signin 没有 GitHub Actions workflow,这把 Key 不需要设成 repo secret。"
 if [[ ! -f "$KEY_FILE" ]]; then
   warn "找不到 Key 文件 $KEY_FILE;跳过只读校验,需人工确认本机凭据还在。"
 elif ( cd "$WEREAD_DIR" && node src/stats.js weekly ); then

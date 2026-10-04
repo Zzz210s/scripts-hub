@@ -1,7 +1,7 @@
 # 全仓库统一 LF 行尾。
 #
 # 为什么必须显式声明:仓库里的 blob 全是 LF。Windows 上 core.autocrlf=true(默认选项之一)
-# 的克隆会把没有 gitattributes 覆盖的文件 checkout 成 CRLF,而 microsoft-rewards/ 自己带
+# 的克隆会把没有 gitattributes 覆盖的文件 checkout 成 CRLF,而 proj-microsoft-rewards/ 自己带
 # 一份 .gitattributes(上游给的,*.js eol=lf)会把那目录固定成 LF —— 两边不一致,
 # scripts/check-wecom-drift.mjs 的逐字节比对就会在**全新克隆**里失败(2026-10-04 实测)。
 # 统一 eol=lf 后,克隆出的字节与仓库里的一致,任何机器上结果相同。

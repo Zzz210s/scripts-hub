@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROJ="$REPO_DIR/microsoft-rewards"
+PROJ="$REPO_DIR/proj-microsoft-rewards"
 DO_INSTALL=1
 DO_BROWSER=1
 DO_BUILD=1

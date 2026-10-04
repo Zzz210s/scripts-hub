@@ -2,7 +2,7 @@
 #
 # 来源仓库: https://github.com/Zzz210s/weread-bot (上游 funnyzak/weread-bot 的 fork)
 # 分支:     fix/cookie-persist-after-renewal
-# base:     0cc9b5c309d1ede76b60f7fd453f6eb403b6307b  (upstream main,即 weread-signin/ 的底座)
+# base:     0cc9b5c309d1ede76b60f7fd453f6eb403b6307b  (upstream main,即 proj-weread-signin/ 的底座)
 # head:     f2f49fa9cbffa97dcd68cf5d7893daf504fd2484
 # PR:       https://github.com/funnyzak/weread-bot/pull/53  (状态见同目录 README.md)
 # 生成方式: git diff main...fix/cookie-persist-after-renewal

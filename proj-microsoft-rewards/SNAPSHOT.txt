@@ -1,5 +1,5 @@
 source: local development clone %REWARDS_DIR%, tracked files only
-published in: Zzz210s/scripts-hub -> microsoft-rewards/
+published in: Zzz210s/scripts-hub -> proj-microsoft-rewards/
 source commit: 9ebecf6aa7f2c5cff730f702446ea3890b031e6b
 source commit date: 2026-10-04T15:30:03+08:00
 published file count: 148

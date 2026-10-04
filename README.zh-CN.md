@@ -3,8 +3,8 @@
 [English](README.md) | **简体中文**
 
 多个**相互隔离、各自完整**的项目合集:三个 Windows 无人值守自动化程序(**微软积分**、**智慧树刷课**
-Autovisor、**微信读书签到**)加一个通用的企业微信通知库。一个项目一个文件夹,各自带 README、依赖
-清单、测试与许可。
+Autovisor、**微信读书签到**)。一个项目一个文件夹,各自带 README、依赖清单、测试与许可。
+各程序共用的企业微信通知规则见 [`docs/wecom-rules.md`](docs/wecom-rules.md);实现由各项目自己持有。
 
 这里不是装完就能跑的程序。程序本体来自各自的上游项目、单独安装;本仓库放的是它们在本机怎么配、
 怎么被调度、怎么通知、换机后怎么恢复。同时,它还是两个**没有 origin 的本地权威工作区**的远程落点:
@@ -15,15 +15,14 @@ Autovisor、**微信读书签到**)加一个通用的企业微信通知库。一
 
 ```
 scripts-hub/
-├── microsoft-rewards/   微软积分:完整项目(上游源码 + 本地补丁、运行器、通知层)
-├── autovisor/           智慧树刷课:只有 Autovisor 配置(程序本体是上游 Windows 包)
-├── weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
-├── wecom-notify/        通用的企业微信群机器人通知 CLI 与库(零依赖)
-├── docs/                跨项目约定与总览 —— 先看 docs/README.md
-├── machine/             本机部署现状:计划任务、本机目录,换机恢复时对照
-├── patches/             所有上游补丁,按上游项目分目录
-├── scripts/             开通、同步与漂移检测工具 —— 见 scripts/README.md
-├── LICENSE              仓库整体 GPL-3.0;weread-signin/ 与 wecom-notify/ 内为 MIT
+├── proj-microsoft-rewards/   微软积分:完整项目(上游源码 + 本地补丁、运行器、通知层)
+├── proj-autovisor/           智慧树刷课:只有 Autovisor 配置(程序本体是上游 Windows 包)
+├── proj-weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
+├── docs/                     跨项目约定与总览 —— 先看 docs/README.md
+├── machine/                  本机部署现状:计划任务、本机目录,换机恢复时对照
+├── patches/                  所有上游补丁,按上游项目分目录
+├── scripts/                  开通、同步与漂移检测工具 —— 见 scripts/README.md
+├── LICENSE                   仓库整体 GPL-3.0;proj-weread-signin/ 内为 MIT
 └── README.md / README.zh-CN.md
 ```
 
@@ -31,9 +30,9 @@ scripts-hub/
 
 | 程序 | 干什么 | 在哪 |
 | --- | --- | --- |
-| **微软积分** | 每天跑 Microsoft Rewards(搜索、活动、读文章),算完分推送结果。 | `microsoft-rewards/` |
-| **智慧树刷课** | Autovisor 自动播放智慧树 / 知到的课程视频。 | `autovisor/` |
-| **微信读书签到** | 每天完成微信读书阅读挑战,再用官方只读 API 回读校验时长真被计入。 | `weread-signin/` |
+| **微软积分** | 每天跑 Microsoft Rewards(搜索、活动、读文章),算完分推送结果。 | `proj-microsoft-rewards/` |
+| **智慧树刷课** | Autovisor 自动播放智慧树 / 知到的课程视频。 | `proj-autovisor/` |
+| **微信读书签到** | 每天完成微信读书阅读挑战,再用官方只读 API 回读校验时长真被计入。 | `proj-weread-signin/` |
 
 另有一条不属于「程序」的计划任务:`AutoShutdown0200` 每天 02:00 无条件关机。代码来源、安装路径、
 跑在哪台机器、调度、通知方式、凭据、云迁移现状、路径约定与许可细节,全都在
@@ -45,14 +44,13 @@ scripts-hub/
 怎么验证跑通了 / 常见失败),再按 `README` 看细节。程序本体从上游装,文件夹里写清要复制哪些配置与
 脚本到哪里。想让它自己检查一遍,跑 `bash scripts/setup-<项目名>.sh`(离线自检,不登录、不真跑)。
 
-四个项目各自的最少步骤:
+三个项目各自的最少步骤:
 
 | 项目 | 全新克隆到能跑 |
 | --- | --- |
-| `wecom-notify/` | `npm test` —— 零依赖,克隆即可跑 |
-| `weread-signin/` | `npm test` + `node src/index.js status`;真跑要凭据与 Python 底座 |
-| `microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`;离线测试可跳过前两步 |
-| `autovisor/` | 无可执行代码,只有配置;程序本体从上游下载 |
+| `proj-weread-signin/` | `npm test` + `node src/index.js status`;真跑要凭据与 Python 底座 |
+| `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`;离线测试可跳过前两步 |
+| `proj-autovisor/` | 无可执行代码,只有配置;程序本体从上游下载 |
 
 想在新机器上把整套搭起来:
 
@@ -73,6 +71,7 @@ scripts-hub/
 | [`docs/automation-overview.md`](docs/automation-overview.md) | 全貌:程序、代码、机器、调度、仓库、路径约定、许可与来源 |
 | [`docs/scheduling-convention.md`](docs/scheduling-convention.md) | 错峰槽位与两段守卫,本机与规划中的云主机两版 |
 | [`docs/notification-convention.md`](docs/notification-convention.md) | 四种企业微信消息类型与文案硬规则 |
+| [`docs/wecom-rules.md`](docs/wecom-rules.md) | 企业微信 webhook 的共享规则:字节上限、超时与重试、errcode 处理、发送频率 |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | 为什么要云主机、哪些方案被否定 |
 | [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
 | [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | 本机计划任务清单,以及查看与停用命令 |

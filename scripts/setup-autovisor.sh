@@ -8,7 +8,7 @@
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROJ="$REPO_DIR/autovisor"
+PROJ="$REPO_DIR/proj-autovisor"
 CONFIG="$PROJ/configs.ini"
 
 FAILED=0
@@ -25,7 +25,7 @@ printf '== autovisor 自检(%s)==\n' "$PROJ"
 if [[ -f "$CONFIG" ]]; then
   ok 'configs.ini 已就位'
 else
-  bad '缺 configs.ini;从本仓库 autovisor/configs.ini 恢复'
+  bad '缺 configs.ini;从本仓库 proj-autovisor/configs.ini 恢复'
   exit 1
 fi
 

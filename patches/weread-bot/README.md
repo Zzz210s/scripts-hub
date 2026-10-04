@@ -1,7 +1,7 @@
 # weread-bot 上游补丁与 fork 说明
 
 这个目录只做两件事:**存一份上游贡献用的补丁**(便于换机恢复与溯源),以及**记清那个 fork 的结局**。
-这里的文件不参与本仓库任何程序的运行,`weread-signin/` 也不依赖它。
+这里的文件不参与本仓库任何程序的运行,`proj-weread-signin/` 也不依赖它。
 
 ## 补丁
 
@@ -10,8 +10,8 @@
 | `pr-53-cookie-persist-after-renewal.patch` | PR #53 的完整 diff,由 fork 的 `fix/cookie-persist-after-renewal` 分支按 `git diff main...<分支>` 生成 |
 
 来源与版本信息写在补丁文件头的注释里(源仓库、分支、base/head commit、PR 链接)。应用方式:
-在上游 `0cc9b5c` 的工作树上先 `git apply --check` 再应用。**仅作存档**,`weread-signin/` 的底座仍
-按 `weread-signin/VENDOR_COMMIT.txt` 固定在 `0cc9b5c`(未含此补丁)。
+在上游 `0cc9b5c` 的工作树上先 `git apply --check` 再应用。**仅作存档**,`proj-weread-signin/` 的底座仍
+按 `proj-weread-signin/VENDOR_COMMIT.txt` 固定在 `0cc9b5c`(未含此补丁)。
 
 ## 那个 fork:`Zzz210s/weread-bot` —— 已于 2026-10-04 删除
 
@@ -46,4 +46,4 @@ gh pr create --repo funnyzak/weread-bot --base main --head <你的账号>:fix/co
 
 底座的 `_refresh_cookie` 续期成功后只更新内存里的 `wr_skey`,不写回任何文件;进程重启后仍用旧
 cookie,需要人工介入。补丁在 cookie 来源是文件时,把新值原子写回该文件(只替换变化的值),来源
-不是文件时行为不变。它同时是 `weread-signin/` 自研代码里凭据续期落盘逻辑的上游对应物。
+不是文件时行为不变。它同时是 `proj-weread-signin/` 自研代码里凭据续期落盘逻辑的上游对应物。

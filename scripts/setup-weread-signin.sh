@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PROJ="$REPO_DIR/weread-signin"
+PROJ="$REPO_DIR/proj-weread-signin"
 VENDOR_COMMIT=0cc9b5c309d1ede76b60f7fd453f6eb403b6307b
 DO_VENDOR=0
 for arg in "$@"; do

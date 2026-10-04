@@ -1,10 +1,10 @@
 # 微信读书签到:本机部署说明
 
-本文件在 `machine/` 下,只记「这台机器上怎么跑」。代码本体与完整文档在仓库的 `weread-signin/`
+本文件在 `machine/` 下,只记「这台机器上怎么跑」。代码本体与完整文档在仓库的 `proj-weread-signin/`
 目录里 —— 那是 `scripts/sync-weread-signin.sh` 从本机开发克隆 `%WEREAD_DIR%` 生成的**自动快照**,
 不是手写文件(原独立仓库 `Zzz210s/weread-signin` 已于 2026-10-04 删除,快照是对外发布的唯一一份)。
 
-程序做什么、命令有哪些、配置项含义:见 `../weread-signin/README.md`。本文件只补充本机部署。
+程序做什么、命令有哪些、配置项含义:见 `../proj-weread-signin/README.md`。本文件只补充本机部署。
 
 ## 这个程序做什么
 
@@ -12,13 +12,13 @@
 真的被计入。
 
 - 底座:[`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT),固定在 `vendor/` 下,
-  commit 记在 `weread-signin/VENDOR_COMMIT.txt`
+  commit 记在 `proj-weread-signin/VENDOR_COMMIT.txt`
 - 本程序自己补的三块:读回校验、按剩余进度算每日目标、Windows 无人值守调度
 
-## 部署步骤(完整做法以 `../weread-signin/README.md` 为准)
+## 部署步骤(完整做法以 `../proj-weread-signin/README.md` 为准)
 
 ```powershell
-# 1. 把仓库的 weread-signin/ 目录复制到 %WEREAD_DIR%(路径约定见仓库根 README);
+# 1. 把仓库的 proj-weread-signin/ 目录复制到 %WEREAD_DIR%(路径约定见仓库根 README);
 #    本机开发机上 %WEREAD_DIR% 已经是那个开发克隆,跳过这步
 # 2. 在 %WEREAD_DIR% 里复制配置模板
 #    .env.example -> .env,config.yaml.example -> config.yaml
@@ -59,4 +59,4 @@ node src/index.js auth
 运行前做一次凭据体检,失效就先续期,仍失效就推企业微信「需要重新登录」并跳过。
 
 只有长期不开机(超过 360 天)或你在别处主动退出登录之后,才需要手动重抓一次 `read` 请求的 cURL
-覆盖 `secrets\read-request.curl`(提取命令见 `../weread-signin/README.md`)。
+覆盖 `secrets\read-request.curl`(提取命令见 `../proj-weread-signin/README.md`)。

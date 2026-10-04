@@ -36,9 +36,9 @@
 上游补丁在 `../patches/microsoft-rewards/`(**不在本目录**,避免两处维护);升级上游后按文件名顺序
 `git apply`。
 
-`wechat-bridge/` 的企业微信发送核心与 `../wecom-notify/src/wecom.js` 的 `wecom-core` 块必须逐字节一致:
-改任一处后跑 `node scripts/check-wecom-drift.mjs`。权威实现是 `wecom-notify`;本目录只允许外壳
-(消息排版、webhook 读取、返回形状)不同。
+`wechat-bridge/` 的企业微信发送核心是一份 `wecom-core` 块,与 `../proj-weread-signin/src/notify.js` 的
+同一块必须逐字节一致:改任一处后跑 `node scripts/check-wecom-drift.mjs`。共享规则见
+`../docs/wecom-rules.md`;本目录只允许外壳(消息排版、webhook 读取、返回形状)不同。
 
 ## 依赖
 

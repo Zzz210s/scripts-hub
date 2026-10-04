@@ -16,7 +16,7 @@ Windows 打包程序(体积与二进制形态不适合进仓库)。
 ```bash
 bash scripts/setup-autovisor.sh                 # 在仓库根:检查配置与课程链接
 # 1. 解压上游 zip 到 %AUTOVISOR_DIR%\app
-# 2. 复制 autovisor/configs.ini 到 app\ 覆盖同名文件
+# 2. 复制 proj-autovisor/configs.ini 到 app\ 覆盖同名文件
 # 3. 运行 app\Autovisor.exe,打开浏览器后手动登录一次
 ```
 

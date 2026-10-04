@@ -6,7 +6,7 @@
 | 目录 | 上游项目 | 内容 | 是否应用 |
 | --- | --- | --- | --- |
 | `microsoft-rewards/` | [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2(GPL-3.0) | 三个针对上游 TypeScript 源码的补丁:每日集快照重试 + 移动端刷新健壮性 + `rewards-context` 健壮性 | **是**,升级上游后按文件名顺序 `git apply`;不应用则每日集可能白丢 30 分/账号,移动端登录卡死后会中断整个账号 |
-| `weread-bot/` | [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT) | PR #53 的完整 diff 与 fork 结局说明 | **否**,仅作存档;fork 已于 2026-10-04 删除、PR #53 随之关闭,补丁可从同一上游重新 fork 后 `git apply`;底座固定在 `0cc9b5c`(见 `../weread-signin/VENDOR_COMMIT.txt`) |
+| `weread-bot/` | [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT) | PR #53 的完整 diff 与 fork 结局说明 | **否**,仅作存档;fork 已于 2026-10-04 删除、PR #53 随之关闭,补丁可从同一上游重新 fork 后 `git apply`;底座固定在 `0cc9b5c`(见 `../proj-weread-signin/VENDOR_COMMIT.txt`) |
 
 ## `microsoft-rewards/` 的三个补丁
 
@@ -23,9 +23,9 @@ cd "%REWARDS_DIR%"
 git apply <hub>/patches/microsoft-rewards/*.patch
 ```
 
-本目录的补丁是**权威存档**;`../microsoft-rewards/` 项目快照里不再放 `patches/`(脚本
+本目录的补丁是**权威存档**;`../proj-microsoft-rewards/` 项目快照里不再放 `patches/`(脚本
 `../scripts/sync-microsoft-rewards.sh` 会跳过它),避免同一份补丁两处维护。恢复整套微软积分
-部署时,把 `../microsoft-rewards/` 的已跟踪文件同步进 `%REWARDS_DIR%`,再把本目录三个补丁按顺序
+部署时,把 `../proj-microsoft-rewards/` 的已跟踪文件同步进 `%REWARDS_DIR%`,再把本目录三个补丁按顺序
 `git apply` 上去,然后 `npm install && npm run build`。
 
 ## `weread-bot/`

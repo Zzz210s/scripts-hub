@@ -8,6 +8,7 @@
 | [automation-overview.md](automation-overview.md) | 三个程序各是什么、代码在哪、跑在哪、被哪个仓库管理 | 第一次进仓库,想先看全貌 |
 | [scheduling-convention.md](scheduling-convention.md) | 什么时候跑、怎么错峰、两段守卫与单实例锁如何工作;本机版与云端版 | 改触发时间、加新程序、排查「为什么这次没跑」 |
 | [notification-convention.md](notification-convention.md) | 会发哪几种企业微信消息,每种长什么样,文案有哪些硬规则 | 改消息内容或新增消息类型 |
+| [wecom-rules.md](wecom-rules.md) | 企业微信 webhook 的共享约束:接口形态、字节上限与截断、超时与重试、errcode 处理、发送频率,以及各项目实现的位置 | 改发送层、调消息长度或排查发送失败 |
 | [cloud-vm.md](cloud-vm.md) | 为什么要一台云主机、评估过哪些替代方案、代价是什么 | 考虑云迁移,或想知道现在为什么还没上云 |
 | [credentials.md](credentials.md) | 哪个文件要填什么、去哪拿、有效期多久、失效后怎么恢复 | 初次部署、凭据失效、换机恢复 |
 

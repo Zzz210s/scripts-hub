@@ -12,7 +12,7 @@
 ## 三条命令
 
 ```bash
-cd weread-signin
+cd proj-weread-signin
 cp .env.example .env && cp config.yaml.example config.yaml   # 模板(按需改挑战日期)
 npm test                                                     # 218 条,离线,不需要凭据
 node src/index.js status                                     # 本地干跑:不登录、不读时长

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # sync-microsoft-rewards.sh —— 把本机开发克隆(默认 %REWARDS_DIR%)的已跟踪文件同步成
-# 本仓库 microsoft-rewards/ 下的快照。
+# 本仓库 proj-microsoft-rewards/ 下的快照。
 #
 # 源仓库是上游 TheNetsky/Microsoft-Rewards-Script v4.3.2 的本地改造:只有 upstream 远端,
 # 没有自己的 origin。本脚本承担「push」的角色 —— 在 %REWARDS_DIR% 提交后跑一次,把结果
@@ -23,7 +23,7 @@
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-DEST="$REPO_DIR/microsoft-rewards"
+DEST="$REPO_DIR/proj-microsoft-rewards"
 
 LOCAL_PATHS_FILE="${AUTOMATION_LOCAL_PATHS:-$HOME/.config/automation-suite/local-paths.env}"
 if [[ -f "$LOCAL_PATHS_FILE" ]]; then
@@ -170,7 +170,7 @@ fi
 
 {
   printf 'source: local development clone %%REWARDS_DIR%%, tracked files only\n'
-  printf 'published in: Zzz210s/scripts-hub -> microsoft-rewards/\n'
+  printf 'published in: Zzz210s/scripts-hub -> proj-microsoft-rewards/\n'
   printf 'source commit: %s\n' "$(git -C "$SOURCE" rev-parse HEAD)"
   printf 'source commit date: %s\n' "$(git -C "$SOURCE" log -1 --format=%cI)"
   printf 'published file count: %s\n' "${#pub[@]}"
@@ -184,4 +184,4 @@ fi
 } > "$DEST/SNAPSHOT.txt"
 
 printf '同步完成:%s -> %s(%s 个文件)\n' "$SOURCE" "$DEST" "${#pub[@]}"
-printf '记得 git add microsoft-rewards && git status 复核。\n'
+printf '记得 git add proj-microsoft-rewards && git status 复核。\n'

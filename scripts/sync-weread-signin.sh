@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # sync-weread-signin.sh:把本机开发克隆(默认 %WEREAD_DIR%)的已跟踪文件同步成
-# 本仓库 weread-signin/ 下的快照 —— 那是该程序对外发布的那一份,没有独立仓库。
+# 本仓库 proj-weread-signin/ 下的快照 —— 那是该程序对外发布的那一份,没有独立仓库。
 #
 # 只同步 `git ls-files` 列出的文件:凭据、运行数据、vendor/ 等未跟踪内容一概不进快照。
 # 快照目录里由本脚本生成的文件(见 KEEP)不会被动,开发克隆里机器相关的文件(见 SKIP)不发布;
@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-DEST="$REPO_DIR/weread-signin"
+DEST="$REPO_DIR/proj-weread-signin"
 
 LOCAL_PATHS_FILE="${AUTOMATION_LOCAL_PATHS:-$HOME/.config/automation-suite/local-paths.env}"
 if [[ -f "$LOCAL_PATHS_FILE" ]]; then
@@ -116,7 +116,7 @@ find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
 {
   printf 'source: local development clone %%WEREAD_DIR%%, tracked files only\n'
-  printf 'published in: Zzz210s/scripts-hub -> weread-signin/\n'
+  printf 'published in: Zzz210s/scripts-hub -> proj-weread-signin/\n'
   printf 'source commit: %s\n' "$(git -C "$SOURCE" rev-parse HEAD)"
   printf 'source commit date: %s\n' "$(git -C "$SOURCE" log -1 --format=%cI)"
   printf 'synced file count: %s\n' "${#pub_files[@]}"
@@ -125,4 +125,4 @@ find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 } > "$DEST/SNAPSHOT.txt"
 
 printf '同步完成:%s -> %s(%s 个文件)\n' "$SOURCE" "$DEST" "${#pub_files[@]}"
-printf '记得 git add weread-signin && git status 复核。\n'
+printf '记得 git add proj-weread-signin && git status 复核。\n'

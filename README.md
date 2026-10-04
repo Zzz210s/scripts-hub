@@ -4,8 +4,9 @@
 
 A collection of isolated, self-contained projects for three unattended Windows automation
 programs -- **Microsoft Rewards**, **Zhihuishu course playback** (Autovisor) and **WeRead
-daily check-in** -- plus the reusable WeCom notification library. One folder per project, each
-with its own README, dependency manifest, tests and license.
+daily check-in**. One folder per project, each with its own README, dependency manifest,
+tests and license. The WeCom notification rules shared by the projects are in
+[`docs/wecom-rules.md`](docs/wecom-rules.md); each project keeps its own implementation.
 
 This is not an application you install and run. The programs come from upstream projects and
 are installed separately; what lives here is how they are configured, scheduled, notified and
@@ -19,15 +20,14 @@ credentials.
 
 ```
 scripts-hub/
-├── microsoft-rewards/   Microsoft Rewards: complete project (upstream source + local patches, runners, WeCom layer)
-├── autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
-├── weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
-├── wecom-notify/        Reusable WeCom group-robot notification CLI + library (zero dependencies)
-├── docs/                Cross-project conventions and overviews -- read docs/README.md first
-├── machine/             What is deployed on the author's machine: scheduled tasks, local paths
-├── patches/             Every upstream patch, one folder per upstream project
-├── scripts/             Provisioning, sync and drift-check utilities -- see scripts/README.md
-├── LICENSE              GPL-3.0 for the repository; MIT inside weread-signin/ and wecom-notify/
+├── proj-microsoft-rewards/   Microsoft Rewards: complete project (upstream source + local patches, runners, WeCom layer)
+├── proj-autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
+├── proj-weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
+├── docs/                     Cross-project conventions and overviews -- read docs/README.md first
+├── machine/                  What is deployed on the author's machine: scheduled tasks, local paths
+├── patches/                  Every upstream patch, one folder per upstream project
+├── scripts/                  Provisioning, sync and drift-check utilities -- see scripts/README.md
+├── LICENSE                   GPL-3.0 for the repository; MIT inside proj-weread-signin/
 └── README.md / README.zh-CN.md
 ```
 
@@ -35,9 +35,9 @@ scripts-hub/
 
 | Program | What it does | Where |
 | --- | --- | --- |
-| **Microsoft Rewards** | Runs the daily Microsoft Rewards tasks and pushes the points result. | `microsoft-rewards/` |
-| **Zhihuishu playback** | Autovisor plays Zhihuishu / Zhida course videos automatically. | `autovisor/` |
-| **WeRead check-in** | Completes the daily reading challenge and verifies the counted minutes through the official read-only API. | `weread-signin/` |
+| **Microsoft Rewards** | Runs the daily Microsoft Rewards tasks and pushes the points result. | `proj-microsoft-rewards/` |
+| **Zhihuishu playback** | Autovisor plays Zhihuishu / Zhida course videos automatically. | `proj-autovisor/` |
+| **WeRead check-in** | Completes the daily reading challenge and verifies the counted minutes through the official read-only API. | `proj-weread-signin/` |
 
 One scheduled task is not a program: `AutoShutdown0200` powers the machine off at 02:00 every
 day. Code sources, install paths, machines, schedules, notification channels, credentials, the
@@ -55,10 +55,9 @@ Minimum steps from a fresh clone to something that runs:
 
 | Project | Fresh clone to running |
 | --- | --- |
-| `wecom-notify/` | `npm test` -- zero dependencies, runs straight from the clone |
-| `weread-signin/` | `npm test` + `node src/index.js status`; a real run needs credentials and the Python vendor |
-| `microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
-| `autovisor/` | nothing executable here, config only; the program comes from upstream |
+| `proj-weread-signin/` | `npm test` + `node src/index.js status`; a real run needs credentials and the Python vendor |
+| `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
+| `proj-autovisor/` | nothing executable here, config only; the program comes from upstream |
 
 To rebuild the whole setup on a new machine:
 
@@ -81,6 +80,7 @@ For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
 | [`docs/automation-overview.md`](docs/automation-overview.md) | Everything: programs, code, machines, schedules, repositories, path convention, license and provenance |
 | [`docs/scheduling-convention.md`](docs/scheduling-convention.md) | Staggered slots and guards, for this machine and for the planned cloud host |
 | [`docs/notification-convention.md`](docs/notification-convention.md) | The four WeCom message types and the wording rules |
+| [`docs/wecom-rules.md`](docs/wecom-rules.md) | The shared WeCom webhook rules: byte limits, timeout/retry, errcode handling, rate limits |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | Why a cloud VM, and which options were rejected |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
 | [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | This machine's scheduled tasks and how to inspect or disable them |
