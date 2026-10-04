@@ -59,6 +59,8 @@ done
 [[ -f "$SENSITIVE_FILE" ]] || {
   printf '缺少个人标识清单:%s\n' "$SENSITIVE_FILE" >&2
   printf '本项目的测试夹具含真实账号,先建该文件(一行一个标识)再同步。\n' >&2
+  printf '模板:scripts/sensitive-patterns.txt.example(复制到上面那个路径并填自己的标识)。\n' >&2
+  printf '宁可不同步也不误发 —— 这道防线不允许跳过。\n' >&2
   exit 1
 }
 

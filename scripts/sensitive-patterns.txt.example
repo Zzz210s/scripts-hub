@@ -1,0 +1,16 @@
+# 个人标识清单示例 —— 复制到 ~/.config/automation-suite/sensitive-patterns.txt,一行一个标识。
+#
+# 用途:scripts/sync-microsoft-rewards.sh 发布快照时把每个标识替换成 sample(防止真实账号
+# 从测试夹具漏进公开仓库);scripts/check-privacy.mjs 也用它扫整个仓库。
+#
+# 规则:
+#   * 只放**本机真实**的标识:真名、常用邮箱、用户名、主机名等;不要放通用词,否则会把正常文本也脱敏。
+#   * 空行与 # 开头的行忽略。
+#   * 这个文件在仓库之外,永不入库。缺它时 sync-microsoft-rewards.sh **拒绝同步**(安全属性,不要绕过)。
+#   * 下面全是占位符,示例值不会命中任何真实内容 —— 请替换成你自己的。
+#
+# 示例(删除或替换为真实值):
+# your-real-name
+# your-handle
+# user@example.com
+# YOUR-HOSTNAME
