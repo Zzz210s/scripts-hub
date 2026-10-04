@@ -14,6 +14,8 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 
 const repo = path.resolve(import.meta.dirname, '..')
+// 本文件自身含允许清单里的公开提交身份字面量,只对它跳过「私有标识」规则(通用规则照跑)
+const SELF = 'scripts/check-privacy.mjs'
 const verbose = process.argv.includes('--verbose')
 const BS = String.fromCharCode(92)
 
@@ -82,7 +84,8 @@ for (const rel of files) {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       if (literal) {
-        // 公开提交身份允许出现:私有清单里的 zzz210s 命中 zzz210s@qq.com 时不算泄漏
+        if (rel === SELF) continue
+        // 公开提交身份允许出现:私有清单里的 handle 命中公开提交邮箱时不算泄漏
         const probe = line.replace(/zzz210s@qq\.com/gi, '')
         if (!probe.includes(literal)) continue
         findings++

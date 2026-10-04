@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 漂移检测:三份企业微信发送实现(wecom-notify / wechat-bridge / weread-signin)
-// 里标了 `wecom-core` 的核心块必须逐字节一致。不一致就报错并退出 1。
+// 里标了 `wecom-core` 的核心块必须一致(按 LF 归一后逐字节比对,不受 checkout 的行尾影响)。
+// 不一致就报错并退出 1。
 //
 // 用法:node scripts/check-wecom-drift.mjs
 //       node scripts/check-wecom-drift.mjs --verbose   打印各文件块大小
@@ -27,7 +28,9 @@ function extractCore(relative) {
     const absolute = path.join(ROOT, relative)
     let text
     try {
-        text = fs.readFileSync(absolute, 'utf8')
+        // 归一 CRLF:Windows 上 core.autocrlf=true 的克隆会把行尾改成 CRLF,
+        // 而仓库里 .gitattributes 未覆盖的文件与覆盖的(microsoft-rewards/)会不一致
+        text = fs.readFileSync(absolute, 'utf8').replace(/\r\n/g, '\n')
     } catch (error) {
         throw new Error(`读不到 ${relative}:${error.message}`)
     }
@@ -74,4 +77,4 @@ if (drifted) {
     process.exit(1)
 }
 
-process.stdout.write(`[wecom-drift] 通过:${FILES.length} 份核心块逐字节一致(权威 ${authority.relative})\n`)
+process.stdout.write(`[wecom-drift] 通过:${FILES.length} 份核心块一致(忽略行尾;权威 ${authority.relative})\n`)
