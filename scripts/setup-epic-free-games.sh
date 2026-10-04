@@ -76,13 +76,16 @@ if [[ -f "$PROJ/secrets/wecom-webhook.txt" ]]; then
 else
   info '缺 secrets/wecom-webhook.txt —— 不配则不推送,其余照常'
 fi
-if [[ -d "$PROJ/data/browser" ]]; then
-  ok '持久化浏览器 profile 已存在(登录态可能仍会过期)'
+if [[ -f "$PROJ/secrets/epic-tokens.json" ]]; then
+  ok '设备授权令牌已存在(登录态会自动续期)'
+elif [[ -d "$PROJ/data/browser" ]]; then
+  info '只有浏览器 profile 登录态,没有 token 文件;要长期免登录就跑 node src/cli.js login'
 else
   cat <<'EOF'
-[提示] 还没有浏览器登录态。第一次登录:
+[提示] 还没有任何登录态。第一次登录:
        cd proj-epic-free-games
-       node src/cli.js login          # 打开浏览器人工登录一次,不保存密码
+       node src/cli.js login            # 设备授权:打印链接与验证码,浏览器确认一次,不保存密码
+       node src/cli.js login --browser  # 退路:开浏览器人工登录一次(落 profile)
        登录后再启用计划任务:改 config/schedule.json 里 epic-free-games.enabled 为 true,
        然后 node scripts/apply-schedule.mjs --apply --yes
 EOF

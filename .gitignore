@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 secrets/
+# Epic 设备授权令牌:即使 secrets/ 被改动也不要入库
+secrets/epic-tokens.json
 *.webhook
 *webhook*.txt
 wecom-webhook.txt

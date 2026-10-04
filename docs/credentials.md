@@ -36,7 +36,8 @@
 
 | 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
 | --- | --- | --- | --- |
-| 浏览器登录态 | `data\browser\`(目录,不是单个文件) | 跑 `node src/cli.js login`,在打开的浏览器里人工登录一次 | 会话级,可长期保持;失效会推「需要你处理」,重跑 `login` 即可 |
+| 设备授权令牌 | `secrets\epic-tokens.json` | 跑 `node src/cli.js login`,按提示在浏览器确认一次;程序自己写入 | access token 约 2 小时,每次运行自动刷新延长;refresh token 响应里带 `refresh_expires_at`,实测约 23 天且随刷新滚动。只有被 Epic 吐销时才要重跑 `login`,用 `node src/cli.js auth` 看到期时间 |
+| 浏览器登录态 | `data\browser\`(目录,不是单个文件) | 登录流程生成;程序每次运行把 `EPIC_BEARER_TOKEN` 注入这里 | profile 自身会话失效时自动靠上面的 token 重新注入;注入失败退化用既有会话。兜底入口 `node src/cli.js login --browser` |
 | 企业微信群机器人 webhook | `secrets\wecom-webhook.txt` | 同上,企业微信群机器人 | 文件不存在时不推送 |
 
 **没有密码类凭据**:程序刻意不向引擎传 `EG_EMAIL` / `EG_PASSWORD`,所以不存在「密码泄漏」这条路径。

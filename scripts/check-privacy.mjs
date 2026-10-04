@@ -32,6 +32,7 @@ const RULES = [
   ['企业微信 webhook 真 key', /webhook\/send\?key=(?!0{8}|YOUR_WEBHOOK_KEY)[A-Za-z0-9-]{20,}/, null],
   ['中国大陆手机号', /(^|[^\d-])1[3-9]\d{9}([^\d-]|$)/, null],
   ['微信 wxid', /wxid_[A-Za-z0-9]{6,}/, null],
+  ['Epic OAuth 令牌', /eg1~[A-Za-z0-9._~+/-]{60,}/, null],
   ['邮箱', /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, allowedEmail],
   ['私有标识', null, null], // 由 sensitive-patterns.txt 填充
 ]
@@ -68,6 +69,12 @@ const files = execFileSync('git', ['ls-files', '-z'], { cwd: repo, maxBuffer: 1 
 let findings = 0
 const fileNameHits = []
 for (const rel of files) {
+  // secrets/ 下的任何文件都不应被跟踪:epic-tokens.json、webhook 等都属于本机私有
+  if (/(^|\/)secrets\//.test(rel)) {
+    findings++
+    console.log(`命中  ${rel}  [secrets 目录下的文件不应入库]`)
+    continue
+  }
   for (const [name, , , literal] of RULES) {
     if (literal && rel.includes(literal)) fileNameHits.push(`${rel}  文件名含「${name}」`)
   }

@@ -30,8 +30,13 @@
 
 ```
 src/
-  cli.js        命令行:run / probe / status / link / login / report / pause / resume
-  run.js        一次运行:守卫 -> 探测 -> 去重 -> 通知开始 -> 引擎 -> 归类 -> 通知
+  cli.js        命令行:run / probe / status / link / login / auth / report / pause / resume
+  run.js        一次运行:守卫 -> 探测 -> 去重 -> 通知开始 -> 确保登录态 -> 引擎 -> 归类 -> 通知
+  auth.js       确保登录可用:复用 token、自动续期、注入;都失败才要求人工登录
+  oauth.js      Epic OAuth 端点与设备码 / 刷新授权                  (IO,可注入)
+  tokens.js     secrets/epic-tokens.json:读写、过期判定、掩码
+  login.js      设备授权登录,浏览器 profile 作为退路
+  inject.js     把 EPIC_BEARER_TOKEN 写进引擎用的持久化 profile
   probe.js      唯一主动发 HTTP 的地方:取免费清单并解析
   promo.js      当期/预告判定、商店 slug、预置结账链接            (纯函数)
   clock.js      美东换挡点与 Holiday Sale 窗口                    (纯函数)
@@ -55,7 +60,7 @@ vendor/free-games-claimer/  上游引擎,未改一行
 ## 前置条件
 
 - Node.js >= 20.11(用到 `import.meta.dirname` 与内置 test runner)
-- 一个 Epic 账号,**人工登录一次**;不保存密码
+- 一个 Epic 账号,**跑一次设备授权登录**;不保存密码(登录态会自己续期,见 `docs/auth.md`)
 - 真跑需要引擎自己的依赖:`patchright` 与它的 Chromium(`npm install` + `npx patchright install chromium`)
 - 企业微信群机器人 webhook(可选;没有就不推送)
 - 机器处于已登录的图形会话(上游故意让浏览器可见)
@@ -67,8 +72,10 @@ vendor/free-games-claimer/  上游引擎,未改一行
 npm install
 npx patchright install chromium
 
-# 2. 人工登录一次,不保存任何密码
-node src/cli.js login          # 打开浏览器,登录后关闭即可
+# 2. 持久登录:一次设备授权,之后自动续期,不保存密码
+node src/cli.js login          # 打印一个链接与验证码,在浏览器确认一次
+node src/cli.js login --browser  # 退路:开浏览器人工登录一次(落 profile)
+node src/cli.js auth           # 看 token 到期时间与有效性
 
 # 3. 可选:企业微信 webhook
 mkdir -p secrets
@@ -86,13 +93,27 @@ node scripts/apply-schedule.mjs --apply --yes
 node src/cli.js probe            # 看当期与预告的免费游戏,不登录
 node src/cli.js status           # 本地状态与今日尝试次数
 node src/cli.js link 1           # 第 1 款游戏的预置结账链接
-node src/cli.js login            # 打开浏览器人工登录
+node src/cli.js login            # 设备授权登录,之后自动续期
+node src/cli.js login --browser  # 退路:开浏览器人工登录
+node src/cli.js auth             # token 状态与到期时间
 node src/cli.js run              # 跑一次,过守卫
 node src/cli.js run --dry-run    # 只报告会发什么,不联网不起浏览器
 node src/cli.js report           # 打印状态摘要
 node src/cli.js pause / resume   # 暂停 / 恢复无人值守运行
 npm test                         # 离线单测
 ```
+
+## 持久登录
+
+`node src/cli.js login` 走 Epic 的**设备码授权**:它打印一个链接与一组验证码,你在任意浏览器里
+确认一次,程序把可长期使用的 `refresh_token` 存进 `secrets/epic-tokens.json`(已 gitignore)。
+之后每次运行都自动刷新 access token,并把登录态以 `EPIC_BEARER_TOKEN` cookie 写进持久化 profile,
+引擎启动时已经是登录态。token 文件权限尽量收紧,日志与通知里 token 一律掩码;
+浏览器 profile 登录保留为退路(`login --browser`)。
+
+只有在 Epic **真正吐销**刷新令牌时才需要重新登录:改密码、在账号安全页撤销设备,
+或闲置过久导致刷新窗口过期(实测约 23 天)。`node src/cli.js auth` 会打印两个到期时间。
+调研结论、来源与尚未验证的部分见 `docs/auth.md`。
 
 ## 配置
 
@@ -134,6 +155,7 @@ npm test          # node --test test/*.test.js
 
 - 引擎会弹出**可见**的浏览器窗口(上游:无头模式更容易触发 hCaptcha),计划任务跑到时桌面上会出现一个窗口。
 - 自动结账可能违反 Epic 的服务条款,存在账号风险。
+- 设备码登录仍需一次人工确认,不是完全无人值守的首次登录。
 - hCaptcha 仍可能挡住结账;那是退化路径要处理的情形,不是故障。
 - 区域限制的游戏领不到;程序如实报告,不绕区。
 - Windows 运行器脚本只在 Windows 可用。

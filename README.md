@@ -68,7 +68,7 @@ Minimum steps from a fresh clone to something that runs:
 | `proj-weread-signin/` | `npm test` + `node src/index.js status`; a real run needs credentials and the Python vendor |
 | `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
 | `proj-autovisor/` | nothing executable here, config only; the program comes from upstream |
-| `proj-epic-free-games/` | `npm test` + `node src/cli.js status`; a real claim needs `npm install`, `npx patchright install chromium` and one manual browser login |
+| `proj-epic-free-games/` | `npm test` + `node src/cli.js status`; a real claim needs `npm install`, `npx patchright install chromium` and one device-authorization login (`node src/cli.js login`) |
 
 To rebuild the whole setup on a new machine:
 

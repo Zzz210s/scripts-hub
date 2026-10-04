@@ -58,7 +58,7 @@ scripts-hub/
 | `proj-weread-signin/` | `npm test` + `node src/index.js status`;真跑要凭据与 Python 底座 |
 | `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`;离线测试可跳过前两步 |
 | `proj-autovisor/` | 无可执行代码,只有配置;程序本体从上游下载 |
-| `proj-epic-free-games/` | `npm test` + `node src/cli.js status`;真领要 `npm install`、`npx patchright install chromium` 并人工登录一次 |
+| `proj-epic-free-games/` | `npm test` + `node src/cli.js status`;真领要 `npm install`、`npx patchright install chromium` 并跑一次设备授权登录(`node src/cli.js login`) |
 
 想在新机器上把整套搭起来:
 

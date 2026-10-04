@@ -36,8 +36,13 @@ four things that project does not have:
 
 ```
 src/
-  cli.js        command line: run / probe / status / link / login / report / pause / resume
-  run.js        one run: guards -> probe -> dedup -> notify start -> engine -> classify -> notify
+  cli.js        command line: run / probe / status / link / login / auth / report / pause / resume
+  run.js        one run: guards -> probe -> dedup -> notify start -> ensure session -> engine -> classify -> notify
+  auth.js       ensure a live login: reuse the token, auto-refresh it, inject it, or ask for a login
+  oauth.js      Epic OAuth endpoints and the device-code / refresh grants             (IO, injectable)
+  tokens.js     secrets/epic-tokens.json: read/write, expiry checks, masking
+  login.js      device-authorization login, with the browser profile as fallback
+  inject.js     write EPIC_BEARER_TOKEN into the persistent profile for the engine
   probe.js      the only outbound HTTP call: fetch the free-games list and parse it
   promo.js      free/upcoming detection, store slug, prefilled checkout URL   (pure)
   clock.js      Eastern-time switch point and Holiday Sale window             (pure)
@@ -62,7 +67,8 @@ diffs it against the local state, and only then starts the browser engine.
 ## Requirements
 
 - Node.js >= 20.11 (uses `import.meta.dirname` and the built-in test runner)
-- An Epic Games account, logged in **once** by hand in the browser; no password is stored
+- An Epic Games account, logged in once through the device-authorization flow; no password is stored
+  (the login state renews itself; see `docs/auth.md`)
 - The engine's own dependencies for real runs: `patchright` and its Chromium build
   (`npm install` + `npx patchright install chromium`)
 - A WeCom group-bot webhook (optional; without it nothing is pushed)
@@ -75,8 +81,10 @@ diffs it against the local state, and only then starts the browser engine.
 npm install
 npx patchright install chromium
 
-# 2. Log the browser in once. No password is saved anywhere.
-node src/cli.js login          # a browser opens; log in, then close it
+# 2. Persistent login: one device authorization, then it renews itself. No password is saved.
+node src/cli.js login            # print a URL and a code; confirm in a browser once
+node src/cli.js login --browser  # fallback: log in by hand in the opened browser
+node src/cli.js auth             # show token expiry and validity
 
 # 3. Optional: WeCom webhook
 mkdir -p secrets
@@ -94,13 +102,29 @@ node scripts/apply-schedule.mjs --apply --yes
 node src/cli.js probe            # what is free now and what is coming, no login
 node src/cli.js status           # local state and today's attempt count
 node src/cli.js link 1           # prefilled checkout link for the first current game
-node src/cli.js login            # open a browser and log in by hand
+node src/cli.js login            # device authorization; renews itself afterwards
+node src/cli.js login --browser  # fallback: log in by hand in the opened browser
+node src/cli.js auth             # token status and expiry
 node src/cli.js run              # one run, honouring the guards
 node src/cli.js run --dry-run    # print what would be sent, no network, no browser
 node src/cli.js report           # print the state summary
 node src/cli.js pause / resume   # pause / resume unattended runs
 npm test                         # offline unit tests
 ```
+
+## Persistent login
+
+`node src/cli.js login` uses Epic's device-code flow: it prints a link and a short code, you
+confirm once in any browser, and the program saves a long-lived `refresh_token` to
+`secrets/epic-tokens.json` (gitignored). Every run then refreshes the access token, writes the
+token back where Epic puts it (`EPIC_BEARER_TOKEN`) into the persistent profile, and starts the
+engine already signed in. The token file is written with tight permissions and tokens are masked
+in logs and notifications. The browser-profile login stays as a fallback via `login --browser`.
+
+You only need to log in again if Epic revokes the refresh token — changed password, revoked
+device, or the refresh window lapsed after a very long idle period (observed around 23 days).
+`node src/cli.js auth` shows both expiry times. The research, sources and what is still unverified
+live in `docs/auth.md`.
 
 ## Configuration
 
@@ -145,6 +169,7 @@ and retry/errcode handling are pinned by assertions.
 - The engine runs a **visible** browser window (upstream: headless triggers hCaptcha more often).
   A scheduled run will pop a window on the desktop.
 - Automated checkout may violate the Epic Games terms of service and carries account risk.
+- The device-code login still needs one human confirmation; it is not a password-less unattended bootstrap.
 - hCaptcha can still block the checkout; that is a fallback case, not a bug.
 - Region-locked games stay unclaimable; the project reports them instead of trying to route
   around the region.
