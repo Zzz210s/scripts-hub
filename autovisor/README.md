@@ -1,6 +1,11 @@
 # 智慧树刷课(Autovisor 配置)
 
-用 Autovisor 自动播放智慧树 / 知到的共享课视频。本目录只有**配置**,程序本体是上游打包好的 exe。
+用 Autovisor 自动播放智慧树 / 知到的共享课视频。
+
+**说明:本目录只是配置与说明,不是程序本体。** 程序本体是上游发布的 Windows 打包程序
+(`Autovisor.exe`,PyInstaller 内嵌 Python 与 Playwright),体积与二进制形态都不适合进本仓库,
+所以它不在版本控制里 —— 换机时从上游 release 下载,再把本目录的 `configs.ini` 覆盖进去。
+本目录没有依赖清单与测试入口,因为这里没有任何自研代码可跑。
 
 | | |
 | --- | --- |
@@ -80,5 +85,6 @@ https://studyvideoh5.zhihuishu.com/stuStudy?recruitAndCourseId=<课程ID>
 
 ## 相关文档
 
+- 工作模型(各程序的权威工作区在哪、配置怎么进仓库):`../docs/workspace-model.md`
 - 全貌与调度位置:`../docs/automation-overview.md`
 - 凭据:`../docs/credentials.md`

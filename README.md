@@ -2,20 +2,25 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-Configuration, runner scripts and documentation for three unattended Windows automation
-programs: **Microsoft Rewards**, **Zhihuishu course playback** (Autovisor) and **WeRead
-daily check-in**. One folder per program.
+A collection of isolated, self-contained projects for three unattended Windows automation
+programs -- **Microsoft Rewards**, **Zhihuishu course playback** (Autovisor) and **WeRead
+daily check-in** -- plus the reusable WeCom notification library. One folder per project, each
+with its own README, dependency manifest, tests and license.
 
-This is not an application you install and run. The programs themselves come from upstream
-projects and are installed separately; what lives here is how they are configured, scheduled,
-notified and restored on a new machine. Everything is sanitized: no real credentials.
+This is not an application you install and run. The programs come from upstream projects and
+are installed separately; what lives here is how they are configured, scheduled, notified and
+restored on a new machine. This repository is also the remote landing spot for two local
+workspaces that have no origin of their own: `%REWARDS_DIR%` (Microsoft Rewards) and
+`%WEREAD_DIR%` (WeRead). How code changes flow into this repository is in
+[`docs/workspace-model.md`](docs/workspace-model.md). Everything is sanitized: no real
+credentials.
 
 ## 30-second map
 
 ```
 scripts-hub/
-├── microsoft-rewards/   Microsoft Rewards: config, Windows runners, WeCom notification layer
-├── autovisor/           Zhihuishu playback: the Autovisor config only
+├── microsoft-rewards/   Microsoft Rewards: complete project (upstream source + local patches, runners, WeCom layer)
+├── autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
 ├── weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
 ├── wecom-notify/        Reusable WeCom group-robot notification CLI + library (zero dependencies)
 ├── docs/                Cross-project conventions and overviews -- read docs/README.md first
@@ -61,10 +66,11 @@ For the cloud VM (not yet provisioned): `scripts/oracle-setup-wizard.sh`, then
 | Document | What is in it |
 | --- | --- |
 | [`docs/README.md`](docs/README.md) | Index of all documentation |
+| [`docs/workspace-model.md`](docs/workspace-model.md) | Where each project's authoritative workspace is, how code changes land here, and why not submodules |
 | [`docs/automation-overview.md`](docs/automation-overview.md) | Everything: programs, code, machines, schedules, repositories, path convention, license and provenance |
 | [`docs/scheduling-convention.md`](docs/scheduling-convention.md) | Staggered slots and guards, for this machine and for the planned cloud host |
 | [`docs/notification-convention.md`](docs/notification-convention.md) | The four WeCom message types and the wording rules |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | Why a cloud VM, and which options were rejected |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
 | [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | This machine's scheduled tasks and how to inspect or disable them |
-| [`scripts/README.md`](scripts/README.md) | The wizards, the snapshot sync and the WeCom drift check |
+| [`scripts/README.md`](scripts/README.md) | The wizards, the snapshot syncs and the WeCom drift check |

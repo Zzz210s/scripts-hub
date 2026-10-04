@@ -16,7 +16,7 @@
 | 每个凭据去哪拿、有效期、失效后怎么恢复 | `docs/credentials.md` |
 | 本机计划任务清单与停用命令 | `machine/scheduled-tasks.md` |
 | 本机微信读书部署现状 | `machine/weread-deployment.md` |
-| 微软积分运行器与通知层 | 开发目录 `%REWARDS_DIR%`(本地 git 仓库);同步副本在 `microsoft-rewards/` |
+| 微软积分运行器、通知层与源码改动 | 权威工作区 `%REWARDS_DIR%`(本地 git 仓库,只有 upstream 远端);已跟踪文件由 `scripts/sync-microsoft-rewards.sh` 发布成 `microsoft-rewards/`(完整快照) |
 | 微信读书签到程序 | 代码本体就在本仓库 `weread-signin/`;开发在本地克隆 `%WEREAD_DIR%`,用 `scripts/sync-weread-signin.sh` 发布 |
 | 智慧树刷课配置 | `autovisor/configs.ini` |
 | 上游补丁与贡献状态 | `patches/` |
@@ -31,13 +31,13 @@
 
 第三个任务不属于「程序」但同属这套自动化:计划任务 `AutoShutdown0200` 每天 02:00 无条件真关机
 (`shutdown /s /f /t 60`,60 秒内 `shutdown /a` 可撤销),脚本
-`microsoft-rewards/scripts-windows/auto-shutdown.bat`。
+`microsoft-rewards/scripts/windows/auto-shutdown.bat`。
 
 ## 2. 仓库清单
 
 | 仓库 | 可见性 | 作用 | 现状备注 |
 | --- | --- | --- | --- |
-| `Zzz210s/scripts-hub` | PUBLIC | 唯一的配置与文档仓库:三个程序的配置、运行器、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 代码本体。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
+| `Zzz210s/scripts-hub` | PUBLIC | 多个完整项目的合集,每个项目一个隔离子目录(`microsoft-rewards/`、`weread-signin/`、`wecom-notify/`、`autovisor/`),外加合集层的约定文档、补丁存档、向导与同步脚本。同时是两个没 origin 的权威工作区(`%REWARDS_DIR%`、`%WEREAD_DIR%`)的远程落点。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
 | `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留 |
 | `Zzz210s/automation-suite` | 已删除(2026-10-04) | 曾是自动化脚本与向导的合集仓库(私有) | 已并入 `scripts-hub/docs/`、`scripts-hub/scripts/` |
 | `Zzz210s/wecom-notify` | 已删除(2026-10-04) | 曾是独立的私有企业微信通知 CLI/库 | 已并入 `scripts-hub/wecom-notify/`;此处是唯一副本 |
@@ -97,8 +97,11 @@
 - 改「会怎么跑、什么时候跑」→ 改 `docs/scheduling-convention.md`,再改程序里的守卫。
 - 改「消息长什么样」→ 改 `docs/notification-convention.md`,两边实现与测试一起改
   (文案断言已锁住「不带圆括号」与标题行形状)。
-- 改微软积分的运行器或通知层 → **在 `%REWARDS_DIR%\` 里改并提交**(那才是开发目录),再把
-  `wechat-bridge/` 与 `scripts/windows/` 覆盖回本仓库。两处都改必分叉。
+- 改微软积分的代码、运行器或通知层 → **在权威工作区 `%REWARDS_DIR%` 里改并提交**,再跑
+  `scripts/sync-microsoft-rewards.sh` 发布到本仓库的 `microsoft-rewards/`(完整快照)。直接改那个
+  目录必被下次同步覆盖。补丁不放项目目录,升级上游后按 `../patches/microsoft-rewards/` 的文件名顺序
+  `git apply`。同步会把本机路径改成 `%REWARDS_DIR%`、按机器私有清单脱敏;缺清单脚本拒绝运行。
+  完整工作模型见 `docs/workspace-model.md`。
 - 改任一份企业微信发送核心 → 权威实现是 `wecom-notify/src/wecom.js` 里 `wecom-core` 标记之间的整块;
   改完把该块整段同步到 `microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `weread-signin/src/notify.js`,
   再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印块大小)。三份只允许外壳
@@ -114,7 +117,7 @@
 
 | 占位符 | 指什么 |
 | --- | --- |
-| `%REWARDS_DIR%` | 微软积分程序本体的根目录(解压上游 release 后的目录) |
+| `%REWARDS_DIR%` | 微软积分的权威工作区:本机本地 git 仓库(上游 v4.3.2 + 本地改造,只有 upstream 远端);它的已跟踪文件由 `scripts/sync-microsoft-rewards.sh` 发布成 `microsoft-rewards/` |
 | `%AUTOVISOR_DIR%` | Autovisor 安装目录(其下有 `app\`) |
 | `%WEREAD_DIR%` | 微信读书的开发克隆 —— 一个本地 git 克隆,它的已跟踪文件由 `scripts/sync-weread-signin.sh` 发布成 `weread-signin/` |
 
@@ -125,8 +128,9 @@
 ## 11. 许可与来源
 
 仓库整体按 **GPL-3.0** 授权(见 `LICENSE`),因为其中一部分是 GPL-3.0 上游的衍生作品:
-微软积分的补丁是针对上游 TypeScript 源码的 diff,`microsoft-rewards/env.example` 是上游原版文件,
-`microsoft-rewards/config.json` 由上游配置改写而来。
+微软积分的补丁是针对上游 TypeScript 源码的 diff,`microsoft-rewards/` 整目录是上游 v4.3.2 的同步
+快照(上游 `LICENSE` 一并同步),其中 `env.example`、`config.example.json` 是上游原版文件,
+`config.json` 由上游配置改写而来。
 
 两个子目录是 **MIT**,各自保留 `LICENSE`:`weread-signin/`(继承自底座 `funnyzak/weread-bot`)
 与 `wecom-notify/`(本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`)。`autovisor/configs.ini`
