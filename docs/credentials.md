@@ -1,19 +1,39 @@
-# 需要填写的真实值(本文件不存值)
+# 凭据清单(本文件不存任何值)
 
-`%REWARDS_DIR%` / `%AUTOVISOR_DIR%` / `%WEREAD_DIR%` 是各程序本体的安装目录,见根目录 README 的「路径约定」。
+真实值只在各程序自己的目录里;本仓库只有模板和这份说明。`.gitignore` 已排除 `.env`、
+`secrets/*`、`*webhook*.txt`、`data/`、`sessions/`、`logs/`。换机恢复时按本表逐个补齐即可。
 
-| 文件/位置 | 需要什么 | 去哪拿 |
-| --- | --- | --- |
-| `%REWARDS_DIR%\.env` | 每个账号的邮箱与密码(`ACCOUNT_N_EMAIL` / `ACCOUNT_N_PASSWORD`) | 自己的微软账号;密码只写在此文件,不入库 |
-| `%REWARDS_DIR%\wechat-bridge\data\wecom-webhook.txt` | 企业微信群机器人 webhook 地址 | 企业微信群 → 添加群机器人 → 复制 webhook |
-| `%AUTOVISOR_DIR%\app\data\cookies.json` | 智慧树登录态(首次手动登录后自动生成) | 运行 Autovisor 时手动登录一次 |
-| `%WEREAD_DIR%\.env` | 挑战起止日期与守卫参数 | 从本仓库 `weread-signin/` 复制 `.env.example` |
-| `%WEREAD_DIR%\config.yaml` | 底座配置(书籍、目标区间、通知 webhook) | 从本仓库 `weread-signin/` 复制 `config.yaml.example` |
-| `%WEREAD_DIR%\secrets\read-request.curl` | 网页版 `read` 请求的 cURL(含 cookie) | 浏览器对 `https://weread.qq.com/web/book/read` 请求 Copy as cURL (bash) |
-| `%WEREAD_DIR%\secrets\weread-api-key.txt` | 形如 `wrk-xxxx` 的官方 API Key | https://weread.qq.com/r/weread-skills |
-| `%WEREAD_DIR%\secrets\wecom-webhook.txt` | 企业微信群机器人 webhook | 企业微信群 → 添加群机器人 |
+路径占位符 `%REWARDS_DIR%` / `%AUTOVISOR_DIR%` / `%WEREAD_DIR%` 见根 README 的「路径约定」。
 
-## 原则
+## 微软积分(`%REWARDS_DIR%`)
 
-- 真实值与 cookie **只保存在各程序本体的目录里**,本仓库只放模板与「去哪拿」的说明。
-- 即使仓库是私有的,也不把 `.env`、cookie、webhook 提交进来(`.gitignore` 已排除)。
+| 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
+| --- | --- | --- | --- |
+| 账号邮箱与密码(可多个) | `.env` 的 `ACCOUNT_N_EMAIL` / `ACCOUNT_N_PASSWORD` | 自己的微软账号;从本仓库 `microsoft-rewards/env.example` 复制成 `.env` 后填 | 无固定期限,改密码即失效;更新 `.env`,无需重新构建。注意别把 6 位 PIN 当密码 |
+| TOTP 密钥(可选) | `.env` 的 `ACCOUNT_N_TOTP_SECRET` | 账号的 2FA 设置 | 随账号 2FA 重置;不配就得手动批准登录挑战(当前未配) |
+| 登录态与浏览器指纹 | `sessions\sessions.db`(SQLite) | 程序自动生成 | 会话级;失效会退回密码登录,删掉即强制重登 |
+| 企业微信群机器人 webhook | `wechat-bridge\data\wecom-webhook.txt` | 企业微信 App → 目标群 → 右上角 `...` → 群机器人 → 添加机器人 → 复制地址 | 无固定期限;把机器人移出群即失效,重新复制一份写回 |
+
+## 微信读书签到(`%WEREAD_DIR%`)
+
+| 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
+| --- | --- | --- | --- |
+| 网页 cookie | `secrets\read-request.curl` | 浏览器对 `https://weread.qq.com/web/book/read` 发起请求 → Copy as cURL (bash) → 覆盖该文件 | `wr_skey` 约 1.5 小时,`wr_rt` / `wr_vid` / `wr_pf` 360 天,都滚动刷新。程序每次运行前自动续期;先 `node src/index.js auth`;仍失效会推「需要重新登录」。只有超 360 天没开机或别处主动退出登录才需手动重抓 |
+| 官方只读 API Key | `secrets\weread-api-key.txt`(`wrk-...`) | <https://weread.qq.com/r/weread-skills> | 无固定期限,可随时作废;换新的后跑 `node src/stats.js weekly` 只读验证 |
+| App 渠道凭据 | `secrets\app-credentials.json`、`app-token.json`、`app-login-qr.png` | `node src/app-login.js qr` 出二维码 → 手机扫码 → `node src/app-login.js wait` | token 会过期;福利书币依赖它,没有则跳过相关步骤 |
+| 企业微信群机器人 webhook | `secrets\wecom-webhook.txt` | 同上,企业微信群机器人 | 文件不存在时不推送 |
+| 挑战窗口与守卫参数 | `.env` | 从本仓库 `weread-signin/.env.example` 复制 | `CHALLENGE_START` / `CHALLENGE_ENDS_ON` 等;不配时按「今天起 30 天」兜底 |
+| 底座配置 | `config.yaml` | 从本仓库 `weread-signin/config.yaml.example` 复制 | 书籍、目标区间、通知 webhook;`target_duration` 由 plan/run 自动改写 |
+
+## 智慧树刷课(`%AUTOVISOR_DIR%`)
+
+| 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
+| --- | --- | --- | --- |
+| 登录态 | `app\data\cookies.json` | 运行 `Autovisor.exe` 时手动登录一次后自动生成 | 站点会话过期即失效;重跑程序手动登录(登录态不在浏览器里,换浏览器不用重登) |
+| 账号密码 | 不存文件,`configs.ini` 的 `username` / `password` 留空 | — | 每次手动输入 |
+
+## 与本仓库无关的私有文件
+
+`~/.config/automation-suite/local-paths.env` 是**路径配置**,不是凭据:它告诉 `scripts/*.sh`
+本机的 `%WEREAD_DIR%`、本仓库路径与备份镜像在哪。该文件名与目录名保持历史值不改(改了本机脚本就失效),
+且永不入库。

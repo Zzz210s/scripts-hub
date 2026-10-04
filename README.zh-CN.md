@@ -2,149 +2,94 @@
 
 [English](README.md) | **简体中文**
 
-一个公开仓库,装三个 Windows 自动化程序(微软积分 / 智慧树刷课 / 微信读书签到)的脚本、配置、
-部署向导与换机恢复说明 —— **每个项目一个文件夹**。
+三个 Windows 无人值守自动化程序的配置、运行器脚本与说明:**微软积分**、**智慧树刷课**(Autovisor)、
+**微信读书签到**。一个程序一个文件夹。
 
-远程仓库名为 `Zzz210s/scripts-hub`;本机克隆目录名沿用旧的 `home-automation-configs`
-(改目录会带偏本机计划任务与脚本里的本地路径,所以只改远程名)。
+这里不是装完就能跑的程序。程序本体来自各自的上游项目、单独安装;本仓库放的是它们在本机怎么配、
+怎么被调度、怎么通知、换机后怎么恢复。内容已脱敏,不含任何真实凭据。
 
-程序本体来自上游项目、各自单独安装;这里放的是它们在本机的配置、无人值守调度层、企业微信通知层、
-部署与同步脚本,以及一份「换机后怎么恢复」的说明。**它不是装完就能跑的程序**。仓库内容已脱敏,
-不含任何真实凭据。
+## 30 秒地图
 
-另有一个通用组件 `wecom-notify/`:企业微信群机器人通知的独立 CLI 与库(零依赖),任意脚本可直接
-复用。微软积分与微信读书目前各自内置了一份更精简的发送实现,三者关系见「[许可与来源](#许可与来源)」。
-
-整体索引见 `docs/automation-overview.md`:每个程序是什么、代码在哪、跑在哪台机器、怎么被调度与通知。
-
-## 目录
-
-- [目录结构](#目录结构)
-- [三个程序](#三个程序)
-- [部署与维护脚本](#部署与维护脚本)
-- [路径约定](#路径约定)
-- [微信读书代码](#微信读书代码)
-- [通用约定](#通用约定)
-- [换机恢复](#换机恢复)
-- [凭据](#凭据)
-- [许可与来源](#许可与来源)
-
-## 目录结构
-
-| 路径 | 是什么 |
-| --- | --- |
-| `docs/` | 跨项目的说明:自动化全貌(索引)、为什么上云、云端调度约定、通知约定 |
-| `scripts/` | 部署/开通向导(Oracle Cloud、删库重建、微信读书代码同步) |
-| `microsoft-rewards/` | 配置快照、Windows 运行器脚本、企业微信通知层、上游补丁存档 |
-| `autovisor/` | 智慧树配置(课程链接,**不含账号密码**) |
-| `weread-signin/` | 微信读书程序的**完整代码**(见下文) |
-| `wecom-notify/` | 企业微信群机器人通知的独立 CLI 与库(零依赖),任意脚本可复用 |
-| `patches/` | 仅作溯源的存档补丁(不参与运行):目前是 weread-bot 上游 PR #53 的 diff 与 fork 说明 |
-| `tasks/` | 本机计划任务清单 + 错峰/通知/守卫约定 |
-| `secrets/README.md` | 凭据清单(哪个文件要填什么、去哪拿;不写值) |
+```
+scripts-hub/
+├── microsoft-rewards/   微软积分:配置、Windows 运行器、企业微信通知层
+├── autovisor/           智慧树刷课:只有 Autovisor 的配置
+├── weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
+├── wecom-notify/        通用的企业微信群机器人通知 CLI 与库(零依赖)
+├── docs/                跨项目约定与总览 —— 先看 docs/README.md
+├── machine/             本机部署现状:计划任务、本机目录,换机恢复时对照
+├── patches/             所有上游补丁,按上游项目分目录
+├── scripts/             开通与同步向导 —— 见 scripts/README.md
+├── LICENSE              仓库整体 GPL-3.0;weread-signin/ 与 wecom-notify/ 内为 MIT
+└── README.md / README.zh-CN.md
+```
 
 ## 三个程序
 
-| 程序 | 作用 | 程序本体 | 配置在本仓库的位置 |
-| --- | --- | --- | --- |
-| **微软积分** | 每天自动跑 Microsoft Rewards(搜索、活动、读文章),算完分推送到企业微信 | 上游 [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2 + 本仓库补丁,装在 `%REWARDS_DIR%` | `microsoft-rewards/` |
-| **智慧树刷课** | Autovisor,自动播放智慧树/知到的网课视频 | 上游 [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) v3.17.3,装在 `%AUTOVISOR_DIR%` | `autovisor/` |
-| **微信读书签到** | 每天自动完成微信读书阅读挑战的打卡(读满当日所需时长),再用官方只读 API 回读校验 | 底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot);代码本体就在本仓库的 `weread-signin/`,开发在本地克隆 `%WEREAD_DIR%` | `weread-signin/`(代码本体) |
+| 程序 | 干什么 | 代码在哪 | 跑在哪台机器 | 什么时候跑 | 怎么通知 |
+| --- | --- | --- | --- | --- | --- |
+| **微软积分** | 每天跑 Microsoft Rewards(搜索、活动、读文章),算完分推送结果 | 上游 [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2,装在 `%REWARDS_DIR%`;本仓放 `microsoft-rewards/`(配置 + 运行器)与 `patches/microsoft-rewards/` | 本机 Windows | 任务 `MicrosoftRewardsScript`:登录后 3 分钟(其后 1 小时内每 10 分钟重试)+ 08:00 起每 2 小时一次、14 小时窗口;一天最多 3 次尝试 | 企业微信群机器人,发送层在 `microsoft-rewards/wechat-bridge/` |
+| **智慧树刷课** | Autovisor 自动播放智慧树 / 知到的课程视频 | 上游 [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) v3.17.3,装在 `%AUTOVISOR_DIR%`;本仓放 `autovisor/configs.ini` | 本机 Windows(需要 Chrome 与图形会话) | 手动跑 `Autovisor.exe`,没有计划任务 | 不接通知,只有程序自己的界面与日志 |
+| **微信读书签到** | 每天完成微信读书阅读挑战,再用官方只读 API 回读校验时长真被计入 | 底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot);代码本体在本仓 `weread-signin/`(由本机开发克隆 `%WEREAD_DIR%` 自动生成的快照) | 本机 Windows | 任务 `WeReadSignIn`:登录后 10 分钟(1 小时内每 10 分钟重试)+ 08:30 起每 60 分钟一次、14 小时窗口 | 企业微信群机器人,发送层在 `weread-signin/src/notify.js` |
 
-另有一条不属于「程序」的计划任务:每天 02:00 无条件关机的 `AutoShutdown0200`(脚本在
-`microsoft-rewards/scripts-windows/auto-shutdown.bat`);各程序另有自己的任务注册脚本。
+另有一条不属于「程序」的计划任务:`AutoShutdown0200` 每天 02:00 无条件关机
+(`microsoft-rewards/scripts-windows/auto-shutdown.bat`)。各程序用自己的安装脚本注册任务。
 
-## 部署与维护脚本
+**云迁移还没做。** 上面这些现在全跑在这一台 Windows 机器上。把微软积分与微信读书签到搬到
+Oracle Cloud 永久免费 ARM 主机已经设计并写进文档(`docs/cloud-vm.md`、`docs/scheduling-convention.md`
+的云端一节),但卡在 Oracle 注册风控,目前还没有云主机。
 
-| 脚本 | 作用 |
+## 快速开始
+
+想用其中一个程序:进它自己的文件夹,读那个文件夹的 README —— 程序本体从上游装,文件夹里写清
+要复制哪些配置与脚本到哪里。
+
+想在新机器上把整套搭起来:
+
+1. 克隆本仓库。
+2. 先读 `docs/README.md` 了解约定,再读 `docs/automation-overview.md` 看全貌。
+3. 从上游安装三个程序本体,按各程序的 README 把本仓库的配置与运行器脚本覆盖进程序目录。
+4. 按 `docs/credentials.md` 填真实凭据。
+5. 注册计划任务;任务名与命令见 `machine/scheduled-tasks.md`。
+
+云主机(尚未开通):先跑 `scripts/oracle-setup-wizard.sh`,再读 `docs/cloud-vm.md`。
+
+## 文档索引
+
+| 文档 | 内容 |
 | --- | --- |
-| `scripts/oracle-setup-wizard.sh` | 一步步注册并开通 Oracle Cloud 永久免费 ARM 主机、放行两层防火墙、写 SSH 配置并验证连通 |
-| `scripts/public-reset-wizard.sh` | 删掉 `home-automation-configs` 并以新名 `scripts-hub` 重建为 PUBLIC(只有删库重建才真正清掉旧对象),再复核推送后的历史 |
-| `scripts/sync-weread-signin.sh` | 从本机开发克隆把 `weread-signin/` 发布出去,只复制 `git ls-files` 列出的文件(支持 `--dry-run`) |
-
-机器相关路径不写死:脚本默认读 `~/.config/automation-suite/local-paths.env`(在本仓库之外,永不入库),
-也支持环境变量覆盖(`WEREAD_SIGNIN_DIR`、`HOME_AUTOMATION_CONFIGS_DIR` 等)。
-
-`automation-suite` 是历史遗留的本机目录名(`~/.config/automation-suite/`、`~/.local/state/automation-suite/`),
-早于本仓库出现,与同名的远程仓库无关(那个仓库已删除)。
+| [`docs/README.md`](docs/README.md) | 全部文档的索引 |
+| [`docs/automation-overview.md`](docs/automation-overview.md) | 全貌:程序、代码、机器、调度、仓库 |
+| [`docs/scheduling-convention.md`](docs/scheduling-convention.md) | 错峰槽位与两段守卫,本机与规划中的云主机两版 |
+| [`docs/notification-convention.md`](docs/notification-convention.md) | 四种企业微信消息类型与文案硬规则 |
+| [`docs/cloud-vm.md`](docs/cloud-vm.md) | 为什么要云主机、哪些方案被否定 |
+| [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
+| [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | 本机计划任务清单,以及查看与停用命令 |
+| [`scripts/README.md`](scripts/README.md) | 三个向导各自做什么 |
 
 ## 路径约定
 
-文档里用三个占位符代指程序本体的安装目录,**按你的实际路径替换**(仓库不绑定任何盘符):
+文档不写死任何盘符。三个占位符指程序本体的安装目录,**按你的实际路径替换**:
 
 | 占位符 | 指什么 |
 | --- | --- |
-| `%REWARDS_DIR%` | 微软积分程序本体的根目录(解压上游 release 后所在目录) |
-| `%AUTOVISOR_DIR%` | Autovisor 的安装目录(其下有 `app\`) |
-| `%WEREAD_DIR%` | 微信读书的开发克隆(一个无远端的本地 git 仓库;它的已跟踪文件由 `scripts/sync-weread-signin.sh` 发布成 `weread-signin/`) |
+| `%REWARDS_DIR%` | 微软积分程序本体的根目录(解压上游 release 后的目录) |
+| `%AUTOVISOR_DIR%` | Autovisor 安装目录(其下有 `app\`) |
+| `%WEREAD_DIR%` | 微信读书的开发克隆 —— 一个本地 git 克隆,它的已跟踪文件由 `scripts/sync-weread-signin.sh` 发布成 `weread-signin/` |
 
-本仓库的微软积分运行器脚本都用 `%~dp0` 相对定位,不写死盘符,所以整个目录可以原样挪到任何路径。
-
-## 微信读书代码
-
-微信读书的代码就在本仓库的 `weread-signin/` —— 没有独立仓库了。开发在本地克隆
-`%WEREAD_DIR%`(一个无远端的本地 git 仓库)里做;`scripts/sync-weread-signin.sh`
-把它的已跟踪文件发布进 `weread-signin/`。
-
-- **对外来源**:本仓库的 `weread-signin/`。原独立仓库 `Zzz210s/weread-signin` 已删除,
-  所以这个目录是随项目发布的唯一一份。
-- **本机开发**:在 `%WEREAD_DIR%` 里改并提交;完事后跑 `bash scripts/sync-weread-signin.sh`,
-  在本仓库 `git status` 复核再提交 —— 那个提交才是「把改动发布出去」。
-- **本目录是自动生成的**:内容取自该克隆的已跟踪文件,取快照时的提交记在 `weread-signin/SNAPSHOT.txt`。
-- **同步方式**:`bash scripts/sync-weread-signin.sh` 从开发克隆复制 `git ls-files` 列出的文件,并重写
-  `weread-signin/README.md` 与 `README.zh-CN.md` 顶部的快照说明。不要直接改这里的文件,下次同步会覆盖。
-- `weread-signin/LOCAL-DEPLOYMENT.md` 是本仓库手写的本机运行说明,不参与同步。
-- **上游贡献通道(有意保留的 fork)**:`Zzz210s/weread-bot` 是底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) 的 fork,**不属于本仓库的合并范围**。它的 `fix/cookie-persist-after-renewal` 分支是开放中 PR [#53](https://github.com/funnyzak/weread-bot/pull/53) 的 head,删除或转移会让那个 PR 失效,所以不要删。补丁与状态说明存档在 `patches/weread-bot/`。
-
-## 通用约定
-
-- **真实凭据永不入库**:`.env`、cookie、webhook、API Key 只留在各程序自己的目录里;本仓库只有模板和说明(`.gitignore` 已排除)。
-- **调度统一**:Windows 计划任务 + 隐藏窗口启动器(`wscript` 调 `.vbs`)+ 单实例锁 + 一天一次守卫 + 失败重试 + 看门狗超时强杀。云端版改用 systemd timer(见 `docs/cloud-scheduling-convention.md`)。
-- **错峰**:每个程序占一个 30 分钟槽位、登录延迟按 7 分钟步进,运行前先查同伴的锁文件,任一在跑就跳过本次(见 `tasks/scheduling-convention.md`)。
-- **通知统一**:企业微信群机器人 webhook;消息类型与文案硬规则固定在 `docs/notification-convention.md`。
-- **运行数据统一**:状态与日志写在各程序目录的 `logs/`、`data/`、`sessions/`,不入库。
-
-## 换机恢复
-
-本仓库同时是一份恢复包。大致顺序:
-
-1. 克隆本仓库
-2. 装程序本体:微软积分解压上游 release 到 `%REWARDS_DIR%`;Autovisor 解压到 `%AUTOVISOR_DIR%`;把本仓库的 `weread-signin/` 目录复制到 `%WEREAD_DIR%` —— 它就是微信读书程序对外发布的那份代码(见 `weread-signin/LOCAL-DEPLOYMENT.md`)
-3. 把本仓库的模板/脚本覆盖进各程序目录:微软积分用 `microsoft-rewards/` 下的 `config.json`、`scripts-windows/`、`wechat-bridge/`、`patches/`(升级上游后按序 `git apply`)
-4. 按 `secrets/README.md` 填真实凭据
-5. 注册计划任务:微软积分跑 `%REWARDS_DIR%\scripts\windows\install-autostart.bat`;微信读书跑代码里的 `scripts\windows\install-autostart.ps1`
-6. 用 `tasks/inventory.md` 里的命令核对任务状态
-
-云主机:先用 `scripts/oracle-setup-wizard.sh` 开通,再按 `docs/cloud-vm.md` 与
-`docs/cloud-scheduling-convention.md` 装调度。
-
-## 凭据
-
-见 `secrets/README.md`:那里逐个列出哪个文件要填什么、去哪里拿。**仓库里没有任何真实值**(可以在历史里自查:所有 `.env`、cookie、webhook 从未被提交过)。
+运行器脚本都用 `%~dp0` 相对定位,整个目录可以原样挪到任何路径。必须留在本机、不入库的路径写在
+私有文件 `~/.config/automation-suite/local-paths.env`(在仓库之外);那里的 `automation-suite`
+是历史遗留的本机目录名,与任何 git 仓库无关。
 
 ## 许可与来源
 
-仓库整体按 **GPL-3.0** 授权(见 `LICENSE`)。选它的原因:本仓库分发的部分内容是 GPL-3.0 上游的衍生作品 —— 微软积分的补丁是直接针对上游 TypeScript 源码的 diff,`env.example` 是上游原版,`config.json` 由上游配置改写而来。整体用 GPL-3.0 与上游一致,不会产生许可冲突。其余文件(运行器脚本、通知层、脚本、说明文档)按 GPL-3.0 一并分发。
+仓库整体按 **GPL-3.0** 授权(见 `LICENSE`),因为其中一部分是 GPL-3.0 上游的衍生作品:
+微软积分的补丁是针对上游 TypeScript 源码的 diff,`microsoft-rewards/env.example` 是上游原版文件,
+`microsoft-rewards/config.json` 由上游配置改写而来。
 
-**有一个子目录是 MIT,不是 GPL-3.0**:`weread-signin/` 自带 MIT 的 `LICENSE`,
-继承自它的底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot),
-该文件原样保留。MIT 与 GPL-3.0 单向兼容,所以它可以放进 GPL-3.0 仓库一并分发;
-`weread-signin/` 下的文件仍按原始 MIT 条款。`autovisor/configs.ini` 同理(来自 MIT 上游)。
+两个子目录是 **MIT**,各自保留 `LICENSE`:`weread-signin/`(继承自底座 `funnyzak/weread-bot`)
+与 `wecom-notify/`(本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`)。`autovisor/configs.ini`
+同样来自 MIT 上游。MIT 与 GPL-3.0 单向兼容,所以它们能放进本仓库,内部文件仍按 MIT。
 
-另一个 MIT 子目录是 `wecom-notify/`:它原为独立私有仓库 `Zzz210s/wecom-notify`(本项目自研),
-2026-10-04 并入本仓库;该独立仓库随后已删除,这里是唯一副本。目录保留自己的 MIT `LICENSE`,
-目录内文件按 MIT 条款。
-
-内含的上游来源与许可:
-
-| 本仓库路径 | 来源 | 许可 |
-| --- | --- | --- |
-| `microsoft-rewards/patches/*.patch` | 针对 [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2 源码的补丁 | GPL-3.0 |
-| `microsoft-rewards/env.example` | 上游同名文件,原样保留 | GPL-3.0 |
-| `microsoft-rewards/config.json` | 由上游配置示例改写 | GPL-3.0 |
-| `microsoft-rewards/scripts-windows/`、`microsoft-rewards/wechat-bridge/` | 本项目自研(不来自上游) | GPL-3.0 |
-| `autovisor/configs.ini` | [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) 的配置模板,填了本机取值 | MIT |
-| `weread-signin/**` | 本项目自研(底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
-| `wecom-notify/**` | 本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`(2026-10-04 删除后并入本仓库) | MIT |
-| `patches/weread-bot/*.patch` | 针对 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) 的 PR #53 diff,存档不应用 | MIT |
-| `docs/`、`scripts/`、`tasks/`、`secrets/README.md`、两份 README | 本项目自研 | GPL-3.0 |
+`patches/weread-bot/` 记录一个有意保留的 fork,用来向上游提交修复,不属于本仓库的合并范围;
+为什么在 PR #53 关闭前不能删,见该目录的 README。

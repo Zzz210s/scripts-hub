@@ -16,7 +16,7 @@ check_node() {
 }
 
 check_package() {
-    [ -f ./package.json ] || fail "当前目录没有 package.json,请在仓库根目录执行本脚本"
+    [ -f ./package.json ] || fail "当前目录没有 package.json,请在本目录(wecom-notify/)执行本脚本"
     command -v npm >/dev/null 2>&1 || fail "未找到 npm"
 }
 

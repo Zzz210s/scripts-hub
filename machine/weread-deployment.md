@@ -1,28 +1,29 @@
 # 微信读书签到:本机部署说明
 
-本目录是微信读书签到程序的**代码本体**(MIT),由 `scripts/sync-weread-signin.sh` 从本机开发克隆
-`%WEREAD_DIR%` 生成;程序本体、配置模板、调度脚本、完整文档都在这里的 `README.md` / `README.zh-CN.md`。
-原独立仓库 `Zzz210s/weread-signin` 已于 2026-10-04 删除,本目录是它对外发布的那一份。
+本文件在 `machine/` 下,只记「这台机器上怎么跑」。代码本体与完整文档在仓库的 `weread-signin/`
+目录里 —— 那是 `scripts/sync-weread-signin.sh` 从本机开发克隆 `%WEREAD_DIR%` 生成的**自动快照**,
+不是手写文件(原独立仓库 `Zzz210s/weread-signin` 已于 2026-10-04 删除,快照是对外发布的唯一一份)。
 
-本文件只记「这台机器上怎么跑」,内容与本仓库的 `docs/`、`tasks/` 互补。
-文件由人工维护,`scripts/sync-weread-signin.sh` 不会覆盖它。
+程序做什么、命令有哪些、配置项含义:见 `../weread-signin/README.md`。本文件只补充本机部署。
 
 ## 这个程序做什么
 
-自动完成微信读书阅读挑战的每日打卡(当天有效阅读 > 5 分钟),跑完用腾讯官方只读 API 校验时长是否真的被计入。
+自动完成微信读书阅读挑战的每日打卡(当天有效阅读 > 5 分钟),跑完用腾讯官方只读 API 校验时长是否
+真的被计入。
 
-- 底座:[`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT),固定在 `vendor/` 下,commit 记在 `VENDOR_COMMIT.txt`
+- 底座:[`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT),固定在 `vendor/` 下,
+  commit 记在 `weread-signin/VENDOR_COMMIT.txt`
 - 本程序自己补的三块:读回校验、按剩余进度算每日目标、Windows 无人值守调度
 
-## 部署步骤(完整做法以本目录 `README.md` 为准)
+## 部署步骤(完整做法以 `../weread-signin/README.md` 为准)
 
 ```powershell
-# 1. 把本仓库的 weread-signin/ 目录复制到 %WEREAD_DIR%(路径约定见仓库根 README);
+# 1. 把仓库的 weread-signin/ 目录复制到 %WEREAD_DIR%(路径约定见仓库根 README);
 #    本机开发机上 %WEREAD_DIR% 已经是那个开发克隆,跳过这步
 # 2. 在 %WEREAD_DIR% 里复制配置模板
 #    .env.example -> .env,config.yaml.example -> config.yaml
 
-# 3. 填凭据:见本仓库 secrets/README.md 里 %WEREAD_DIR% 开头的几行
+# 3. 填凭据:见 ../docs/credentials.md 里 %WEREAD_DIR% 开头的几行
 
 # 4. 注册计划任务 + 体检
 powershell -ExecutionPolicy Bypass -File scripts\windows\install-autostart.ps1
@@ -31,10 +32,16 @@ node src/index.js auth
 
 ## 这台机器上的运行约定
 
-- 计划任务 `WeReadSignIn`:登录后 10 分钟触发(其后 1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次、持续 14 小时。与微软积分错峰(它 08:00 / 登录后 3 分钟),见 `tasks/scheduling-convention.md`。
-- 每次触发分两段过守卫。**本地段**(不联网、约 0.7 秒):已达标 / 尝试次数 / 同伴在跑 / 安静时段 / 距关机不足 30 分钟 / 内存不足;**联网段**:凭据体检(失效自动续期)与官方统计读取。本地段不满足时不访问网络。
-- 通知走企业微信:真跑一次发「开始 + 结束」两条;跳过类同一天同一种原因最多一条;凭据失效每次提醒。文案规则见 `docs/notification-convention.md`。
-- 停用/卸载:`Disable-ScheduledTask -TaskName WeReadSignIn` / `Unregister-ScheduledTask -TaskName WeReadSignIn`;临时暂停在程序目录放 `data/paused`。
+- 计划任务 `WeReadSignIn`:登录后 10 分钟触发(其后 1 小时内每 10 分钟重试)+ 每天 08:30 起每 60
+  分钟一次、持续 14 小时。与微软积分错峰(它 08:00 / 登录后 3 分钟),见
+  `../docs/scheduling-convention.md`。
+- 每次触发分两段过守卫。**本地段**(不联网、约 0.7 秒):已达标 / 尝试次数 / 同伴在跑 / 安静时段 /
+  距关机不足 30 分钟 / 内存不足;**联网段**:凭据体检(失效自动续期)与官方统计读取。本地段不满足时
+  不访问网络。
+- 通知走企业微信:真跑一次发「开始 + 结束」两条;跳过类同一天同一种原因最多一条;凭据失效每次提醒。
+  文案规则见 `../docs/notification-convention.md`。
+- 停用/卸载:`Disable-ScheduledTask -TaskName WeReadSignIn` /
+  `Unregister-ScheduledTask -TaskName WeReadSignIn`;临时暂停在程序目录放 `data/paused`。
 
 ## 日志与状态(都在 `%WEREAD_DIR%` 下)
 
@@ -48,6 +55,8 @@ node src/index.js auth
 
 ## 登录会过期吗
 
-会,但程序自己续。`wr_skey` 约 1.5 小时,`wr_rt` / `wr_vid` / `wr_pf` 360 天,都是滚动刷新;每次运行前做一次凭据体检,失效就先续期,仍失效就推企业微信「需要重新登录」并跳过。
+会,但程序自己续。`wr_skey` 约 1.5 小时,`wr_rt` / `wr_vid` / `wr_pf` 360 天,都是滚动刷新;每次
+运行前做一次凭据体检,失效就先续期,仍失效就推企业微信「需要重新登录」并跳过。
 
-只有长期不开机(超过 360 天)或你在别处主动退出登录之后,才需要手动重抓一次 `read` 请求的 cURL 覆盖 `secrets\read-request.curl`(具体命令见本目录 `README.md`)。
+只有长期不开机(超过 360 天)或你在别处主动退出登录之后,才需要手动重抓一次 `read` 请求的 cURL
+覆盖 `secrets\read-request.curl`(提取命令见 `../weread-signin/README.md`)。
