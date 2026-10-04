@@ -1,15 +1,17 @@
-// 企业微信群机器人推送:脱敏 + 与 wecom-notify 对齐的发送核心(字节截断、超时、退避重试)。
+// 企业微信群机器人推送:脱敏 + 与 wecom-core 对齐的发送核心(字节截断、超时、退避重试)。
 // 零依赖。
 import fs from 'node:fs'
 
-// >>> wecom-core begin —— 三份企业微信发送实现的共同核心,改一处必须同步三处
-// 本块在 wecom-notify/src/wecom.js、microsoft-rewards/wechat-bridge/lib/wecom.js、
-// weread-signin/src/notify.js 中逐字节一致,由 scripts/check-wecom-drift.mjs 校验。
+// >>> wecom-core begin —— 企业微信发送实现的共同核心,改一处必须同步其余各处
+// 本块在 proj-microsoft-rewards/wechat-bridge/lib/wecom.js 与 proj-weread-signin/src/notify.js
+// 中逐字节一致,由 scripts/check-wecom-drift.mjs 校验;共享规则见 docs/wecom-rules.md。
 const WECOM_TEXT_MAX_BYTES = 2048
 const WECOM_MARKDOWN_MAX_BYTES = 4096
 const WECOM_TIMEOUT_MS = 10000
+// 只有限流(45009)值得退避重试;其余 errcode 是服务端拒绝,重试没有意义。
+const WECOM_RETRYABLE_ERRCODES = new Set([45009])
 
-/** 服务端明确拒绝的 errcode:重试没有意义。 */
+/** 企业微信返回的 errcode 错误;errcode 供调用方区分限流与配置类失败。 */
 class WecomError extends Error {
     constructor(message, errcode) {
         super(message)
@@ -57,7 +59,7 @@ async function postOnce(url, body, fetchImpl, timeoutMs) {
     }
 }
 
-/** 截断 + 组包 + 发送:网络失败按指数退避重试,errcode 拒绝立即失败。 */
+/** 截断 + 组包 + 发送:网络失败与限流按指数退避重试,其余 errcode 拒绝立即失败。 */
 async function postWecom({ url, text, msgtype = 'text', retries = 2, timeoutMs = WECOM_TIMEOUT_MS, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), onRetry }) {
     const maxBytes = msgtype === 'markdown' ? WECOM_MARKDOWN_MAX_BYTES : WECOM_TEXT_MAX_BYTES
     const content = clampText(text, maxBytes)
@@ -71,7 +73,7 @@ async function postWecom({ url, text, msgtype = 'text', retries = 2, timeoutMs =
             return await postOnce(url, body, fetchImpl, timeoutMs)
         } catch (error) {
             lastError = error
-            if (error instanceof WecomError || attempt === retries) break
+            if ((error instanceof WecomError && !WECOM_RETRYABLE_ERRCODES.has(error.errcode)) || attempt === retries) break
             onRetry?.(error, attempt + 1)
             await sleep(1000 * 2 ** attempt)
         }
