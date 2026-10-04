@@ -86,4 +86,5 @@ scripts-hub/
 | [`docs/docker-deployment.md`](docs/docker-deployment.md) | 云主机上的容器化部署:分工、布局、顺序编排、守卫、启动时间优化、凭据与运维 |
 | [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
 | [`docs/local-deployment.md`](docs/local-deployment.md) | 本机部署现状:工作区、计划任务、运行器守卫、本机私有文件 |
+| [`docs/infrastructure.md`](docs/infrastructure.md) | 套件之外的底座:异地备份、通知中间层、更新与监控;已做的、已装的和待决策的 |
 | [`scripts/README.md`](scripts/README.md) | 向导、快照同步、项目自检引导与检查(企业微信漂移、隐私扫描) |

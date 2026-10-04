@@ -14,6 +14,7 @@
 | [cloud-vm.md](cloud-vm.md) | 为什么要一台云主机、评估过哪些替代方案、代价是什么 | 考虑云迁移,或想知道现在为什么还没上云 |
 | [docker-deployment.md](docker-deployment.md) | 云主机上的容器化部署:分层与布局、systemd 顺序编排、守卫与看门狗、启动时间优化、构建坑、凭据与运维 | 部署/升级云主机上的自动化程序,或排查「今天没跑」 |
 | [credentials.md](credentials.md) | 哪个文件要填什么、去哪拿、有效期多久、失效后怎么恢复 | 初次部署、凭据失效、换机恢复 |
+| [infrastructure.md](infrastructure.md) | 套件之外的底座:异地备份(restic + 清单 + 脚本)、通知中间层 apprise、更新 topgrade、监控 changedetection/RSSHub;哪些已做、哪些待决策 | 想给整套自动化加基础设施,或问「会不会丢」时 |
 
 不在 `docs/` 里的:
 

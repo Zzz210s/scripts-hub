@@ -97,4 +97,5 @@ the files live in [`scripts/linux/`](scripts/linux/). Why a VM at all: [`docs/cl
 | [`docs/docker-deployment.md`](docs/docker-deployment.md) | Containerised deployment on the cloud VM: layering, layout, sequential orchestration, guards, startup-time tuning, credentials and operations |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
 | [`docs/local-deployment.md`](docs/local-deployment.md) | What is deployed on this machine: workspaces, scheduled tasks, runner guards, private local files |
+| [`docs/infrastructure.md`](docs/infrastructure.md) | Off-site backup, the notification middle layer, update tooling and monitoring: what was decided, what was installed, what still needs a decision |
 | [`scripts/README.md`](scripts/README.md) | Wizards, snapshot syncs, project self-check scripts and checks (WeCom drift, privacy scan) |

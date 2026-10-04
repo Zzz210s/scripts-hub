@@ -1,0 +1,52 @@
+# topgrade 配置模板 —— 本机(Windows)保持「升级但不破坏配置」的收窄版。
+#
+# 放到 %APPDATA%\topgrade.toml(Windows)或 ~/.config/topgrade.toml,再跑 `topgrade --dry-run`
+# 看还剩哪些步骤。本机实测(`topgrade --dry-run`,17.12.3)默认会跑:
+#   self_update · wsl · chocolatey · scoop · winget · rustup · cargo · pi · vscode ·
+#   miktex · pip3 · helix · npm · yarn · pnpm · containers · github_cli_extensions ·
+#   claude_code · claude_code_plugins · skills · platformio_core · uv
+#
+# 为什么默认把这些关掉(每条都有具体后果,不是保守起见):
+#   pi              —— pi update 之后必须重跑 config-ai/setup.sh(重种扩展依赖 + 重打 dist 补丁),
+#                       无人值守升级会把已部署配置留在半旧状态。
+#   npm/pnpm/yarn   —— 全局包装着 pi 扩展、claude、opencode;升级后要人工验证,不宜无人值守。
+#   claude_code / claude_code_plugins / skills —— 同上,属 AI 工具链,改版会换行为。
+#   containers      —— Docker Desktop 常没起,只会报 "failed to connect to the docker API"。
+#   chocolatey      —— 本机没有 gsudo / Windows Sudo,必然 SKIPPED 并刷一条告警。
+#   uv / cargo / rustup / helix / miktex / platformio_core / pip3 / vscode —— 与自动化套件无关的
+#                       个人工具链,升不升由人决定,不让它自动动。
+#   self_update     —— topgrade 由 scoop 管,scoop 步骤已经覆盖。
+#   wsl / wsl_update —— 需要管理员,且与套件无关(`wsl --update` 是单独一步,要单独关)。
+#
+# 保留的步骤(scoop / winget / github_cli_extensions 等)都是「升了就完事、不需要后续动作」的。
+
+[misc]
+# `assume_yes = true` 等价于 `topgrade -y`:无人值守时别停在确认上。
+# 上面那步例外自己看着办。
+assume_yes = true
+# 只升 scoop / winget / gh 扩展三类,其余显式排除
+# 注意:步名必须是 topgrade 自己的名字 —— npm 那一步叫 `node`,写 `npm` 会让整个配置解析失败。
+disable = [
+  "self_update",
+  "wsl",
+  "wsl_update",
+  "chocolatey",
+  "pi",
+  "node",
+  "pnpm",
+  "yarn",
+  "containers",
+  "claude_code",
+  "claude_code_plugins",
+  "skills",
+  "uv",
+  "cargo",
+  "rustup",
+  "helix",
+  "miktex",
+  "platformio_core",
+  "pip3",
+  "vscode",
+]
+
+# 真正的最小集:上面再加 "winget" 与 "github_cli_extensions",只留 Scoop。

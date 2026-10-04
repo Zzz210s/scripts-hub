@@ -7,7 +7,7 @@
 
 下面所有命令都假设**当前目录是项目根** `proj-epic-free-games/`。从零开始时先做这一步,
 否则会掉进最常见的那种失败 —— 在 `~` 里直接跑 `node src/cli.js ...`,报
-`Cannot find module 'C:\Users\<你>\src\cli.js'`(那是拿错了目录,不是程序坏了)。
+`Cannot find module '<你的家目录>\src\cli.js'`(那是拿错了目录,不是程序坏了)。
 
 新机器(`git clone`):
 
@@ -16,10 +16,10 @@ git clone https://github.com/Zzz210s/scripts-hub.git
 cd scripts-hub/proj-epic-free-games
 ```
 
-本机已经克隆过(直接用这个绝对路径):
+本机已经克隆过(cmd 里用 `cd %USERPROFILE%\home-automation-configs\proj-epic-free-games`):
 
 ```bash
-cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"
+cd "$HOME/home-automation-configs/proj-epic-free-games"
 ```
 
 进去之后 `pwd` 应指向 `.../proj-epic-free-games`,`ls` 应看到 `src/`、`vendor/`、`package.json`。
@@ -35,8 +35,8 @@ scripts\windows\epic-run.bat --dry-run     rem 只报告会发什么,不联网
 ```
 
 `node src/cli.js` 的路径解析以**项目根**为基准(不是当前目录),所以从任何目录执行
-`node "C:/.../proj-epic-free-games/src/cli.js" status` 也能跑通;上面那些命令写成
-`node src/cli.js ...` 只是因为你已经 `cd` 进来了。
+`node "<项目根>/src/cli.js" status` 也能跑通;上面那些命令写成 `node src/cli.js ...`
+只是因为你已经 `cd` 进来了。
 
 ## 前置条件
 
@@ -68,7 +68,7 @@ bash ../scripts/setup-epic-free-games.sh
 真跑一次(会打开浏览器并结账),**都在项目根里执行**:
 
 ```bash
-cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"   # 从零开始时先做
+cd "$HOME/home-automation-configs/proj-epic-free-games"   # 从零开始时先做
 npm install && npx patchright install chromium   # 只需一次;必须在项目目录里跑
 node src/cli.js login          # 设备授权登录一次:打印链接与验证码,浏览器确认
 node src/cli.js auth           # 确认 token 已落盘且未过期
@@ -117,7 +117,7 @@ Holiday Sale 期间(12 月中旬至 1 月初,每天换一批)把 `intervalMinute
 
 | 现象 | 处置 |
 | --- | --- |
-| `Cannot find module 'C:\Users\<你>\src\cli.js'` | 你在 `~` 或其他目录里跑了命令。先 `cd` 到项目根(见「第 0 步」),或用 `scripts\windows\epic-status.bat` 这类快捷入口 |
+| `Cannot find module '<你的家目录>\src\cli.js'` | 你在 `~` 或其他目录里跑了命令。先 `cd` 到项目根(见「第 0 步」),或用 `scripts\windows\epic-status.bat` 这类快捷入口 |
 | `npm install` 装完还是缺 `patchright` | 它是在别的目录装的。`cd` 到项目根(里面有 `package.json`)再装 |
 | `[跳过] nothing-new` | 正常:当期免费项都领过了。想确认就 `node src/cli.js probe` |
 | `[跳过] probe-failed · HTTP ...` | 清单接口不通或被拦;过一会儿重试,或换网络 |

@@ -72,6 +72,13 @@
 
 `deploy-*.sh` 第 6 步会拿 `expect` 的输出与**本机任务的实际触发器**逐项比对,不一致报 `[缺]`。
 
+## 备份
+
+| 脚本 | 干什么 | 什么时候用 | 关键说明 |
+| --- | --- | --- | --- |
+| `backup.mjs` | 按 `config/backup.json` 枚举「没有异地副本」的资产,`--apply` 时交给 restic 推走 | 盘点、接异地备份、换机前的盘点 | **默认 `--dry-run`**,不需要 restic、不需要 `npm install`;`--list` / `--json` / `--set=<id>` / `--include-optional` / `--strict`;仓库与密码未配置时 `--apply` **故意拒绝执行**。选型与目标位置选项见 `../docs/infrastructure.md` |
+| `lib/backup.mjs` | 清单读取(展开 `~`、合并默认排除项)+ 递归枚举(文件数/字节数) | 被 `backup.mjs` 调用 | 纯本地纯函数,不联网;排除按目录名做 |
+
 ## 检查
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
@@ -118,4 +125,5 @@
   `deploy-plan.sh` 管文件计划/备份/二次确认/落盘。改部署行为改这两处,不要在单个 `deploy-*.sh` 里另写一份。
 - 提交前 `bash -n scripts/*.sh scripts/lib/*.sh` 与 `shellcheck scripts/*.sh scripts/lib/*.sh` 都应无输出;
   `node --check scripts/*.mjs scripts/lib/*.mjs` 与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过;
-  `node scripts/apply-schedule.mjs --dry-run` 应能把默认配置渲染成触发器(不改本机任务)。
+  `node scripts/apply-schedule.mjs --dry-run` 应能把默认配置渲染成触发器(不改本机任务);
+  `node scripts/backup.mjs` 应能枚举出全部集合(只读,不写盘)。

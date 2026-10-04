@@ -86,11 +86,11 @@ cd scripts-hub/proj-epic-free-games
 On this machine the repository is already cloned:
 
 ```bash
-cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"
+cd "$HOME/home-automation-configs/proj-epic-free-games"
 ```
 
 Skipping that `cd` is the most common failure: `node src/cli.js ...` from `~` resolves to
-`C:\Users\<you>\src\cli.js` and dies with `Cannot find module`. The CLI itself resolves all paths
+`<your home>\src\cli.js` and dies with `Cannot find module`. The CLI itself resolves all paths
 relative to the **project root**, not the current directory, so an absolute-path invocation works
 from anywhere.
 

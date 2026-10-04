@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "why": "本机异地备份清单。为什么不能靠 GitHub 与现有 bare 镜像兜底,见 docs/infrastructure.md。",
+  "placeholders": {
+    "note": "路径里的 %NAME% 从环境变量或机器私有的 ~/.config/automation-suite/local-paths.env 展开(与 scripts/lib/schedule-targets.mjs 同一套);~ 展开为家目录。这一步故意不写死盘符:仓库是公开的。",
+    "known": ["USERPROFILE", "NOTES_DIR", "WEREAD_SIGNIN_DIR", "REWARDS_DIR", "HOME_AUTOMATION_CONFIGS_DIR", "EPIC_DIR"]
+  },
+  "restic": {
+    "tag": "elevens-machine",
+    "repository": "",
+    "passwordFile": "",
+    "note": "两项留空时用环境变量 RESTIC_REPOSITORY / RESTIC_PASSWORD_FILE;都为空则 --apply 拒绝执行(见 docs/infrastructure.md 待决策项)。"
+  },
+  "excludeDirs": [
+    ".capture",
+    ".sessions-trash-20260903"
+  ],
+  "sets": [
+    {
+      "id": "credentials",
+      "priority": "critical",
+      "why": "真实凭据:任何仓库都不存它们,丢了要逐个重新申请或重配",
+      "paths": [
+        "~/.pi/agent/auth.json",
+        "~/.pi/agent/models-store.json",
+        "~/.pi/agent/mcp.json",
+        "~/.pi/agent/settings.json",
+        "~/.pi/agent/deepseek-valve.json",
+        "~/.pi/agent/max-tokens-guard.json",
+        "~/.opencommit",
+        "~/.npmrc",
+        "~/.ssh",
+        "~/.config/automation-suite",
+        "~/.config/cortexkit",
+        "~/AppData/Roaming/GitHub CLI",
+        "%WEREAD_SIGNIN_DIR%/.env",
+        "%WEREAD_SIGNIN_DIR%/secrets",
+        "%REWARDS_DIR%/.env",
+        "%HOME_AUTOMATION_CONFIGS_DIR%/proj-epic-free-games/secrets"
+      ]
+    },
+    {
+      "id": "agent-memory",
+      "priority": "critical",
+      "why": "AI 会话与项目记忆:只在本机,没有任何远端副本(magic-context 的 context.db 也在内)",
+      "paths": [
+        "~/.pi/agent/sessions",
+        "~/.pi/agent/sessions-trash",
+        "~/.local/share/cortexkit",
+        "~/.ai-brief-hub",
+        "~/.ai-sessions"
+      ]
+    },
+    {
+      "id": "notes",
+      "priority": "critical",
+      "why": "笔记库:远端 Zzz210s/note 是 public 且落后本地若干提交,不能当备份",
+      "paths": ["%NOTES_DIR%"]
+    },
+    {
+      "id": "workspaces",
+      "priority": "critical",
+      "why": "两个权威工作区:没有 origin,本地是唯一一份完整历史与运行数据",
+      "paths": ["%WEREAD_SIGNIN_DIR%", "%REWARDS_DIR%"],
+      "excludePaths": ["%WEREAD_SIGNIN_DIR%/.capture"]
+    },
+    {
+      "id": "repos",
+      "priority": "normal",
+      "why": "本机仓库克隆:GitHub 上有远端,但 ai-session-hub 存在未推提交",
+      "paths": [
+        "~/config-ai",
+        "~/ai-route",
+        "~/ai-session-hub",
+        "~/brief-hub",
+        "~/pi-codegraph",
+        "%HOME_AUTOMATION_CONFIGS_DIR%"
+      ]
+    },
+    {
+      "id": "weread-capture",
+      "priority": "low",
+      "optional": true,
+      "why": "微信读书接口逆向的抓取产物(约 600MB,gitignore 内)。想留就加 --include-optional",
+      "paths": ["%WEREAD_SIGNIN_DIR%/.capture"]
+    }
+  ]
+}

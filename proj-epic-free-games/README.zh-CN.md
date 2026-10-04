@@ -77,10 +77,10 @@ cd scripts-hub/proj-epic-free-games
 本机已经克隆过的话,直接用绝对路径进目录:
 
 ```bash
-cd "C:/Users/23652/home-automation-configs/proj-epic-free-games"
+cd "$HOME/home-automation-configs/proj-epic-free-games"
 ```
 
-漏掉这一步是最常见的坑:在 `~` 里跑 `node src/cli.js ...` 会去解析 `C:\Users\<你>\src\cli.js`,
+漏掉这一步是最常见的坑:在 `~` 里跑 `node src/cli.js ...` 会去解析 `<你的家目录>\src\cli.js`,
 报 `Cannot find module`。CLI 自身的路径解析以**项目根**为基准(不是当前目录),
 所以用绝对路径调用它,在哪个目录都能跑通。
 

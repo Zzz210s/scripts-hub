@@ -49,7 +49,9 @@ const USAGE = `用法:node src/cli.js <命令> [选项]
   -h, --help         显示本帮助
 
 从仓库外执行时用绝对路径,例如:
-  node C:/Users/<你>/home-automation-configs/proj-epic-free-games/src/cli.js status`
+  node "$HOME/home-automation-configs/proj-epic-free-games/src/cli.js" status
+
+Windows 快捷入口(自己 cd 到项目根):scripts/windows/epic-status.bat`
 
 const formatWindow = (game) => `${formatLocal(game.startAt)} - ${formatLocal(game.endAt)}`
 
