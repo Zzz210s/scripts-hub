@@ -105,7 +105,11 @@
 - 改任一份企业微信发送核心 → 权威实现是 `wecom-notify/src/wecom.js` 里 `wecom-core` 标记之间的整块;
   改完把该块整段同步到 `microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `weread-signin/src/notify.js`,
   再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印块大小)。三份只允许外壳
-  (消息排版、webhook 读取、返回形状)不同,核心必须逐字节一致。
+  (消息排版、webhook 读取、返回形状)不同,核心必须一致(按 LF 归一后逐字节)。
+- 换机或全新克隆后想先确认某个项目能不能跑 → 看项目目录的 `QUICKSTART.md`(前置条件 / 三条命令 /
+  凭据 / 验证 / 常见失败),或直接跑 `scripts/setup-<项目>.sh` 自检。改了自检脚本或项目步骤时,
+  把 `scripts/README.md` 与对应 `QUICKSTART.md` 一起更新。
+- 提交前跑 `node scripts/check-privacy.mjs`(本机路径、真实邮箱、凭据形状与机器私有标识,命中退出 1)。
 - 改微信读书签到代码 → **在本机开发克隆 `%WEREAD_DIR%` 里改并提交**,再跑
   `scripts/sync-weread-signin.sh` 发布到本仓库的 `weread-signin/`。直接改那个目录必被下次同步覆盖。
 - 凭据相关文件(`docs/credentials.md`、各子 README、`machine/scheduled-tasks.md`)在换机恢复时
