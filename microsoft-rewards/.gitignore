@@ -1,0 +1,22 @@
+sessions/
+dist/
+.dev/
+node_modules/
+/config.json
+/.vscode
+/diagnostics
+note
+.DS_Store
+.playwright-chromium-installed
+.stfolder/
+.env
+logs/
+patches/*.local
+wechat-bridge/credentials.json
+wechat-bridge/qr.png
+wechat-bridge/data/
+wechat-bridge/node_modules/
+.env.*
+
+# AI 产出的调研/报告文档:不上传仓库(全局规则)
+docs/
