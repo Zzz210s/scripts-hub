@@ -90,8 +90,8 @@ node src/index.js run --dry
 ## 错峰
 
 与微软积分对齐但错开:它 08:00 起、登录后 3 分钟;本程序 08:30 起、登录后 10 分钟。
-另外运行前会读同伴的锁文件(`BUSY_PEERS` 配置),任一在跑就跳过本次。约定见配置方案仓库的
-`tasks/scheduling-convention.md`。
+另外运行前会读同伴的锁文件(`BUSY_PEERS` 配置),任一在跑就跳过本次。约定见本仓库
+`docs/scheduling-convention.md`。
 
 ## 与关机任务的关系
 
