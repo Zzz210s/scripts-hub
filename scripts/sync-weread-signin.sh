@@ -25,7 +25,7 @@ fi
 SOURCE="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 
 # 本脚本自己生成、不参与同步的文件
-KEEP=(SNAPSHOT.txt)
+KEEP=(SNAPSHOT.txt QUICKSTART.md)
 
 # 只留在开发克隆里、不发布进快照的文件(机器相关的工作区说明)
 SKIP=(WORKSPACE.md)

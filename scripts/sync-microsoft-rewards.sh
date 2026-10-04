@@ -34,7 +34,7 @@ SOURCE="${REWARDS_DIR:-/e/Microsoft-Rewards-Script-4.3.2}"
 SENSITIVE_FILE="${SENSITIVE_PATTERNS_FILE:-$HOME/.config/automation-suite/sensitive-patterns.txt}"
 
 # 本目录自维护、不写不删
-KEEP=(README.md SNAPSHOT.txt)
+KEEP=(README.md SNAPSHOT.txt QUICKSTART.md)
 # 源仓库里不发布的路径前缀(第二个文件名里的 $t 是文件名的字面部分,不是变量)
 # shellcheck disable=SC2016
 SKIP=('patches/' 'scripts/windows/_t_logs$t.log')
