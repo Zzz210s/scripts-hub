@@ -16,7 +16,7 @@ LOG="$ROOT/logs/last-run.log"
 RLOG="$ROOT/logs/runner.log"
 STATE="$ROOT/logs/last-run.state"
 LOCK="$ROOT/logs/run.lock"
-NOTIFIED="$ROOT/logs/skip.notified"
+NOTIFIED="$ROOT/logs/skip.notified"   # 只给"需要你处理"用;正常跳过不再推送
 WATCHDOG_MIN="${REWARDS_RUN_TIMEOUT_MIN:-150}"
 mkdir -p "$ROOT/logs" "$ROOT/config" "$ROOT/sessions" "$SUITE_DIR/state"
 
@@ -48,10 +48,7 @@ if [ "$RUNS" -ge 3 ]; then
     KIND=exhausted
     [ "$RUNS" -ge 9 ] && KIND=handled
     note "day $TODAY closed, kind=$KIND, attempts=$RUNS, skipped"
-    if ! grep -q "$TODAY $KIND" "$NOTIFIED" 2>/dev/null; then
-        echo "$TODAY $KIND" >> "$NOTIFIED"
-        node "$ROOT/wechat-bridge/notify-skip.js" "$KIND" "$TODAY" >> "$RLOG" 2>&1
-    fi
+    # 正常跳过不推送(2026-10-04 用户要求),只写 runner.log
     exit 0
 fi
 
@@ -70,10 +67,7 @@ DECISION="$(node "$ROOT/deploy/run-config.js" decide)"
 if [ "$DECISION" = "SKIP" ]; then
     FREE_MB="$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo)"
     note "free memory ${FREE_MB}MB is below the gate, run skipped (attempt not consumed)"
-    if ! grep -q "$TODAY memory" "$NOTIFIED" 2>/dev/null; then
-        echo "$TODAY memory" >> "$NOTIFIED"
-        node "$ROOT/wechat-bridge/notify-skip.js" memory "$FREE_MB" >> "$RLOG" 2>&1
-    fi
+    # 正常跳过不推送(2026-10-04 用户要求),只写 runner.log
     exit 0
 fi
 

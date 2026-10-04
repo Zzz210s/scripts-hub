@@ -21,11 +21,11 @@
 | --- | --- | --- | --- | --- |
 | `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 | `src/run.js` 调 `messages.js` 的 `buildStartMessage` |
 | `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 | `src/messages.js` 的 `buildResultMessage`,由 `src/run.js` 发送 |
-| `skip` 正常跳过 | 触发被规则拦下,这次不跑;说清原因、会不会自动重试、不需要你做什么 | `wechat-bridge/notify-skip.js` `memory` / `handled` / `exhausted` | `src/notify-policy.js` 的 `buildSkipMessage`,reason 不属于 `action` | `src/policy.js` 的 `isSilentSkip` + `src/messages.js` 的 `buildSkipMessage`,由 `src/run.js` 发送 |
+| `skip` 正常跳过 | 触发被规则拦下,这次不跑 —— **2026-10-04 起一律只写运行日志,不推送** | 无(微软 `memory` / `handled` / `exhausted` 已不再调用推送) | 无(reason 不属于 `action` 时 `isSilentSkip` 返回 true) | `src/policy.js` 的 `isSilentSkip` |
 | `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` | 同上,`kind=captcha` / `login` / `blocked`;`captcha` 与 `blocked` 带预置结账链接 |
 
-「正常跳过」还分两档(2026-10-04 定):**不需要人做任何事**的那些只写运行日志、不推送;
-可能让今天白丢的那些照旧推送 —— 见下面的「静音的跳过」。
+「正常跳过」**一律不推送**(2026-10-04 用户要求):企业微信只收「需要你处理」那一类。
+跳过原因照旧整条写进运行日志,事后可查「这次为什么没跑」—— 见下面的「静音的跳过」。
 
 当日口径由 `result` 消息携带:它的汇总行里有「今日共 +X 分」,不再单独发一条当日汇总。
 微软积分原有的 `notify-day.js` 已于 2026-10-03 删除。
@@ -42,22 +42,23 @@
 例外:微信读书的 `stats-unavailable` 也在 `ALWAYS_NOTIFY` 里 —— 连续读不到统计说明
 API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都发。
 
-### 静音的跳过(2026-10-04)
+### 静音的跳过(2026-10-04 起:全部静音)
 
-用户反馈:一天里那些「本来一切正常、不需要人做任何事」的跳过消息没必要推 —— 看多了只会
-把真正的提醒一起忽略。于是按「不看会不会误事」分成两档:
+用户要求:企业微信不再接收「正常跳过」消息 —— 无论原因是什么,只要不需要人动手,就只写运行日志。
+理由:这类消息一天可能出现好几条,看多了会把真正需要处理的提醒一起忽略。
 
-| 档位 | 处理 | 原因 |
-| --- | --- | --- |
-| 静音 | **只写运行日志,不推送** | 微软 `handled`;微信读书 `done`、`peer-running`、`quiet-hours`;Epic `nothing-new`、`already-attempted`、`peer-running`、`quiet-hours` |
-| 照旧推送 | 推一条,同因同日最多一条 | 微软 `memory`、`exhausted`;微信读书 `low-memory`、`attempts-exhausted`、`before-shutdown`、`paused`;Epic `low-memory`、`probe-failed`、`paused` |
+| 项 | 处理 |
+| --- | --- |
+| 所有「正常跳过」原因 | **只写运行日志,不推送**(微软 `memory` / `handled` / `exhausted`;微信读书 `done`、`peer-running`、`quiet-hours`、`low-memory`、`attempts-exhausted`、`before-shutdown`、`paused`;Epic 同类的都算) |
+| 「需要你处理」 | 照旧推送,不受频率限制(微软 `nocreds`;微信读书 `credential-invalid`、`stats-unavailable`;Epic `captcha` / `login` / `blocked`) |
 
-- 静音不等于消失:文案照旧整条写进运行日志(微软 `logs\runner.log` 与 `logs\last-run.log`,
-  微信读书 `logs\last-run.log` / `logs\runner.log`),事后可查「这次为什么没跑」。
-- `paused` 不静音:它是只有人才能清掉的状态,消息里还带一个 `resume` 动作;留着不管会一直不跑,
-  属于「不看会误事」。
-- 实现:微软 `wechat-bridge/lib/skip.js` 的 `isSilentSkip(mode)`;微信读书 `src/notify-policy.js`
-  的 `isSilentSkip(reason)`。两边都有单测钉住这两张表。
+- 静音不等于消失:文案照旧整条写进运行日志(微软 `logs/runner.log` 与 `logs/last-run.log`,
+  微信读书 `logs/last-run.log` / `logs/runner.log`),事后可查「这次为什么没跑」。
+- 实现:微软 `wechat-bridge/lib/skip.js` 的 `isSilentSkip(mode)` 只在 `nocreds` 时为假;
+  微信读书 `src/notify-policy.js` 的 `isSilentSkip(reason)` 是 `!ACTION_REASONS.has(reason)`。
+  也就是说**新加的跳过原因默认静音**,不需要再维护白名单。
+- 正常跳过的文案构造分支已删除(微软 `lib/skip.js`、微信读书的 `buildSkipMessage` 只剩
+  `action` 与 `credential-invalid` 两条路),避免以后又被打开。
 
 ### `skip` 的原因词表
 
@@ -215,5 +216,5 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 2. `start` 一行套第 2 节的模板;`result` 按第 3 节的强制项自由排版;`skip` / `action`
    套第 2 节的两段模板(标题词 + 正文结构都不能混)。
 3. 补一条断言文案的测试(两边都有 `test/`),把"不带圆括号"和标题行形状锁住。
-4. 新的跳过原因要想清楚属于哪一档:不需要人管的写进静音表(两边各一份 `isSilentSkip` 的单测),
-   不看会误事的保持推送。
+4. 新的跳过原因默认静音(只写日志):只有当"不处理就会一直不跑"时才归入 `action` 档。
+   别为了"让人知道"而推送 —— 企业微信只留「需要你处理」这一类。
