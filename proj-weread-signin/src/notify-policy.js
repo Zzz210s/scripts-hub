@@ -19,15 +19,14 @@ import { writeJsonAtomic } from './atomic.js'
 const ALWAYS_NOTIFY = new Set(['credential-invalid', 'stats-unavailable'])
 // 不处理就一直不跑:凭据失效、读不到官方统计。其余原因下次触发都会自动重试
 const ACTION_REASONS = new Set(['credential-invalid', 'stats-unavailable'])
-// 不需要人做任何事的那些原因:程序下次触发会自己重试,推了只是噪音。
-// 2026-10-04 用户反馈:「今天已经跑过」「已达标」「同伴在跑」这类消息不必再推企业微信。
-// 反过来,可能让今天白丢的原因(内存不足 / 尝试次数用尽 / 临近关机 / 凭据失效 /
-// 统计读不到 / 已手动暂停)照旧推送,别把人训练成忽略通知。
-const SILENT_SKIP_REASONS = new Set(['done', 'peer-running', 'quiet-hours'])
+// 2026-10-04 用户要求:企业微信只收「需要你处理」的提醒,「正常跳过」一律只写运行日志。
+// 因此除 ACTION_REASONS 之外的任何原因都静默 —— 不再维护"哪些正常跳过要推"的白名单,
+// 也就不会再出现「今天已达标」「同伴在跑」「安静时段」「内存不足」「次数用尽」这类推送。
+const SILENT_SKIP_REASONS = new Set(['done', 'peer-running', 'quiet-hours'])   // 仅用于文档与测试引用
 
-/** 这条跳过是否只记运行日志、不推企业微信。 */
+/** 这条跳过是否只记运行日志、不推企业微信:只有"需要你处理"的才推。 */
 export function isSilentSkip(reason) {
-    return SILENT_SKIP_REASONS.has(reason)
+    return !ACTION_REASONS.has(reason)
 }
 
 export function buildSkipMessage({ reason, detail, plan, config, date, accountName }) {
@@ -86,7 +85,10 @@ export function buildSkipMessage({ reason, detail, plan, config, date, accountNa
             lines.push('后续:下一次触发会重试')
             lines.push('你需要做什么:不需要')
     }
-    if (plan) lines.push(`今日已读 ${plan.todayMinutes ?? 0} / ${plan.targetMinutes ?? 0} 分钟 · 官方口径 · 含你自己的阅读`)
+    // 进度行只给「静默跳过」用(它整条文案进运行日志,事后能看出当天读了多少)。
+    // 「需要你处理」不附这行(2026-10-04 用户要求):那种消息是让人去换凭据/查网络,
+    // 今日已读多少与要做的事无关,多一行只是噪音。
+    if (plan && !action) lines.push(`今日已读 ${plan.todayMinutes ?? 0} / ${plan.targetMinutes ?? 0} 分钟 · 官方口径 · 含你自己的阅读`)
     return lines.join('\n')
 }
 
