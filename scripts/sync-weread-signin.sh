@@ -117,7 +117,7 @@ find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
 {
   printf 'source: local development clone %%WEREAD_DIR%%, tracked files only\n'
-  printf 'published in: Zzz210s/home-automation-configs -> weread-signin/\n'
+  printf 'published in: Zzz210s/scripts-hub -> weread-signin/\n'
   printf 'source commit: %s\n' "$(git -C "$SOURCE" rev-parse HEAD)"
   printf 'source commit date: %s\n' "$(git -C "$SOURCE" log -1 --format=%cI)"
   printf 'synced file count: %s\n' "${#pub_files[@]}"

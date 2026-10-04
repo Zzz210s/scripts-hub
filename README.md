@@ -1,10 +1,13 @@
-# home-automation-configs
+# scripts-hub
 
 **English** | [简体中文](README.zh-CN.md)
 
-One public repository holding the configuration, runner scripts, deployment wizards and
+One public repository holding the scripts, configuration, deployment wizards and
 machine-migration notes for three Windows automation programs: Microsoft Rewards,
 Zhihuishu course playback, and WeRead check-in — one folder per project.
+
+The remote repository is `Zzz210s/scripts-hub`; the local clone on this machine keeps the
+older directory name `home-automation-configs` (so local paths in the reports still use it).
 
 The programs themselves come from upstream projects and are installed separately; what
 lives here is their configuration for one machine, the unattended-run layer, the WeCom
@@ -57,7 +60,7 @@ task through its own installer script.
 | Script | What it does |
 | --- | --- |
 | `scripts/oracle-setup-wizard.sh` | Interactive wizard to register and provision the Oracle Cloud Always Free ARM VM, open both firewall layers, write SSH config and verify connectivity |
-| `scripts/public-reset-wizard.sh` | Deletes and recreates `home-automation-configs` as a clean public repository (old objects really disappear only this way), then re-verifies the pushed history |
+| `scripts/public-reset-wizard.sh` | Deletes `home-automation-configs` and recreates it under the name `scripts-hub` as a clean public repository (old objects really disappear only this way), then re-verifies the pushed history |
 | `scripts/sync-weread-signin.sh` | Publishes `weread-signin/` from the local development clone, copying `git ls-files` only (`--dry-run` available) |
 
 Machine-specific paths are never hard-coded. The scripts read

@@ -1,9 +1,12 @@
-# home-automation-configs
+# scripts-hub
 
 [English](README.md) | **简体中文**
 
-一个公开仓库,装三个 Windows 自动化程序(微软积分 / 智慧树刷课 / 微信读书签到)的配置、运行器
-脚本、部署向导与换机恢复说明 —— **每个项目一个文件夹**。
+一个公开仓库,装三个 Windows 自动化程序(微软积分 / 智慧树刷课 / 微信读书签到)的脚本、配置、
+部署向导与换机恢复说明 —— **每个项目一个文件夹**。
+
+远程仓库名为 `Zzz210s/scripts-hub`;本机克隆目录名沿用旧的 `home-automation-configs`
+(改目录会带偏本机计划任务与脚本里的本地路径,所以只改远程名)。
 
 程序本体来自上游项目、各自单独安装;这里放的是它们在本机的配置、无人值守调度层、企业微信通知层、
 部署与同步脚本,以及一份「换机后怎么恢复」的说明。**它不是装完就能跑的程序**。仓库内容已脱敏,
@@ -51,7 +54,7 @@
 | 脚本 | 作用 |
 | --- | --- |
 | `scripts/oracle-setup-wizard.sh` | 一步步注册并开通 Oracle Cloud 永久免费 ARM 主机、放行两层防火墙、写 SSH 配置并验证连通 |
-| `scripts/public-reset-wizard.sh` | 删库重建 `home-automation-configs`(只有删库重建才真正清掉旧对象),再复核推送后的历史 |
+| `scripts/public-reset-wizard.sh` | 删掉 `home-automation-configs` 并以新名 `scripts-hub` 重建为 PUBLIC(只有删库重建才真正清掉旧对象),再复核推送后的历史 |
 | `scripts/sync-weread-signin.sh` | 从本机开发克隆把 `weread-signin/` 发布出去,只复制 `git ls-files` 列出的文件(支持 `--dry-run`) |
 
 机器相关路径不写死:脚本默认读 `~/.config/automation-suite/local-paths.env`(在本仓库之外,永不入库),

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 #
-# public-reset-wizard:重建 home-automation-configs(删库重建,清掉旧对象)。
+# public-reset-wizard:删库重建 + 更名 home-automation-configs -> scripts-hub。
 #
 # 为什么要删库:本仓库 force push 清洗过历史,旧对象仍能按旧 SHA 取到 —— 只有
-# 删库重建才真正消失。weread-signin 已并入本仓库的 weread-signin/ 快照,
-# 不再有独立仓库要处理。
+# 删库重建才真正消失。本轮顺带更名:删掉 Zzz210s/home-automation-configs,
+# 以新名 Zzz210s/scripts-hub 重建为 PUBLIC(旧对象随旧库一起消失),再把本地
+# 干净历史推过去、origin 改指新地址。
+# 本地目录名沿用 home-automation-configs(只改远程仓库名,免得带偏本机计划任务)。
+# weread-signin 已并入本仓库的 weread-signin/ 快照,不再有独立仓库要处理。
 #
 # 不重领微信读书 API Key:Key 片段进过 git 历史,但仓库当时是私有的、旧 SHA 从未公开,
 # 用户判断不必轮换。本向导只读取现有 Key,推送后用它跑一次只读校验。
@@ -203,18 +206,23 @@ LOCAL_PATHS_FILE="${AUTOMATION_LOCAL_PATHS:-$HOME/.config/automation-suite/local
 [[ -f "$LOCAL_PATHS_FILE" ]] && . "$LOCAL_PATHS_FILE"
 
 OWNER="${OWNER:-Zzz210s}"
-HAC_SLUG="$OWNER/home-automation-configs"
+OLD_SLUG="$OWNER/home-automation-configs"   # 待删除的旧名仓库
+NEW_SLUG="$OWNER/scripts-hub"               # 重建后的新名仓库
 WEREAD_DIR="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
-HAC_DIR="${HOME_AUTOMATION_CONFIGS_DIR:-$HOME/home-automation-configs}"
+HAC_DIR="${HOME_AUTOMATION_CONFIGS_DIR:-$HOME/home-automation-configs}"  # 本地目录名不改
 HAC_BACKUP_GLOB="${HAC_BACKUP_GLOB:-$HOME/home-automation-configs-backup-*.git}"
 KEY_FILE="${WEREAD_API_KEY_FILE:-$WEREAD_DIR/secrets/weread-api-key.txt}"
 SHA_DIR="${TMPDIR:-/tmp}/public-reset-old-shas"
+SHA_FILE="$SHA_DIR/home-automation-configs.txt"          # 删除前记下的旧 SHA
+TOPIC_FILE="$SHA_DIR/home-automation-configs-topics.txt" # 删除前抄下的旧 topics
 
 # 本向导不写 .env:把库的 ENV_FILE 指到临时文件,免得误读工作目录里已有的 .env。
 ENV_FILE="${TMPDIR:-/tmp}/public-reset-wizard.env"
 
-# 重建后的仓库元信息(与删库前一致,取自 2026-10-03 的线上值;topics 后来按新结构补齐)
-HAC_DESC="Configuration, deployment wizards, and machine-migration notes for three Windows automation programs: Microsoft Rewards, Zhihuishu course playback, and WeRead check-in."
+# 新名仓库的一句英文简介:三个自动化程序的脚本、配置与文档汇总。
+HAC_DESC="Runner scripts, configuration, and documentation for three Windows automation programs: Microsoft Rewards, WeRead check-in, and Zhihuishu course playback."
+# topics 优先从旧仓库现读(改名后原样沿用);读不到时退回这份 2026-10-04 的清单。
+# GitHub 不接受点号:topic 只能是小写字母数字与连字符。
 HAC_TOPICS=(automation configuration docs microsoft-rewards operations playwright self-hosted wecom windows-task-scheduler weread windows zzz-automation autovisor backup-restore oracle-cloud systemd gplv3)
 
 # 个人标识黑名单:默认只查通用 Key 形状;本机私有文件里一行一个额外模式,
@@ -260,14 +268,37 @@ gh_has_scope() {
 # capture_old_shas:删库前记录一批"重写前的旧 SHA",删完用来验证旧对象真的取不回。
 # 两个来源:线上现有 ref(force push 后仍能取回的那些)+ 备份里重写前的提交(抽样 5 个)。
 capture_old_shas() {
-  local file="$SHA_DIR/home-automation-configs.txt"
+  local file="$SHA_FILE"
   mkdir -p "$SHA_DIR"
   : > "$file"
-  git ls-remote "https://github.com/$HAC_SLUG.git" 2>/dev/null \
+  git ls-remote "https://github.com/$OLD_SLUG.git" 2>/dev/null \
     | awk '{print $1}' >> "$file" || true
   git --git-dir="$HAC_BACKUP" rev-list --all 2>/dev/null | head -n 5 >> "$file" || true
   sort -u -o "$file" "$file"
-  note "$HAC_SLUG 记下 $(grep -c . "$file" || true) 个旧 SHA(线上 ref + 备份里的旧提交)"
+  note "$OLD_SLUG 记下 $(grep -c . "$file" || true) 个旧 SHA(线上 ref + 备份里的旧提交)"
+}
+
+# capture_topics:删库前把旧仓库的 topics 抄下来,重建后原样写到新仓库。
+# 读不到(没网/权限不足)就用 HAC_TOPICS 备份清单;抄下来的顺手按 GitHub 规则清洗。
+capture_topics() {
+  mkdir -p "$SHA_DIR"
+  if gh api "repos/$OLD_SLUG/topics" --jq '.names[]' > "$TOPIC_FILE" 2>/dev/null \
+     && [[ -s "$TOPIC_FILE" ]]; then
+    grep -E '^[a-z0-9][a-z0-9-]*$' "$TOPIC_FILE" > "$TOPIC_FILE.clean" || true
+    mv "$TOPIC_FILE.clean" "$TOPIC_FILE"
+    note "$OLD_SLUG 现读 topics $(grep -c . "$TOPIC_FILE" || true) 个,重建后照抄"
+  else
+    printf '%s\n' "${HAC_TOPICS[@]}" > "$TOPIC_FILE"
+    warn "读不到旧仓库 topics,改用本地备份清单(${#HAC_TOPICS[@]} 个)"
+  fi
+}
+
+# load_topics:把抄下来的 topics 读进 HAC_TOPICS(替换静态清单);文件为空则保留静态清单。
+load_topics() {
+  local -a t=()
+  while IFS= read -r _t; do [[ -n "$_t" ]] && t+=("$_t"); done < "$TOPIC_FILE"
+  (( ${#t[@]} )) && HAC_TOPICS=("${t[@]}")
+  return 0
 }
 
 delete_repo() {
@@ -280,7 +311,7 @@ delete_repo() {
   (( verify > 0 )) || wsh_die "备份 $backup 读不出提交,拒绝删除 $slug。" "先修好备份再重跑。"
   if ! confirm "确认删除远程 $slug?(回滚只能靠备份 $backup 的 $verify 个提交)"; then
     wsh_die "已取消,什么都没删。" \
-      "想走网页删:$HAC_SLUG 的 Settings -> Danger Zone" \
+      "想走网页删:$OLD_SLUG 的 Settings -> Danger Zone" \
       "删完重跑本脚本,它会跳过删除直接重建。"
   fi
   gh repo delete "$slug" --yes || wsh_die "删除 $slug 失败。" \
@@ -325,7 +356,7 @@ set_topics() {
 # check_no_old_objects <slug> <dir>:重写前的旧 SHA 必须在远程已取不回。
 # 用一次性裸库去试,免得把旧对象又取回本地克隆。
 check_no_old_objects() {
-  local slug="$1" dir="$2" file="$SHA_DIR/${1##*/}.txt" sha type bad=0 total=0
+  local slug="$1" dir="$2" file="${3:-$SHA_FILE}" sha type bad=0 total=0
   local probe
   [[ -f "$file" ]] || { note "$slug:没有记录删除前的 SHA,跳过旧对象检查"; return 0; }
   probe="$(mktemp -d)/probe.git"
@@ -405,7 +436,7 @@ prune_local() {
 
 # ──────────────────────────────────────────────────────────────────────────
 
-banner "删库重建 home-automation-configs"
+banner "删库重建 + 更名:home-automation-configs -> scripts-hub"
 
 # ── Stage 1 ───────────────────────────────────────────────────────────────
 stage "预检:备份、本地仓库、gh"
@@ -416,10 +447,10 @@ esac
 command -v gh >/dev/null 2>&1 || wsh_die "没装 gh CLI。" "装好并 gh auth login 再重跑。"
 gh auth status >/dev/null 2>&1 || wsh_die "gh 未登录。" "先跑 gh auth login。"
 wsh_ok "gh 已登录:$(gh api user --jq .login)"
-say "home-automation-configs 要删库重建,删之前必须有可用的镜像备份;缺了就停下。"
+say "home-automation-configs 要删库重建为 scripts-hub,删之前必须有可用的镜像备份;缺了就停下。"
 check_backup "$HAC_BACKUP_GLOB" "home-automation-configs" HAC_BACKUP
 [[ -d "$HAC_DIR/.git" ]] || wsh_die "找不到本地仓库:$HAC_DIR" "重建后要推的就是它,缺了先克隆一份。"
-wsh_ok "$HAC_SLUG 本地克隆在 $HAC_DIR($(git -C "$HAC_DIR" rev-list --count main) 个提交,工作区 $(git -C "$HAC_DIR" status --porcelain | wc -l) 处改动)"
+wsh_ok "旧名 $OLD_SLUG · 本地克隆在 $HAC_DIR($(git -C "$HAC_DIR" rev-list --count main) 个提交,工作区 $(git -C "$HAC_DIR" status --porcelain | wc -l) 处改动)"
 [[ -f "$HAC_DIR/weread-signin/README.md" ]] || wsh_die "$HAC_DIR/weread-signin 里没有快照。" \
   "先跑 bash scripts/sync-weread-signin.sh 把 weread-signin 代码同步进来,再重跑本向导。"
 wsh_ok "weread-signin 快照已就位($(git -C "$HAC_DIR" ls-files weread-signin | wc -l) 个已入库文件)"
@@ -445,31 +476,36 @@ else
 fi
 
 # ── Stage 3 ───────────────────────────────────────────────────────────────
-stage "删除 home-automation-configs"
+stage "删除旧名 home-automation-configs"
 say "force push 之后旧对象仍能按旧 SHA 取到,只有删库重建才会真正消失。"
+say "本轮顺带更名:删掉旧名,再以 scripts-hub 重建为 PUBLIC —— 旧对象随旧库一起消失。"
 say "weread-signin 已并入本仓库的 weread-signin/ 快照,不再有独立仓库要处理。"
 step "先记下删除前的 ref 与备份里的旧提交,重建后逐个探测,确认取不回。"
 capture_old_shas
+step "再把旧仓库的 topics 抄下来,新仓库重建后照抄回去。"
+capture_topics
 warn "删除不可逆。备份是唯一的回滚依据:$HAC_BACKUP"
-delete_repo "$HAC_SLUG" "$HAC_BACKUP"
+delete_repo "$OLD_SLUG" "$HAC_BACKUP"
 
 # ── Stage 4 ───────────────────────────────────────────────────────────────
-stage "重建 home-automation-configs 为 PUBLIC"
-say "空库重建:一次提交都没有,历史从零开始。"
-create_repo "$HAC_SLUG" "$HAC_DESC"
-say "补回话题标签(整组覆盖,含新结构里的 oracle-cloud / systemd):"
-set_topics "$HAC_SLUG" "${HAC_TOPICS[@]}"
+stage "以新名重建 scripts-hub 为 PUBLIC"
+say "空库重建:一次提交都没有,历史从零开始;新仓库名 $NEW_SLUG。"
+create_repo "$NEW_SLUG" "$HAC_DESC"
+say "写回话题标签(用上一步从旧仓库抄下来的那一组,整组覆盖):"
+load_topics
+set_topics "$NEW_SLUG" "${HAC_TOPICS[@]}"
 note "许可不用设:GitHub 从仓库里的 LICENSE 识别(根目录 GPL-3.0;weread-signin/ 自带 MIT)。"
 pause "空库在、话题也回来了,按回车开始推送"
 
 # ── Stage 5 ───────────────────────────────────────────────────────────────
 stage "推送本地干净历史并校验"
 say "本地克隆里已经是清洗后的历史:作者邮箱统一 zzz210s@qq.com、个人路径占位化、无凭据。"
+say "推送目标改为新仓库 $NEW_SLUG,并把本地 origin 改指它(本地目录名仍叫 home-automation-configs)。"
 say "再剪掉本地 pack 里重写前的旧对象(不会被 push,但留着迟早在别处漏出来):"
 prune_local "$HAC_DIR"
-publish_repo "$HAC_SLUG" "$HAC_DIR"
-say "验证旧对象(删除前记下的那批 SHA 现在应该一个都取不回;用一次性裸库探测,不碰本地克隆):"
-check_no_old_objects "$HAC_SLUG" "$HAC_DIR"
+publish_repo "$NEW_SLUG" "$HAC_DIR"
+say "验证旧对象(删除前记下的那批 SHA 在新仓库里也应该一个都取不回;用一次性裸库探测,不碰本地克隆):"
+check_no_old_objects "$NEW_SLUG" "$HAC_DIR" "$SHA_FILE"
 say "最后确认删库重建没弄坏本机凭据:用现有 Key 跑一次只读统计(读官方数据,不上报、不改数据)。"
 note "不重领 Key:Key 片段进过 git 历史,但仓库当时是私有的、旧 SHA 从未公开,故不轮换。"
 note "weread-signin 没有 GitHub Actions workflow,这把 Key 不需要设成 repo secret。"
@@ -483,14 +519,20 @@ fi
 
 # ── Stage 6 ───────────────────────────────────────────────────────────────
 stage "收尾确认"
-vis=$(gh api "repos/$HAC_SLUG" --jq .visibility 2>/dev/null || echo 读不到)
-branch=$(gh api "repos/$HAC_SLUG" --jq .default_branch 2>/dev/null || echo 无)
-commits=$(gh api "repos/$HAC_SLUG/commits?per_page=1" --jq length 2>/dev/null || echo 0)
+vis=$(gh api "repos/$NEW_SLUG" --jq .visibility 2>/dev/null || echo 读不到)
+branch=$(gh api "repos/$NEW_SLUG" --jq .default_branch 2>/dev/null || echo 无)
+commits=$(gh api "repos/$NEW_SLUG/commits?per_page=1" --jq length 2>/dev/null || echo 0)
 if [[ "$vis" == "PUBLIC" && "$commits" != "0" ]]; then
-  wsh_ok "$HAC_SLUG:$vis · 默认分支 $branch · 有新历史"
+  wsh_ok "$NEW_SLUG:$vis · 默认分支 $branch · 有新历史"
 else
-  wsh_bad "$HAC_SLUG:可见性 $vis、提交探测 $commits —— 需要人工看一眼"
+  wsh_bad "$NEW_SLUG:可见性 $vis、提交探测 $commits —— 需要人工看一眼"
 fi
+if gh api "repos/$OLD_SLUG" --jq .full_name >/dev/null 2>&1; then
+  wsh_bad "旧名 $OLD_SLUG 仍然存在 —— 删除没生效,确认删的是同一个仓库"
+else
+  wsh_ok "旧名 $OLD_SLUG 已 404(不再存在)"
+fi
+wsh_ok "本地 $HAC_DIR 的 origin 已指向 https://github.com/$NEW_SLUG.git(目录名仍是 home-automation-configs)"
 warn "可选的收尾:撤掉 delete_repo 权限 —— gh auth login --hostname github.com --git-protocol https --web"
 note "本脚本留下的临时文件:$SHA_DIR/(删除前的 SHA 记录,验证完可删)"
 

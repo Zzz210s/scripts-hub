@@ -3,7 +3,7 @@
 这台机器上「每天自己跑一次」的三个自动化程序:是什么、代码在哪、跑在哪、怎么被调度、
 怎么通知、凭据放哪、哪些搬不走。**本文是索引**,每个细节都指向真源文件,不复制它们的正文。
 
-- 所在仓库:`Zzz210s/home-automation-configs`(公开),本文即 `docs/automation-overview.md`
+- 所在仓库:`Zzz210s/scripts-hub`(公开;本机目录名沿用 `home-automation-configs`),本文即 `docs/automation-overview.md`
 - 内容核对时间:2026-10-03(计划任务状态、上游 PR/issue 状态均为当时实查)
 
 ## 0. 真源在哪(改东西先看这张表)
@@ -35,8 +35,8 @@
 
 | 仓库 | 可见性 | 作用 | 现状备注 |
 | --- | --- | --- | --- |
-| `Zzz210s/home-automation-configs` | PUBLIC(用户跑 `public-reset-wizard.sh` 删库重建后) | 唯一的配置与文档仓库:三个程序的配置、运行器脚本、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 的代码本体 | 同时是恢复包;删库重建用于清掉旧对象 |
-| `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `home-automation-configs/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留,用 `scripts/sync-weread-signin.sh` 发布 |
+| `Zzz210s/scripts-hub` | PUBLIC(用户跑 `public-reset-wizard.sh` 删库重建后) | 唯一的配置与文档仓库:三个程序的配置、运行器脚本、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 的代码本体。由 `Zzz210s/home-automation-configs` 删库重建更名而来,本机目录名仍是 `home-automation-configs` | 同时是恢复包;删库重建用于清掉旧对象 |
+| `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留,用 `scripts/sync-weread-signin.sh` 发布 |
 | `Zzz210s/weread-bot` | PUBLIC(fork) | `funnyzak/weread-bot` 的 fork,只是贡献协议的上游通道 | 带开放 PR #53 与 issue #52,见第 8 节 |
 
 ## 3. 调度约定
@@ -112,7 +112,7 @@
 
 ## 5. 凭据清单
 
-真实值**只在各程序自己的目录里**,仓库里只有「去哪拿」的说明。`home-automation-configs/.gitignore`
+真实值**只在各程序自己的目录里**,仓库里只有「去哪拿」的说明。`scripts-hub/.gitignore`
 已排除 `.env`、`secrets/*`(保留 `secrets/README.md`)、`*webhook*.txt`、`data/`、`sessions/`、`logs/`。
 
 | 凭据 | 存在哪个文件 | 有效期 | 失效后怎么恢复 |
@@ -133,7 +133,7 @@
 | 必须本机 | 为什么 |
 | --- | --- |
 | 智慧树刷课 | Autovisor 用 Playwright 驱动**本机 Chrome** 播放视频,依赖图形会话;云主机没有可用桌面,也不该在无人看的服务器上放课件 |
-| Windows 计划任务 | 现状是三个任务(`MicrosoftRewardsScript` / `WeReadSignIn` / `AutoShutdown0200`,见 `home-automation-configs/tasks/inventory.md`);搬走要换成 systemd timer |
+| Windows 计划任务 | 现状是三个任务(`MicrosoftRewardsScript` / `WeReadSignIn` / `AutoShutdown0200`,见 `scripts-hub/tasks/inventory.md`);搬走要换成 systemd timer |
 | 看门狗、单实例锁、内存闸门 | 现在是 `.bat` / `.js` 实现,读的是本机内存水位与进程表;云端要改成 `flock` + systemd 超时 |
 | 02:00 无条件关机 | 本机专属任务,云端不需要 |
 
