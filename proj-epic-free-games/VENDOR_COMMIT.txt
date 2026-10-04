@@ -1,0 +1,26 @@
+free-games-claimer 固定底座
+======================
+
+本项目的 Epic 领取引擎来自 vogler/free-games-claimer(AGPL-3.0),以 vendor/free-games-claimer/
+子目录**原样收编进本仓库**(逐字节复制,未改一行)。要升级时按下面的 commit 重新取文件,
+不要在这里就地改代码 —— 改了就没有上游可比对,也没法把上游修复合并进来。
+
+仓库:   https://github.com/vogler/free-games-claimer.git
+分支:   dev
+commit: f282d3cca93b4b7ff68fa6b647cf0f11520b4273
+日期:   2026-09-02
+说明:   git-ignore .playwright-mcp/
+
+为什么取 dev 而不是 main:main 停在 2025-05-16 的 v1.4.0;dev 领先 141 个提交,
+含 Epic 领取的关键修复("eg: getGameUrls from json since webpage was giving 404s for some time"、
+"eg: fix detecting successful claim");GitHub 上该仓库的 pushedAt 2026-09-02 正是 dev。
+升级前先 `git log --oneline origin/main..origin/dev` 看差了什么,再决定切不切 main。
+
+复现:
+
+    git clone https://github.com/vogler/free-games-claimer.git
+    cd free-games-claimer && git checkout f282d3cca93b4b7ff68fa6b647cf0f11520b4273
+
+校验(应输出 f282d3cca93b4b7ff68fa6b647cf0f11520b4273):
+
+    git rev-parse HEAD
