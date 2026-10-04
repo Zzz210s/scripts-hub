@@ -28,7 +28,7 @@
 | 路径 | 是什么 |
 | --- | --- |
 | `docs/` | 跨项目的说明:自动化全貌(索引)、为什么上云、云端调度约定、通知约定 |
-| `scripts/` | 部署/开通向导(Oracle Cloud、删库重建、微信读书快照同步),以及两个保留备查的组织迁移脚本 |
+| `scripts/` | 部署/开通向导(Oracle Cloud、删库重建、微信读书快照同步) |
 | `microsoft-rewards/` | 配置快照、Windows 运行器脚本、企业微信通知层、上游补丁存档 |
 | `autovisor/` | 智慧树配置(课程链接,**不含账号密码**) |
 | `weread-signin/` | 权威微信读书仓库的**完整代码快照**(见下文) |
@@ -53,7 +53,6 @@
 | `scripts/oracle-setup-wizard.sh` | 一步步注册并开通 Oracle Cloud 永久免费 ARM 主机、放行两层防火墙、写 SSH 配置并验证连通 |
 | `scripts/public-reset-wizard.sh` | 删库重建 `home-automation-configs`(只有删库重建才真正清掉旧对象),把已只读的 `Zzz210s/weread-signin` 归档,再复核推送后的历史 |
 | `scripts/sync-weread-signin.sh` | 从权威克隆刷新 `weread-signin/` 快照,只复制 `git ls-files` 列出的文件(支持 `--dry-run`) |
-| `scripts/github-org-wizard.sh`、`scripts/transfer-repos.sh` | 来自已放弃的「把仓库迁进 GitHub 组织」方案,保留备查,平时不需要跑 |
 
 机器相关路径不写死:脚本默认读 `~/.config/automation-suite/local-paths.env`(在本仓库之外,永不入库),
 也支持环境变量覆盖(`WEREAD_SIGNIN_DIR`、`HOME_AUTOMATION_CONFIGS_DIR` 等)。

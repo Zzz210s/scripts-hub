@@ -32,7 +32,7 @@ which machine it runs on, how it is scheduled and notified.
 | Path | What it is |
 | --- | --- |
 | `docs/` | Cross-cutting notes: automation overview and index, why a cloud VM, the cloud scheduling convention, the notification convention |
-| `scripts/` | Deployment / provisioning wizards (Oracle Cloud, public reset, WeRead snapshot sync) plus two org-migration scripts kept for reference |
+| `scripts/` | Deployment / provisioning wizards (Oracle Cloud, public reset, WeRead snapshot sync) |
 | `microsoft-rewards/` | Config snapshot, Windows runner scripts, WeCom bridge, patch archive for the upstream source |
 | `autovisor/` | Zhihuishu configuration (course URLs, **no account or password**) |
 | `weread-signin/` | Full code snapshot of the authoritative WeRead repository (see [below](#weread-code-snapshot)) |
@@ -59,7 +59,6 @@ task through its own installer script.
 | `scripts/oracle-setup-wizard.sh` | Interactive wizard to register and provision the Oracle Cloud Always Free ARM VM, open both firewall layers, write SSH config and verify connectivity |
 | `scripts/public-reset-wizard.sh` | Deletes and recreates `home-automation-configs` as a clean public repository (old objects really disappear only this way), archives the now-read-only `Zzz210s/weread-signin`, then re-verifies the pushed history |
 | `scripts/sync-weread-signin.sh` | Refreshes `weread-signin/` from the authoritative clone, copying `git ls-files` only (`--dry-run` available) |
-| `scripts/github-org-wizard.sh`, `scripts/transfer-repos.sh` | From an abandoned "move the repositories into a GitHub organization" plan; kept for reference, not needed for normal use |
 
 Machine-specific paths are never hard-coded. The scripts read
 `~/.config/automation-suite/local-paths.env` (outside this repository, never committed)
