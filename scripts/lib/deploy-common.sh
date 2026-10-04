@@ -64,6 +64,39 @@ task_line() {
   powershell.exe -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; \$t=Get-ScheduledTask -TaskName '$1' -ErrorAction SilentlyContinue; if(-not \$t){exit 3}; \$tr=(\$t.Triggers|ForEach-Object{\$_.CimClass.CimClassName}) -join ','; Write-Output (\$t.State.ToString()+' '+\$tr)" 2>/dev/null
 }
 
+# 读 config/schedule.json 里某个程序的期望触发器(start=/delay=/interval=/duration=)
+schedule_expect() {
+  command -v node >/dev/null 2>&1 || return 1
+  node "$REPO_DIR/scripts/lib/schedule.mjs" expect "$1" 2>/dev/null
+}
+
+# 本机计划任务的实际触发器;键与上面一致,查不到/形状不认识时返回 1
+task_expect() {
+  command -v powershell.exe >/dev/null 2>&1 || return 1
+  powershell.exe -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; \$t=Get-ScheduledTask -TaskName '$1' -ErrorAction SilentlyContinue; if(-not \$t){exit 3}; \$l=\$t.Triggers|Where-Object{\$_.CimClass.CimClassName -like '*Logon*'}|Select-Object -First 1; \$c=\$t.Triggers|Where-Object{\$_.CimClass.CimClassName -notlike '*Logon*'}|Select-Object -First 1; if(-not \$c -or -not \$c.StartBoundary){exit 4}; Write-Output ('start='+\$c.StartBoundary.Substring(11,5)); Write-Output ('delay='+\$l.Delay); Write-Output ('interval='+\$c.Repetition.Interval); Write-Output ('duration='+\$c.Repetition.Duration)" 2>/dev/null
+}
+
+# 比对期望与实际:不一致就说清差异和怎么生效(PowerShell 输出是 CRLF,先去掉 \r)
+deploy_check_schedule() {
+  local want have
+  if ! want=$(schedule_expect "$1"); then
+    miss "读不到 config/schedule.json 里 $1 的期望触发器(需要 node)"
+    return 0
+  fi
+  if ! have=$(task_expect "$2"); then
+    info "查不到 $2 的实际触发器,跳过时间比对"
+    return 0
+  fi
+  want=${want//$'\r'/}
+  have=${have//$'\r'/}
+  if [[ "$want" == "$have" ]]; then
+    ok "触发时间与 config/schedule.json 一致($(echo "$want" | tr '\n' ' '))"
+  else
+    miss "触发时间与配置不一致:配置 $(echo "$want" | tr '\n' ' ')|任务 $(echo "$have" | tr '\n' ' ')"
+    info '生效:node scripts/apply-schedule.mjs --dry-run 看生成物,再 --apply --yes 注册'
+  fi
+}
+
 # 判定 TARGET 是否与快照同源(HEAD == SNAPSHOT.txt 的 source commit);设置 SAME_SOURCE
 deploy_same_source() {
   SAME_SOURCE=0

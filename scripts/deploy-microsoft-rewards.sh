@@ -128,15 +128,16 @@ else
   miss '缺 node_modules —— 补:cd <工作区> && npm ci'
 fi
 
-step '6/6 计划任务'
+step '6/6 计划任务(触发时间来自 config/schedule.json)'
 for pair in 'MicrosoftRewardsScript:登录触发 + 每日触发' 'AutoShutdown0200:每日 02:00 触发'; do
   name=${pair%%:*}
   want=${pair#*:}
   if line=$(task_line "$name") && [[ -n "$line" ]]; then
     ok "$name:${line%% *};触发器 ${line#* }"
   else
-    miss "计划任务 $name 不存在或查不到(应:$want)—— 微软积分重跑 $TARGET/scripts/windows/install-autostart.bat;关机见同目录文档"
+    miss "计划任务 $name 不存在或查不到(应:$want)—— 微软积分重跑 node scripts/apply-schedule.mjs --apply --yes;关机见同目录文档"
   fi
 done
+deploy_check_schedule microsoft-rewards MicrosoftRewardsScript
 
 deploy_finish

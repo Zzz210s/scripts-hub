@@ -126,7 +126,7 @@ else
   miss '缺底座 vendor —— 只有真跑阅读需要;补:bash scripts/setup-weread-signin.sh --vendor'
 fi
 
-step '6/6 计划任务'
+step '6/6 计划任务(触发时间来自 config/schedule.json)'
 if line=$(task_line "$TASK_NAME") && [[ -n "$line" ]]; then
   state=${line%% *}
   trig=${line#* }
@@ -134,10 +134,11 @@ if line=$(task_line "$TASK_NAME") && [[ -n "$line" ]]; then
   if [[ "$trig" == *LogonTrigger* && "$trig" == *DailyTrigger* ]]; then
     ok '登录触发 + 每日触发都在'
   else
-    miss "触发器与约定不符(应同时有登录与每日触发)—— 重跑 $TARGET/scripts/windows/install-autostart.ps1"
+    miss "触发器与约定不符(应同时有登录与每日触发)—— 重跑 node scripts/apply-schedule.mjs --apply --yes"
   fi
 else
-  miss "计划任务 $TASK_NAME 不存在或查不到 —— 注册:powershell -ExecutionPolicy Bypass -File \"$TARGET/scripts/windows/install-autostart.ps1\""
+  miss "计划任务 $TASK_NAME 不存在或查不到 —— 注册:node scripts/apply-schedule.mjs --dry-run 看,再 --apply --yes"
 fi
+deploy_check_schedule weread-signin "$TASK_NAME"
 
 deploy_finish
