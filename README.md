@@ -15,6 +15,11 @@ notification layer, the deployment/sync scripts, and the "how to restore this on
 machine" guide. It is **not** a package you install and run. Everything is sanitized:
 no real credentials.
 
+There is one shared component, `wecom-notify/`: a standalone CLI and library for WeCom
+group-robot notifications (zero dependencies), reusable from any script. Microsoft Rewards
+and WeRead each currently embed their own thinner sender; the relationship is described
+under [License and provenance](#license-and-provenance).
+
 `docs/automation-overview.md` is the index — what each program is, where its code lives,
 which machine it runs on, how it is scheduled and notified.
 
@@ -39,6 +44,8 @@ which machine it runs on, how it is scheduled and notified.
 | `microsoft-rewards/` | Config snapshot, Windows runner scripts, WeCom bridge, patch archive for the upstream source |
 | `autovisor/` | Zhihuishu configuration (course URLs, **no account or password**) |
 | `weread-signin/` | The complete WeRead program code (see [below](#weread-code)) |
+| `wecom-notify/` | Standalone WeCom group-robot notification CLI + library (zero dependencies), reusable by any script |
+| `patches/` | Archived patches kept for provenance only (not applied by this repo): currently the weread-bot upstream PR #53 diff and the fork notes |
 | `tasks/` | Windows scheduled-task inventory plus the local staggering / notification / guard conventions |
 | `secrets/README.md` | Credentials checklist: which value goes where and where to get it, never the value |
 
@@ -102,6 +109,12 @@ files into `weread-signin/`.
   the next sync overwrites them.
 - `weread-signin/LOCAL-DEPLOYMENT.md` is hand-written in this repository (machine-specific
   run notes) and is exempt from the sync.
+- **Upstream contribution channel (an intentional fork)**: `Zzz210s/weread-bot` is a fork of
+  the [base `funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) and is **not in scope
+  for this repository's merge**. Its `fix/cookie-persist-after-renewal` branch is the head of
+  open PR [#53](https://github.com/funnyzak/weread-bot/pull/53); deleting or transferring the
+  fork would invalidate that PR, so do not delete it. The patch and status notes are archived
+  in `patches/weread-bot/`.
 
 ## Shared conventions
 
@@ -162,6 +175,17 @@ and keeps that file. MIT is one-way compatible with GPL-3.0, so it can be redist
 inside a GPL-3.0 repository; the files under `weread-signin/` retain their original MIT
 terms. The same applies to `autovisor/configs.ini`, which comes from an MIT upstream.
 
+Another MIT subdirectory is `wecom-notify/`: it was the standalone private repository
+`Zzz210s/wecom-notify` (original to this project) and was merged here on 2026-10-04, keeping
+its own MIT `LICENSE`; the files inside are under MIT terms.
+
+**Three notification senders.** The authoritative, most complete WeCom sender is
+`wecom-notify/` (text and Markdown, timeout, exponential-backoff retry, webhook resolution
+and masking). `microsoft-rewards/wechat-bridge/lib/wecom.js` and
+`weread-signin/src/notify.js` are separate, thinner implementations of the same protocol;
+neither imports `wecom-notify/`. This merge only archived and documented the relationship —
+no program code was changed.
+
 Upstream sources and their licenses:
 
 | Path in this repo | Origin | License |
@@ -172,4 +196,6 @@ Upstream sources and their licenses:
 | `microsoft-rewards/scripts-windows/`, `microsoft-rewards/wechat-bridge/` | Original to this repository (not from upstream) | GPL-3.0 |
 | `autovisor/configs.ini` | Configuration template from [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) with local values filled in | MIT |
 | `weread-signin/**` | Original to this repository (base: [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
+| `wecom-notify/**` | Original to this repository; formerly the standalone private repository `Zzz210s/wecom-notify` | MIT |
+| `patches/weread-bot/*.patch` | PR #53 diff against [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot), archived and not applied | MIT |
 | `docs/`, `scripts/`, `tasks/`, `secrets/README.md`, both READMEs | Original to this repository | GPL-3.0 |

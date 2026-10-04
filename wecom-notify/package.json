@@ -1,0 +1,26 @@
+{
+    "name": "wecom-notify",
+    "version": "1.0.0",
+    "private": true,
+    "description": "企业微信群机器人 webhook 通知 CLI 与库(零依赖)",
+    "type": "module",
+    "bin": {
+        "wecom-notify": "./cli.js"
+    },
+    "main": "./src/wecom.js",
+    "engines": {
+        "node": ">=18"
+    },
+    "scripts": {
+        "test": "node --test"
+    },
+    "keywords": [
+        "wecom",
+        "wechat-work",
+        "webhook",
+        "notification",
+        "cli"
+    ],
+    "license": "MIT",
+    "author": "Zzz210s"
+}

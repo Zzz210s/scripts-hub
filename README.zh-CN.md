@@ -12,6 +12,9 @@
 部署与同步脚本,以及一份「换机后怎么恢复」的说明。**它不是装完就能跑的程序**。仓库内容已脱敏,
 不含任何真实凭据。
 
+另有一个通用组件 `wecom-notify/`:企业微信群机器人通知的独立 CLI 与库(零依赖),任意脚本可直接
+复用。微软积分与微信读书目前各自内置了一份更精简的发送实现,三者关系见「[许可与来源](#许可与来源)」。
+
 整体索引见 `docs/automation-overview.md`:每个程序是什么、代码在哪、跑在哪台机器、怎么被调度与通知。
 
 ## 目录
@@ -35,6 +38,8 @@
 | `microsoft-rewards/` | 配置快照、Windows 运行器脚本、企业微信通知层、上游补丁存档 |
 | `autovisor/` | 智慧树配置(课程链接,**不含账号密码**) |
 | `weread-signin/` | 微信读书程序的**完整代码**(见下文) |
+| `wecom-notify/` | 企业微信群机器人通知的独立 CLI 与库(零依赖),任意脚本可复用 |
+| `patches/` | 仅作溯源的存档补丁(不参与运行):目前是 weread-bot 上游 PR #53 的 diff 与 fork 说明 |
 | `tasks/` | 本机计划任务清单 + 错峰/通知/守卫约定 |
 | `secrets/README.md` | 凭据清单(哪个文件要填什么、去哪拿;不写值) |
 
@@ -86,6 +91,7 @@
 - **同步方式**:`bash scripts/sync-weread-signin.sh` 从开发克隆复制 `git ls-files` 列出的文件,并重写
   `weread-signin/README.md` 与 `README.zh-CN.md` 顶部的快照说明。不要直接改这里的文件,下次同步会覆盖。
 - `weread-signin/LOCAL-DEPLOYMENT.md` 是本仓库手写的本机运行说明,不参与同步。
+- **上游贡献通道(有意保留的 fork)**:`Zzz210s/weread-bot` 是底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) 的 fork,**不属于本仓库的合并范围**。它的 `fix/cookie-persist-after-renewal` 分支是开放中 PR [#53](https://github.com/funnyzak/weread-bot/pull/53) 的 head,删除或转移会让那个 PR 失效,所以不要删。补丁与状态说明存档在 `patches/weread-bot/`。
 
 ## 通用约定
 
@@ -122,6 +128,9 @@
 该文件原样保留。MIT 与 GPL-3.0 单向兼容,所以它可以放进 GPL-3.0 仓库一并分发;
 `weread-signin/` 下的文件仍按原始 MIT 条款。`autovisor/configs.ini` 同理(来自 MIT 上游)。
 
+另一个 MIT 子目录是 `wecom-notify/`:它原为独立私有仓库 `Zzz210s/wecom-notify`(本项目自研),
+2026-10-04 并入本仓库,保留自己的 MIT `LICENSE`,目录内文件按 MIT 条款。
+
 内含的上游来源与许可:
 
 | 本仓库路径 | 来源 | 许可 |
@@ -132,4 +141,6 @@
 | `microsoft-rewards/scripts-windows/`、`microsoft-rewards/wechat-bridge/` | 本项目自研(不来自上游) | GPL-3.0 |
 | `autovisor/configs.ini` | [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) 的配置模板,填了本机取值 | MIT |
 | `weread-signin/**` | 本项目自研(底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
+| `wecom-notify/**` | 本项目自研,原独立私有仓库 `Zzz210s/wecom-notify` | MIT |
+| `patches/weread-bot/*.patch` | 针对 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) 的 PR #53 diff,存档不应用 | MIT |
 | `docs/`、`scripts/`、`tasks/`、`secrets/README.md`、两份 README | 本项目自研 | GPL-3.0 |
