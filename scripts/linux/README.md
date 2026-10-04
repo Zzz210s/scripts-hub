@@ -49,10 +49,25 @@ systemctl list-timers automation-suite.timer
 | 看守卫与跳过原因 | `tail -f /srv/apps/automation/rewards/logs/runner.log` |
 | 今天算不算完成 | `cat /srv/apps/automation/rewards/logs/last-run.state`(9 = 已完成)、`cat /srv/apps/automation/weread/data/state.json` |
 | 暂停 / 恢复 | `touch|rm /srv/apps/automation/weread/data/paused` |
-| 只预览不真跑 | `docker compose -f /srv/apps/automation/compose.yaml run --rm -T weread-run node src/index.js plan` |
+| 只预览不真跑 | `docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node weread-run src/index.js plan`<br>注意必须带 `--entrypoint node` —— 服务的 entrypoint 是 `run-once.sh`(直接跑一次),不带它时后面跟的命令会被忽略 |
 
 ## 一次性容器的边界
 
 - 两个服务都跑完即退,**没有常驻进程**;`docker ps` 里平时看不到它们,`docker ps -a | grep -E 'rewards-run|weread-run'` 只在运行中或异常残留时才有输出。
 - 并发由两把锁保证:宿主 `state/*.flock`(编排与单程序)+ 容器内程序自己的锁。
 - 看门狗超时会 `docker rm -f` 掉对应容器并记为失败(当天 12:00 那次会重试)。
+
+## 自检脚本(手动跑,不进编排)
+
+| 脚本 | 查什么 | 跑法 |
+| --- | --- | --- |
+| `rewards/deploy/smoke.sh` | 账号数、配置、登录态、浏览器能否启动、ConfigSync | `docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint bash rewards-run /opt/deploy/smoke.sh` |
+| `weread/deploy/test-peer.mjs` | 错峰:同伴锁判定(无锁 → 不忙;新锁 → 忙) | `... run --rm -T --entrypoint node weread-run /opt/deploy/test-peer.mjs` |
+| `weread/deploy/test-welfare.mjs` | App 凭据换取 + 福利书币 / 周奖励接口 | `... run --rm -T --entrypoint node weread-run /opt/deploy/test-welfare.mjs` |
+| Python 底座直跑(把目标压到 1–2 分钟) | 底座依赖与阅读链路 | `... run --rm -T --entrypoint bash weread-run -c 'cd /opt/weread && sed "s/^  target_duration: .*/  target_duration: \"1-2\"/" config.yaml > /tmp/t.yaml && python vendor/weread-bot/weread-bot.py --config /tmp/t.yaml'` |
+
+2026-10-04 全量自检发现并修掉的问题:① 可用内存取 `os.freemem()` 在 Linux 上偏低(应读 `/proc/meminfo` 的 `MemAvailable`),
+导致永远只开单集群;② `suite.env` 用 `.` 载入但没 `set -a`,参数进不了子进程(node 读不到阈值);
+③ 看门狗 `docker rm -f <服务名>` 删不掉 compose run 的一次性容器(名字是自动生成的),要按
+`label=com.docker.compose.service=<服务名>` 删;④ venv 用符号链暴露 `python` 会让 Python 解析不到
+`pyvenv.cfg`,报"依赖装了却 ModuleNotFoundError",要 `ENV PATH=/opt/venv/bin:$PATH`。

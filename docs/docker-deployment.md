@@ -140,10 +140,27 @@ tail -f /srv/apps/automation/rewards/logs/runner.log
 # 容器层面
 docker compose -f /srv/apps/automation/compose.yaml run --rm -T weread-run   # 真跑一次
 docker compose -f /srv/apps/automation/compose.yaml run --rm -T rewards-run
+# 想跑程序自己的子命令(status / plan / verify / auth / pause)必须显式覆盖 entrypoint:
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node weread-run src/index.js status
+
+# 自检脚本(不进编排,手动跑)
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint bash rewards-run /opt/deploy/smoke.sh
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node weread-run /opt/deploy/test-peer.mjs
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node weread-run /opt/deploy/test-welfare.mjs
 ```
 
 判定「今天那次算不算成功」:微软积分看 `rewards/logs/last-run.state`(`<逻辑日> 9` = 已完成;
 `3..8` = 当天尝试都失败);微信读书看 `weread/data/state.json` 的 `done` 与 `attempts`。
+
+## 7.1 全量自检发现并修掉的问题(2026-10-04)
+
+| 症状 | 根因 | 修法 |
+| --- | --- | --- |
+| 永远只开 1 个集群(慢一倍) | `os.freemem()` 在 Linux 上返回 `MemFree`,把可回收页缓存算作已用;同一时刻 `MemAvailable` 2362MB 而它给出不到 1000MB | `run-config.js` 优先读 `/proc/meminfo` 的 `MemAvailable`,读不到才退回 `os.freemem()` |
+| 阈值改了不生效 | `suite.env` 用 `.` 载入但没 `set -a`,变量只存在于当前 shell,node 子进程读不到 | 三个脚本都改成 `set -a; . suite.env; set +a` |
+| 看门狗超时后容器还在跑 | `docker rm -f rewards-run` 删不掉 `compose run` 的一次性容器(真名是 `automation-rewards-run-run-<hash>`) | 按标签删:`docker ps -aq --filter "label=com.docker.compose.service=rewards-run" \| xargs -r docker rm -f` |
+| 底座报「缺少依赖: PyYAML, requests, httpx」 | venv 用 `ln -s /opt/venv/bin/python /usr/local/bin/python` 暴露:符号链让 Python 把 `sys.executable` 解析成 `/usr/bin/python3`,找不到 `pyvenv.cfg` → 看不到 venv 的 site-packages | 改用 `ENV PATH="/opt/venv/bin:$PATH"`(并加 `/etc/profile.d/venv.sh` 兜住登录 shell) |
+| 子命令(status/plan/auth)跑了却像在跑 `run` | 服务的 entrypoint 是 `run-once.sh`,后面跟的命令被忽略 | 显式 `--entrypoint node` |
 
 ## 8. 本机怎么办
 
