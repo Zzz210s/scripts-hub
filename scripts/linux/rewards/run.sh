@@ -9,7 +9,7 @@ set -uo pipefail
 
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
 ROOT="$SUITE_DIR/rewards"
-[ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"
+set -a; [ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"; set +a   # set -a:让参数也进入子进程(node 读的是环境变量)
 cd "$ROOT" || exit 1
 
 LOG="$ROOT/logs/last-run.log"
@@ -100,7 +100,9 @@ RUNPID=$!
     sleep $((WATCHDOG_MIN * 60))
     if kill -0 "$RUNPID" 2>/dev/null; then
         echo "[WATCHDOG] run killed after $WATCHDOG_MIN minutes" >> "$LOG"
-        docker rm -f rewards-run >/dev/null 2>&1
+        # 注意:compose run 的一次性容器名是自动生成的(automation-<svc>-run-<hash>),
+        # 不能按 "docker rm -f rewards-run" 删 —— 按 compose 的 service 标签删才命中。
+        docker ps -aq --filter "label=com.docker.compose.service=rewards-run" | xargs -r docker rm -f >/dev/null 2>&1
         kill "$RUNPID" 2>/dev/null
     fi
 ) &

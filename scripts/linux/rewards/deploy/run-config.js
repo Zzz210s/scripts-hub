@@ -16,6 +16,22 @@ const CONFIG = process.env.REWARDS_CONFIG ?? '/srv/apps/automation/rewards/confi
 const FREE_MB_FOR_PARALLEL = Number(process.env.REWARDS_FREE_MB_FOR_PARALLEL ?? 2500)
 const MIN_FREE_MB = Number(process.env.REWARDS_MIN_FREE_MB ?? 1200)
 
+/**
+ * 可用内存(MB)。
+ *
+ * 为什么不用 os.freemem():Linux 上它返回 MemFree,把可回收的页缓存也算作“已用” ——
+ * 实测同一时刻 MemFree 不到 1000MB 而 MemAvailable 是 2362MB,于是闸门会把可跑的
+ * 情形判成“内存不够”,永远只开单集群(Windows 上没这个问题,上游默认值就是按它定的)。
+ * 所以优先读 /proc/meminfo 的 MemAvailable,读不到再退回 os.freemem()。
+ */
+function freeMemoryMb() {
+    try {
+        const m = /^MemAvailable:\s+(\d+) kB/m.exec(fs.readFileSync('/proc/meminfo', 'utf8'))
+        if (m) return Math.round(Number(m[1]) / 1024)
+    } catch { /* 非 Linux 或读不到,走兜底 */ }
+    return Math.round(os.freemem() / (1024 * 1024))
+}
+
 function readConfig() {
     return JSON.parse(fs.readFileSync(CONFIG, 'utf8'))
 }
@@ -25,8 +41,6 @@ function writeConfig(config) {
     fs.writeFileSync(tmp, `${JSON.stringify(config, null, 4)}\n`, 'utf8')
     fs.renameSync(tmp, CONFIG)
 }
-
-const freeMemoryMb = () => Math.round(os.freemem() / (1024 * 1024))
 
 const command = process.argv[2] ?? 'show'
 const value = process.argv[3]

@@ -7,7 +7,7 @@
 set -uo pipefail
 
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
-[ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"
+set -a; [ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"; set +a   # set -a:让参数也进入子进程(node 读的是环境变量)
 LOG="$SUITE_DIR/logs/suite.log"
 mkdir -p "$SUITE_DIR/logs" "$SUITE_DIR/state"
 
