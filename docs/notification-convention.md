@@ -20,8 +20,11 @@
 | --- | --- | --- | --- |
 | `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 |
 | `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 |
-| `skip` 正常跳过 | 触发被规则拦下,这次不跑;说清原因、会不会自动重试、不需要你做什么 | `wechat-bridge/notify-skip.js` `memory` / `handled` | `src/notify-policy.js` 的 `buildSkipMessage`,reason 不属于 `action` |
+| `skip` 正常跳过 | 触发被规则拦下,这次不跑;说清原因、会不会自动重试、不需要你做什么 | `wechat-bridge/notify-skip.js` `memory` / `handled` / `exhausted` | `src/notify-policy.js` 的 `buildSkipMessage`,reason 不属于 `action` |
 | `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` |
+
+「正常跳过」还分两档(2026-10-04 定):**不需要人做任何事**的那些只写运行日志、不推送;
+可能让今天白丢的那些照旧推送 —— 见下面的「静音的跳过」。
 
 当日口径由 `result` 消息携带:它的汇总行里有「今日共 +X 分」,不再单独发一条当日汇总。
 微软积分原有的 `notify-day.js` 已于 2026-10-03 删除。
@@ -32,18 +35,36 @@
 | --- | --- | --- |
 | `start` | 每次运行一条;当天最多 3 次尝试 | `scripts/windows/run-daily.bat` 的 once-per-day 守卫 + `logs/last-run.state` |
 | `result` | 每次运行一条 | 每次运行后调用一次;日志里没有结论(还在跑 / 没跑完)时不发 |
-| `skip` | 同一天同一种原因最多一条 | 微软:bat 侧的 `logs/*.notified` 标记;微信读书:`shouldNotifyOnce` |
+| `skip` | 同一天同一种原因最多一条;**不需要人管的那些一条都不发,只写运行日志** | 微软:bat 侧的 `logs/*.notified` 标记;微信读书:`shouldNotifyOnce`;静音判断见 `isSilentSkip` |
 | `action` | 每次都发,不受限制 | 微信读书 `ALWAYS_NOTIFY`;微软 nocreds 每天一条 |
 
 例外:微信读书的 `stats-unavailable` 也在 `ALWAYS_NOTIFY` 里 —— 连续读不到统计说明
 API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都发。
 
+### 静音的跳过(2026-10-04)
+
+用户反馈:一天里那些「本来一切正常、不需要人做任何事」的跳过消息没必要推 —— 看多了只会
+把真正的提醒一起忽略。于是按「不看会不会误事」分成两档:
+
+| 档位 | 处理 | 原因 |
+| --- | --- | --- |
+| 静音 | **只写运行日志,不推送** | 微软 `handled`;微信读书 `done`、`peer-running`、`quiet-hours` |
+| 照旧推送 | 推一条,同因同日最多一条 | 微软 `memory`、`exhausted`;微信读书 `low-memory`、`attempts-exhausted`、`before-shutdown`、`paused` |
+
+- 静音不等于消失:文案照旧整条写进运行日志(微软 `logs\runner.log` 与 `logs\last-run.log`,
+  微信读书 `logs\last-run.log` / `logs\runner.log`),事后可查「这次为什么没跑」。
+- `paused` 不静音:它是只有人才能清掉的状态,消息里还带一个 `resume` 动作;留着不管会一直不跑,
+  属于「不看会误事」。
+- 实现:微软 `wechat-bridge/lib/skip.js` 的 `isSilentSkip(mode)`;微信读书 `src/notify-policy.js`
+  的 `isSilentSkip(reason)`。两边都有单测钉住这两张表。
+
 ### `skip` 的原因词表
 
 两边原因名各自保留(它们是程序内部的状态名),但都必须翻译成人话写进 `原因:` 行。
 
-- 微软积分:`handled` 当天已经跑过、`memory` 内存不足、`nocreds` 没有配置账号。
-- 微信读书签到:`done` 已达标、`peer-running` 同伴在跑、`quiet-hours` 安静时段、
+- 微软积分:`handled` 当天已经跑过(静音)、`memory` 内存不足、`exhausted` 尝试次数用尽、
+  `nocreds` 没有配置账号(归 `action`)。
+- 微信读书签到:`done` 已达标(静音)、`peer-running` 同伴在跑(静音)、`quiet-hours` 安静时段(静音)、
   `before-shutdown` 临近关机、`attempts-exhausted` 尝试用尽、`paused` 已手动暂停、
   `credential-invalid` 凭据失效、`stats-unavailable` 读不到官方统计、`low-memory` 内存不足。
 
@@ -91,11 +112,13 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 ```
 
 - `正常跳过`:程序自己会在下一次触发重试,人不用管。最后一行固定是 `你需要做什么:不需要`。
+  其中「不需要人做任何事」的那些(见第 1 节的静音表)连这条消息都不发,只写运行日志。
 - `需要你处理`:不处理就永远不会自己好。正文第一句必须是 `请你:` 开头。
 - 判断标准只有一条:不处理会不会一直不跑。目前「登录凭据失效」
   (微信读书 `credential-invalid`)、「读不到官方统计」(微信读书 `stats-unavailable`)
   与「没有配置账号」(微软 `nocreds`)属于 `action`;
   其余原因(已达标 / 安静时段 / 内存不足 / 当天已跑过 …… )都是 `skip`。
+- 静音与类型是两回事:静音只决定「发不发」,`skip` / `action` 决定「发什么」。
 
 ### 动作词表(两边共用)
 
@@ -185,3 +208,5 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 2. `start` 一行套第 2 节的模板;`result` 按第 3 节的强制项自由排版;`skip` / `action`
    套第 2 节的两段模板(标题词 + 正文结构都不能混)。
 3. 补一条断言文案的测试(两边都有 `test/`),把"不带圆括号"和标题行形状锁住。
+4. 新的跳过原因要想清楚属于哪一档:不需要人管的写进静音表(两边各一份 `isSilentSkip` 的单测),
+   不看会误事的保持推送。

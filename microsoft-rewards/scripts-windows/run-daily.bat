@@ -71,15 +71,21 @@ if exist "%STATE%" for /f "usebackq tokens=1,2" %%a in ("%STATE%") do set "STATE
 if "%STATE_DAY%"=="%TODAY%" set "RUNS=%STATE_N%"
 if !RUNS! LSS 3 goto day_open
 
-echo [%REALDAY% %CLOCK%] day %TODAY% already handled, attempts=%RUNS%, skipped >> "%LOG%"
+rem 成功跑完时状态写的是 9(哨兵,见 run_end);3..8 表示今天的尝试都失败了。
+rem 两者都会跳过当天剩下的触发,但含义不同:前者正常跳过(只记日志,不推送),
+rem 后者是"今天可能白丢"(2026-10-04 约定:有风险的跳过照旧推送)。
+set "SKIPKIND=exhausted"
+if !RUNS! GEQ 9 set "SKIPKIND=handled"
+echo [%REALDAY% %CLOCK%] day %TODAY% closed, kind=!SKIPKIND!, attempts=%RUNS%, skipped >> "%LOG%"
 
-rem 跳过也要说一声(否则用户只看到"开机后什么都没跑"):
+rem 正常跳过只记日志,有风险的跳过(尝试次数用尽)照旧说一声,
+rem 否则用户只看到"开机后什么都没跑":
 rem 同一天只提醒一次,不然每两小时一条。
 set "NOTIFIED=0"
-if exist "logs\handled-skip.notified" findstr /c:"%TODAY%" "logs\handled-skip.notified" >nul 2>&1 && set "NOTIFIED=1"
+if exist "logs\handled-skip.notified" findstr /c:"%TODAY% !SKIPKIND!" "logs\handled-skip.notified" >nul 2>&1 && set "NOTIFIED=1"
 if "!NOTIFIED!"=="1" goto handled_done
->"logs\handled-skip.notified" echo %TODAY%
-node "wechat-bridge\notify-skip.js" handled %TODAY% >> "%RLOG%" 2>&1
+>"logs\handled-skip.notified" echo %TODAY% !SKIPKIND!
+node "wechat-bridge\notify-skip.js" !SKIPKIND! %TODAY% >> "%RLOG%" 2>&1
 
 :handled_done
 del /q "logs\run.lock" >nul 2>&1
@@ -131,7 +137,7 @@ set "NOTIFIED=0"
 if exist "logs\mem-skip.notified" findstr /c:"%TODAY%" "logs\mem-skip.notified" >nul 2>&1 && set "NOTIFIED=1"
 if "!NOTIFIED!"=="1" goto mem_skip_done
 >"logs\mem-skip.notified" echo %TODAY%
-node "wechat-bridge\notify-skip.js" !FREE_MB! >> "%RLOG%" 2>&1
+node "wechat-bridge\notify-skip.js" memory !FREE_MB! >> "%RLOG%" 2>&1
 
 :mem_skip_done
 del /q "logs\run.lock" >nul 2>&1

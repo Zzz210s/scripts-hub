@@ -91,8 +91,12 @@
 | --- | --- | --- | --- | --- |
 | `start` 开始运行 | 真要跑了,run 之前 | 每次运行一条,当天最多 3 次尝试 | `wechat-bridge/notify-start.js` + `lib/start.js` | `src/notify-policy.js` `buildStartMessage` |
 | `result` 运行结果 | 每次运行结束:成功 / 有失败 / 中断无数据 | 每次运行一条(日志里没结论时不发) | `wechat-bridge/notify-run.js` + `lib/report.js` | `src/notify.js` `buildReport` |
-| `skip` 正常跳过 | 触发被规则拦下,这次不跑 | **同一天同一种原因最多一条** | `wechat-bridge/notify-skip.js` `memory` / `handled` | `shouldNotifyOnce` |
+| `skip` 正常跳过 | 触发被规则拦下,这次不跑 | **同一天同一种原因最多一条;不需要人管的那些只写日志** | `wechat-bridge/notify-skip.js` `memory` / `handled` / `exhausted` | `shouldNotifyOnce` |
 | `action` 需要你处理 | 不处理就永远不会自己好 | **每次都发,不受限制** | `notify-skip.js` `nocreds` | `credential-invalid`、`stats-unavailable` |
+
+2026-10-04 起「正常跳过」再分两档:不需要人做任何事的那些(微软 `handled`;微信读书 `done` /
+`peer-running` / `quiet-hours`)只写运行日志、不推送;可能让今天白丢的那些(内存不足 / 尝试次数
+用尽 / 临近关机 / 已手动暂停)照旧推送。文案与日志照旧,只是不发消息。
 
 文案硬规则(所有消息,违反就等于发错):
 

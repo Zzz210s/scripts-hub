@@ -2,7 +2,8 @@
 //
 // 用法:
 //   node wechat-bridge/notify-skip.js memory <可用内存MB>   内存不足,正常跳过
-//   node wechat-bridge/notify-skip.js handled <逻辑日>       当天已经跑过,正常跳过
+//   node wechat-bridge/notify-skip.js handled <逻辑日>       当天已经跑过,正常跳过(只记日志,不推送)
+//   node wechat-bridge/notify-skip.js exhausted <逻辑日>     尝试次数用尽,正常跳过(照旧推送)
 //   node wechat-bridge/notify-skip.js nocreds               .env 里没有真实账号,需要你处理
 //
 // 为什么要有这个文件:
@@ -16,9 +17,9 @@
 import { broadcast, channelStatus } from './lib/channels.js'
 import { readHistory } from './lib/history.js'
 import { localDay } from './lib/report.js'
-import { buildSkipMessage } from './lib/skip.js'
+import { buildSkipMessage, isSilentSkip } from './lib/skip.js'
 
-const MODES = ['memory', 'handled', 'nocreds']
+const MODES = ['memory', 'handled', 'exhausted', 'nocreds']
 
 /** 当天各账号已入账的分数合计(来自积分历史,取不到就返回 0)。 */
 function gainedOn(day) {
@@ -35,24 +36,34 @@ async function main() {
     const dryRun = process.argv.includes('--dry')
     const positional = process.argv.slice(3).filter(arg => !arg.startsWith('--'))
     const mode = (process.argv[2] ?? 'memory').toLowerCase()
-    const fallback = mode === 'handled' ? localDay(new Date()) : mode === 'nocreds' ? null : '未知'
+    const known = MODES.includes(mode)
+    const needsDay = mode === 'handled' || mode === 'exhausted'
+    const fallback = needsDay ? localDay(new Date()) : mode === 'nocreds' ? null : '未知'
     const arg = positional[0]?.trim() || fallback
+
+    const today = localDay(new Date())
+    const text = buildSkipMessage({
+        mode: known ? mode : 'memory',
+        arg,
+        gained: needsDay ? gainedOn(arg) : 0,
+        sameDay: mode === 'handled' ? arg === today : true
+    })
+    if (dryRun) console.log(text)
+
+    // 正常跳过(handled)只写运行日志:静音不等于消失,整条文案留在 runner.log 里。
+    // 放在通道检查之前 —— 没配 webhook 时也要能事后查到「今天为什么没跑」。
+    if (isSilentSkip(mode)) {
+        console.log('已静音:正常跳过不推送,只写运行日志')
+        return
+    }
 
     if (!channelStatus().wecom) {
         console.log('未配置通知通道,跳过提醒')
         return
     }
 
-    const today = localDay(new Date())
-    const text = buildSkipMessage({
-        mode: MODES.includes(mode) ? mode : 'memory',
-        arg,
-        gained: mode === 'handled' ? gainedOn(arg) : 0,
-        sameDay: mode === 'handled' ? arg === today : true
-    })
-    if (dryRun) console.log(text)
     // 未知 mode 也按 memory 文案发出,但先提示一下,免得静默发错类别
-    if (!MODES.includes(mode)) console.error(`未知的跳过原因: ${mode},已按内存不足处理`)
+    if (!known) console.error(`未知的跳过原因: ${mode},已按内存不足处理`)
     for (const line of await broadcast(text, { dryRun })) console.log(line)
 }
 
