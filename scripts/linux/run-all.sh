@@ -21,11 +21,11 @@ fi
 
 note "=== 编排开始(先微软积分,后微信读书)==="
 
-"$SUITE_DIR/rewards/run.sh"
+"$SUITE_DIR/rewards/run.sh" 7>&-
 RC_REWARDS=$?
 note "微软积分退出码 $RC_REWARDS"
 
-"$SUITE_DIR/weread/run.sh"
+"$SUITE_DIR/weread/run.sh" 7>&-
 RC_WEREAD=$?
 note "微信读书退出码 $RC_WEREAD"
 

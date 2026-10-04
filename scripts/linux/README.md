@@ -23,10 +23,14 @@ chmod +x /srv/apps/automation/{run-all.sh,rewards/run.sh,weread/run.sh} \
 #    见 docs/docker-deployment.md 第 6 节的凭据清单
 
 # 4. 构建镜像(首次约 15–30 分钟:apt + npm ci + Chromium 下载)
+#    构建前先把 chrome-headless-shell 预下到构建上下文(否则从 Playwright CDN 拉 114 MB
+#    只有 ~130 KB/s,实测还会停住;npmmirror 是 13 MB/s):
+./scripts/linux/fetch-cft-browser.sh 149.0.7827.55 1228 /srv/apps/automation/rewards/src/vendor
 cd /srv/apps/automation/rewards/src && docker build -t automation-rewards:local .
 cd /srv/apps/automation/weread && docker build -f Dockerfile -t automation-weread:local .
-#   提示:容器内 apt 走 deb.debian.org 很慢,构建前可在 Dockerfile 里换成国内镜像:
-#   sed -i "s|deb.debian.org|mirrors.cloud.tencent.com|g" /etc/apt/sources.list.d/debian.sources
+#   两个 Dockerfile 的 apt 与 pip 都指向国内镜像(实测 deb.debian.org 只有几百 KB/s):
+#   apt: sed -i "s|deb.debian.org|mirrors.cloud.tencent.com|g" /etc/apt/sources.list.d/debian.sources
+#   pip: -i https://mirrors.cloud.tencent.com/pypi/simple
 
 # 5. systemd 定时器
 sudo cp /srv/apps/automation/systemd/automation-suite.{service,timer} /etc/systemd/system/

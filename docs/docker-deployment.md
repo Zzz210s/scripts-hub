@@ -90,10 +90,22 @@
 | 措施 | 效果 |
 | --- | --- |
 | 镜像预先构建(代码、依赖、Chromium 都在镜像里) | 触发时零构建、零下载 |
+| 预置 `chrome-headless-shell`(npmmirror 下好放进构建上下文) | 构建从 40+ 分钟降到 5 分钟:Playwright CDN 实测 ~130 KB/s 且会停住,npmmirror 是 13 MB/s |
 | `SKIP_RANDOM_SLEEP=true` | 上游默认会随机等 5–50 分钟再跑,这里直接开跑 |
 | `RUN_ON_START=false` + `CRON_SCHEDULE` 置为永不触发 | 容器只跑我们要求的那一次 |
 | `REWARDS_FREE_MB_FOR_PARALLEL=1800`(上游默认 2500) | 云主机独占 2C4G,可用内存约 2.3GB → 开 2 集群并行跑账号,约省一半时间 |
 | 一次性容器 + `mem_limit` | 跑完即退,不占常驻内存;超限只 OOM 容器自己 |
+
+## 5.1 构建镜像时的两个坑(实测)
+
+1. **容器内 apt 走 `deb.debian.org` 只有几百 KB/s**:42 个包下 20 多分钟还没完;换成
+   `mirrors.cloud.tencent.com` 后 97 个包 28 秒。两个 Dockerfile 构建前都改。
+2. **Playwright CDN 下载 `chrome-headless-shell` 会卡住**(114 MB,~130 KB/s):
+   改用 `scripts/linux/fetch-cft-browser.sh` 从 npmmirror 预下(13 MB/s、9 秒)放进构建上下文,
+   Dockerfile 里解压到 `node_modules/patchright-core/.local-browsers/chromium_headless_shell-<revision>/`
+   并写 `INSTALLATION_COMPLETE` / `DEPENDENCIES_VALIDATED` marker,让 patchright 跳过下载只做校验。
+   **注意保留 `chrome-headless-shell-linux64/` 这一层目录** —— 铺平会报「Executable doesn't exist」。
+   顺带:node:24-slim 里没有 `unzip`,apt 列表要加。
 
 ## 6. 凭据
 

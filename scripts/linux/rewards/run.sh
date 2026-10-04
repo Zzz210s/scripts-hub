@@ -78,14 +78,16 @@ if [ "$DECISION" = "SKIP" ]; then
 fi
 
 # ---- 轮转日志、记账、开始通知 ----
+touch "$LOG"   # 先由宿主创建:容器以 root 追加写入,文件归属保持 ubuntu
 [ -f "$LOG" ] && mv -f "$LOG" "$ROOT/logs/previous-run.log"
 RUNS=$((RUNS + 1))
-node "$ROOT/wechat-bridge/notify-start.js" --day "$TODAY" >> "$LOG" 2>&1
-printf '%s %s\n' "$TODAY" "$RUNS" > "$STATE"
 
-# ---- 内存自适应:决定并行几个集群(写进 config/config.json) ----
+# ---- 内存自适应:先定并行度,再发开始通知(通知里会写“并行 N”) ----
 CLUSTERS="$(node "$ROOT/deploy/run-config.js" clusters auto)"
 FREE_MB="$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo)"
+node "$ROOT/wechat-bridge/notify-start.js" --day "$TODAY" >> "$LOG" 2>&1
+printf '%s %s\n' "$TODAY" "$RUNS" > "$STATE"
+note "run start, attempt $RUNS of max 3 today, clusters=$CLUSTERS, free ${FREE_MB}MB"
 flog "=== run start, attempt $RUNS of max 3 today ==="
 flog "free memory ${FREE_MB}MB -> clusters=$CLUSTERS"
 
@@ -94,6 +96,7 @@ COMPOSE="$SUITE_DIR/compose.yaml"
 docker compose -f "$COMPOSE" run --rm -T rewards-run >> "$LOG" 2>&1 &
 RUNPID=$!
 (
+    exec 8>&-          # 别继承锁 fd:脚本退出后这个 sleep 还在,会一直占着锁
     sleep $((WATCHDOG_MIN * 60))
     if kill -0 "$RUNPID" 2>/dev/null; then
         echo "[WATCHDOG] run killed after $WATCHDOG_MIN minutes" >> "$LOG"

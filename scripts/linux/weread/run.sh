@@ -26,12 +26,14 @@ if ! flock -n 9; then
     exit 0
 fi
 
+touch "$LOG"   # 先由宿主创建:容器以 root 追加写入,文件归属保持 ubuntu
 [ -f "$LOG" ] && mv -f "$LOG" "$ROOT/logs/previous-run.log"
 
 COMPOSE="$SUITE_DIR/compose.yaml"
 docker compose -f "$COMPOSE" run --rm -T weread-run >> "$LOG" 2>&1 &
 RUNPID=$!
 (
+    exec 9>&-          # 别继承锁 fd:脚本退出后这个 sleep 还在,会一直占着锁
     sleep $((WATCHDOG_MIN * 60))
     if kill -0 "$RUNPID" 2>/dev/null; then
         echo "[WATCHDOG] run killed after $WATCHDOG_MIN minutes" >> "$LOG"
