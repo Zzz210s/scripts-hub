@@ -8,6 +8,7 @@
 | `sync-*` | 把权威工作区的已跟踪文件发布成仓库里的项目快照 | 非交互,幂等,带 `--dry-run` |
 | `deploy-*` | 把仓库里的项目快照刷回本机工作区,并体检本机部署 | 非交互,默认 `--dry-run`,`--apply` 才写 |
 | `setup-*` | 从全新克隆自检某个项目能不能跑(装依赖 / 建模板 / 跑测试 / 干跑) | 非交互,可重复跑,退出码即结论 |
+| `apply-*` | 把用户改的配置渲染成实际动作(由 `config/schedule.json` 生成/注册计划任务与 timer) | 非交互,默认 `--dry-run`,`--apply --yes` 才写本机 |
 | `check-*` | 只读检查,命中不一致或敏感内容就退出 1 | 非交互,可进 CI 或提交前钩子 |
 
 用法一律 `bash scripts/<脚本名>.sh` 或 `node scripts/<脚本名>.mjs`。
@@ -56,6 +57,19 @@
 | `setup-microsoft-rewards.sh` | Node >= 24、`npm ci`、patchright chromium、`.env` 模板、`npm run build`、26 条离线测试 | 默认联网(依赖与浏览器);`--no-install --no-browser --no-build` 可只跑离线测试 |
 | `setup-autovisor.sh` | `configs.ini` 是否存在、课程链接是否受支持、账号密码是否留空、程序本体是否解压 | 不联网 |
 
+## 调度(时间来自 `config/schedule.json`)
+
+触发时刻不写死在注册脚本里:改 `config/schedule.json`(字段说明与默认值在
+`config/schedule.example.json` 的 `_readme`),再跑一遍下面这个。约定见 `../docs/scheduling-convention.md` 第 0 节。
+
+| 脚本 | 干什么 | 什么时候用 | 关键说明 |
+| --- | --- | --- | --- |
+| `apply-schedule.mjs` | 按配置生成 Windows 任务 XML 与 systemd timer;`--apply --yes` 真注册(Windows) | 改完时间、换机恢复、加新程序 | 默认 `--dry-run` 只打印;`--dest=<目录>` 落盘生成物,`--emit=windows\|systemd\|both`、`--only=<程序id>` 收窄;动作路径的 `%REWARDS_DIR%` 类占位符从机器私有的 `local-paths.env` 展开,填不了时 `--apply` 直接拒绝 |
+| `lib/schedule.mjs` | 读 + 校验 + 归一化配置;库,兼一个只读小 CLI(`show` / `expect` / `json`) | 被 `apply-schedule.mjs` 与 `deploy-*.sh` 调用 | `startTime` / `logonDelayMinutes` 写 `auto` 就在这按 `order` 与 `stagger` 推导 |
+| `lib/schedule-targets.mjs` | 生成物(XML / unit)与动作路径解析 —— 纯函数 | 同上 | 不读写任何本机文件,便于干跑与测试 |
+
+`deploy-*.sh` 第 6 步会拿 `expect` 的输出与**本机任务的实际触发器**逐项比对,不一致报 `[缺]`。
+
 ## 检查
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
@@ -79,6 +93,9 @@
 `local-paths.env` **不是**凭据文件(具体凭据清单见 `../docs/credentials.md`)。文件名与目录名
 `automation-suite` 是历史遗留值,改了本机脚本就失效,保持不动。
 
+触发时间写在仓库里的 `config/schedule.json`(与机器私有目录无关:它是可提交的调度约定,不含凭据);
+换一个位置/文件名用 `HAC_SCHEDULE_FILE` 覆盖。
+
 两个机器私有文件都有模板:复制 `scripts/local-paths.env.example` 到 `~/.config/automation-suite/local-paths.env`,
 复制 `scripts/sensitive-patterns.txt.example` 到 `~/.config/automation-suite/sensitive-patterns.txt` 并填自己的标识。
 缺 `sensitive-patterns.txt` 时 `sync-microsoft-rewards.sh` **拒绝同步** —— 这是安全属性,不要绕过。
@@ -95,7 +112,8 @@
   `lib/wizard-common.sh`(两个向导共用);`wizard-public-reset.sh` 的路径与敏感模式配置在
   `lib/reset-common.sh`、备份/SHA/topics 校验在 `lib/reset-verify.sh`、GitHub 动作与推送后校验在
   `lib/reset-gh.sh`。改向导通用行为改库段,不要在单个向导里另写一份。
-- `scripts/lib/` 是 `deploy-*.sh` 共用的片段:`deploy-common.sh` 管输出/参数/同源检测/授权闸门,
+- `scripts/lib/` 是 `deploy-*.sh` 共用的片段:`deploy-common.sh` 管输出/参数/同源检测/授权闸门/任务触发器读取,
   `deploy-plan.sh` 管文件计划/备份/二次确认/落盘。改部署行为改这两处,不要在单个 `deploy-*.sh` 里另写一份。
 - 提交前 `bash -n scripts/*.sh scripts/lib/*.sh` 与 `shellcheck scripts/*.sh scripts/lib/*.sh` 都应无输出;
-  `node --check scripts/*.mjs` 与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过。
+  `node --check scripts/*.mjs scripts/lib/*.mjs` 与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过;
+  `node scripts/apply-schedule.mjs --dry-run` 应能把默认配置渲染成触发器(不改本机任务)。

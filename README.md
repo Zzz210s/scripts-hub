@@ -32,6 +32,7 @@ scripts-hub/
 ├── proj-autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
 ├── proj-weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
 ├── docs/                     Cross-project conventions and overviews -- read docs/README.md first
+├── config/                   schedule.json: when each program runs; drives the task/timer generation
 ├── patches/                  Every upstream patch, one folder per upstream project
 ├── scripts/                  Provisioning, sync and drift-check utilities -- see scripts/README.md
 ├── LICENSE                   GPL-3.0 for the repository; MIT inside proj-weread-signin/

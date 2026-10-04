@@ -4,9 +4,44 @@
 两套运行环境只有外壳不同 —— 本机是 Windows 计划任务(现状),云主机是 systemd timer(规划中,
 见 [cloud-vm.md](cloud-vm.md));核心约定(错峰、守卫、锁、幂等)两边一致。
 
+## 0. 时间从哪来:`config/schedule.json`
+
+触发时刻**不写死在注册脚本里**。单一份配置是 [`../config/schedule.json`](../config/schedule.json)
+(字段说明与默认值同在 `config/schedule.example.json` 的 `_readme` 里):
+
+| 字段 | 含义 | 默认值 |
+| --- | --- | --- |
+| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` |
+| `stagger.baseStartTime` / `slotMinutes` | 第一个程序的每日起始时间 / 相邻程序的间隔 | `08:00` / `30` |
+| `stagger.logonBaseMinutes` / `logonStepMinutes` | 登录后延迟的起点 / 步进 | `3` / `7` |
+| `programs.<id>.startTime` | 每日起始时间 `HH:MM`;`auto` = 按 order+stagger 推导 | `auto` |
+| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60` |
+| `programs.<id>.windowHours` | 每日触发窗口长度(小时) | `14` |
+| `programs.<id>.maxAttemptsPerDay` | 程序内部一天最多真跑几次(不是触发次数) | `3` |
+| `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10) |
+| `programs.<id>.logonRetryMinutes` / `logonRetryWindowMinutes` | 登录触发的重复间隔 / 总时长 | `10` / `60` |
+| `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` 占位符 | 占位符形式 |
+| `programs.<id>.enabled` | `false` = 不注册它的触发 | `true` |
+
+两条路径都读这份配置:
+
+- `node scripts/apply-schedule.mjs`(默认 `--dry-run`)把它渲染成触发器:Windows 任务 XML 与
+  systemd `OnCalendar`;**只有 `--apply --yes` 才真注册**。生成物可用 `--dest=<目录>` 落盘查看,
+  `--emit=windows|systemd|both`、`--only=<程序id>` 收窄范围。
+- `scripts/deploy-*.sh` 第 6 步拿它与**本机任务的实际触发器**逐项比对(`start` / `delay` / `interval` /
+  `duration`),不一致直接报 `[缺]` 并给出上面那条注册命令。
+
+于是:**改时间 = 改 `config/schedule.json` -> `node scripts/apply-schedule.mjs --apply --yes`**。
+`deploy-*.sh` 只报告、不写任务。配置缺失时回退 `config/schedule.example.json` 的默认值并警告。
+
+`maxAttemptsPerDay` 是**程序内部**的守卫阈值:微信读书读 `.env` 的 `MAX_ATTEMPTS_PER_DAY`,
+微软积分写在 `run-daily.bat` 里(改它要改工作区,见 [workspace-model.md](workspace-model.md))。
+配置里改这个字段只改「登记值」与触发机会数校验,不改程序行为。
+
 ## 1. 错峰槽位
 
 同一时刻只让一个程序真跑,避免抢内存、抢网络、抢同一条出口 IP。
+下表**本机触发**列是 `config/schedule.json` 的默认值;真实时刻以配置为准(第 0 节)。
 
 | 程序 | 本机触发(现状) | 云端触发(规划) | 幂等依据 |
 | --- | --- | --- | --- |
@@ -70,7 +105,8 @@
    `run-state.js`(锁/配额/内存/强杀)+ 看门狗 + XML 注册脚本。
 2. 单实例锁写 `logs\run.lock`,内容 `{"pid":<pid>,"startedAt":"<ISO>"}`。
 3. 在 `.env` 里用 `BUSY_PEERS=` 列出同伴的锁文件路径。
-4. 槽位与登录延迟按第 1 节顺延,并在本文件登记。
+4. 在 `config/schedule.json` 里加一项程序(槽位与登录延迟写 `auto` 就按 `order` 与 `stagger` 顺延),
+   跑 `node scripts/apply-schedule.mjs --dry-run` 核对生成的触发器,再 `--apply --yes` 注册。
 5. 本地段守卫至少包含:同伴在跑 / 当天已完成 / 安静时段 / 关机避让 / 内存不足。
 
 **云主机(规划)**:

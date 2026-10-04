@@ -76,6 +76,9 @@
 | `WeReadSignIn` | 登录后 10 分钟(1 小时内每 10 分钟重复)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | 跑阅读会话并用官方只读 API 校验时长 | `%WEREAD_DIR%\data\state.json` 的 `done` |
 | `AutoShutdown0200` | 每天 02:00(`WakeToRun=True`) | 无条件真关机 `shutdown /s /f /t 60`(60 秒内 `shutdown /a` 可撤销) | 无 |
 
+表中前两行的时刻**不写死在脚本里**,来自仓库 [`../config/schedule.json`](../config/schedule.json)
+(字段与默认值见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节);上面列的是默认值。
+
 - 登录触发按 7 分钟步进错开:微软 3 分钟、微信读书 10 分钟。
 - 白天的周期重复只为「给多次机会」:开机晚、机器忙、关机,错过的那次直接丢失(计划任务不补跑),
   靠窗口内的下一次补上;程序自己的幂等守卫保证重复触发无害。
@@ -95,13 +98,22 @@ Disable-ScheduledTask -TaskName WeReadSignIn
 Unregister-ScheduledTask -TaskName WeReadSignIn
 ```
 
-注册方式(重新注册也用它,可重复跑):
+注册方式(重新注册也用它,可重复跑)。前两个任务用**统一入口**,触发器由 `config/schedule.json` 生成:
 
-| 项目 | 注册命令 | 任务名与触发写在哪 |
+```bash
+node scripts/apply-schedule.mjs --dry-run      # 只打印会生成的 XML/unit,不动本机任务
+node scripts/apply-schedule.mjs --apply --yes  # 真注册(覆盖同名任务)
+```
+
+| 项目 | 注册命令 | 任务名与触发器写在哪 |
 | --- | --- | --- |
-| 微软积分 | `powershell -File scripts\windows\install-autostart.bat` 或在工作区双击 `install-autostart.bat` | `proj-microsoft-rewards/scripts/windows/install-autostart.bat` |
-| 微信读书签到 | `powershell -ExecutionPolicy Bypass -File scripts\windows\install-autostart.ps1` | `proj-weread-signin/scripts/windows/install-autostart.ps1`(用 XML 注册,登录延迟必须是 `PT3M`/`PT10M` 形式) |
-| 关机 | 见 `proj-microsoft-rewards/scripts/windows/install-autostart.bat` 同目录文档 | `auto-shutdown.bat` |
+| 微软积分 + 微信读书签到 | `node scripts/apply-schedule.mjs --apply --yes` | 仓库 `config/schedule.json`;生成物是任务 XML 与 systemd timer |
+| 微软积分(工作区自带脚本,备用) | 工作区 `scripts\windows\install-autostart.bat` | 时刻是写死的历史值(08:00 / 2h / 14h),改时间请改配置 |
+| 微信读书签到(工作区自带脚本,备用) | `powershell -ExecutionPolicy Bypass -File scripts\windows\install-autostart.ps1` | 时刻是写死的历史值(08:30 / 60m / 14h);登录延迟必须是 `PT10M` 形式 |
+| 关机 `AutoShutdown0200` | 见 `proj-microsoft-rewards/scripts/windows/` 同目录文档 | 固定 02:00,不在调度配置里 |
+
+工作区自带的两个 `install-autostart*` 仍在、与配置默认值一致,
+但**它们不知道配置** —— 改时间只改 `config/schedule.json` 并跑上面的统一入口。
 
 微信读书必须用 XML 注册:登录触发器的 `Delay` 只能写成 `PT10M`,PowerShell 的 `.Delay = TimeSpan`
 会序列化成 `00:10:00`,任务计划程序判定 XML 非法(`0x80041318`)。
@@ -186,5 +198,5 @@ Unregister-ScheduledTask -TaskName WeReadSignIn
 3. 从上游装程序本体到两个工作区,跑 `deploy-*.sh --apply` 刷入仓库配置与运行器。
 4. 按 `credentials.md` 补齐 `.env`、`secrets\*`、`wechat-bridge\data\wecom-webhook.txt`。
 5. `npm ci` + `npx patchright install chromium` + `npm run build`(微软);`--vendor` 克隆底座(微信读书)。
-6. 注册三个计划任务(第 3 节命令)。
+6. 注册计划任务:`node scripts/apply-schedule.mjs --dry-run` 核对后 `--apply --yes`(时刻来自 `config/schedule.json`);关机任务另按工作区文档。
 7. 跑 `bash scripts/setup-<项目>.sh` 与对应 `deploy-*.sh --dry-run` 逐项核对。

@@ -24,6 +24,7 @@ scripts-hub/
 ├── proj-autovisor/           智慧树刷课:只有 Autovisor 配置(程序本体是上游 Windows 包)
 ├── proj-weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
 ├── docs/                     跨项目约定与总览 —— 先看 docs/README.md
+├── config/                   schedule.json:各程序什么时候跑,生成计划任务/timer 的依据
 ├── patches/                  所有上游补丁,按上游项目分目录
 ├── scripts/                  开通、同步与漂移检测工具 —— 见 scripts/README.md
 ├── LICENSE                   仓库整体 GPL-3.0;proj-weread-signin/ 内为 MIT

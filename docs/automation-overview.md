@@ -29,6 +29,9 @@
 | **微信读书签到** | 每天完成阅读挑战打卡(读满当日目标,单日上限 120 分钟),再用官方只读 API 回读校验时长真被计入 | 本仓库 `proj-weread-signin/`(MIT;开发在本地克隆 `%WEREAD_DIR%`,无远端);底座 `funnyzak/weread-bot` 固定在 `vendor/`,commit 记在 `VENDOR_COMMIT.txt` | `%WEREAD_DIR%` | 本机 Windows | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | Node.js >= 20.11(实测 v24.14.0)+ Python 3(vendor 依赖 `requests` / `httpx` / `PyYAML` / `urllib3` / `croniter` / `apprise`) | `%WEREAD_DIR%\secrets\`:网页 cookie、官方只读 Key、App 渠道凭据 | 企业微信群机器人;`secrets\wecom-webhook.txt`,发送层 `src/notify.js` |
 | **智慧树刷课** | Autovisor 自动播放智慧树/知到的共享课视频 | 上游 `CXRunfree/Autovisor` v3.17.3(MIT),代码未改,只改配置 | `%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`) | **只在本机 Windows**(需要本机 Chrome 与图形会话) | **手动**跑 `Autovisor.exe`;没有计划任务 | 打包好的 exe(PyInstaller;内嵌 Python 3.10 + Playwright)+ 本机标准路径的 Chrome | 运行时手动登录一次,登录态落 `app\data\cookies.json`;`configs.ini` 的账号密码留空 | 程序自带界面与日志,不接企业微信 |
 
+表里的「什么时候跑」是默认值,真实时刻由 [`../config/schedule.json`](../config/schedule.json) 决定
+(见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节):改完跑 `node scripts/apply-schedule.mjs --apply --yes`。
+
 第三个任务不属于「程序」但同属这套自动化:计划任务 `AutoShutdown0200` 每天 02:00 无条件真关机
 (`shutdown /s /f /t 60`,60 秒内 `shutdown /a` 可撤销),脚本
 `proj-microsoft-rewards/scripts/windows/auto-shutdown.bat`。
