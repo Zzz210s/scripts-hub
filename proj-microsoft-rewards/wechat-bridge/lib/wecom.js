@@ -106,11 +106,22 @@ export function isConfigured() {
     return Boolean(webhookUrl())
 }
 
-/** Send one text message. Throws with the server's errcode when it fails. */
-export async function sendWecom(text) {
-    const url = webhookUrl()
+/**
+ * Send one text message. Throws with the server's errcode when it fails.
+ * fetchImpl / sleep / retries / timeoutMs / onRetry 可注入,便于测试退避重试。
+ */
+export async function sendWecom(text, options = {}) {
+    const url = options.url ?? webhookUrl()
     if (!url) throw new Error('未配置企业微信机器人 webhook')
 
-    await postWecom({ url, text })
+    await postWecom({
+        url,
+        text,
+        fetchImpl: options.fetchImpl,
+        sleep: options.sleep,
+        retries: options.retries,
+        timeoutMs: options.timeoutMs,
+        onRetry: options.onRetry
+    })
     return true
 }
