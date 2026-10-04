@@ -2,9 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-A collection of isolated, self-contained projects for three unattended Windows automation
-programs -- **Microsoft Rewards**, **Zhihuishu course playback** (Autovisor) and **WeRead
-daily check-in**. One folder per project, each with its own README, dependency manifest,
+A collection of isolated, self-contained projects for four unattended automation programs --
+**Microsoft Rewards**, **Zhihuishu course playback** (Autovisor), **WeRead daily check-in** and
+**Epic free games**. One folder per project, each with its own README, dependency manifest,
 tests and license. The WeCom notification rules shared by the projects are in
 [`docs/wecom-rules.md`](docs/wecom-rules.md); each project keeps its own implementation.
 
@@ -31,21 +31,23 @@ scripts-hub/
 ├── proj-microsoft-rewards/   Microsoft Rewards: complete project (upstream source + local patches, runners, WeCom layer)
 ├── proj-autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
 ├── proj-weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
+├── proj-epic-free-games/     Epic free games: vendored AGPL claim engine plus a probe/state/WeCom shell
 ├── docs/                     Cross-project conventions and overviews -- read docs/README.md first
 ├── config/                   schedule.json: when each program runs; drives the task/timer generation
 ├── patches/                  Every upstream patch, one folder per upstream project
 ├── scripts/                  Provisioning, sync and drift-check utilities -- see scripts/README.md
-├── LICENSE                   GPL-3.0 for the repository; MIT inside proj-weread-signin/
+├── LICENSE                   GPL-3.0 for the repository; MIT inside proj-weread-signin/, AGPL-3.0 inside proj-epic-free-games/
 └── README.md / README.zh-CN.md
 ```
 
-## The three programs
+## The four programs
 
 | Program | What it does | Where |
 | --- | --- | --- |
 | **Microsoft Rewards** | Runs the daily Microsoft Rewards tasks and pushes the points result. | `proj-microsoft-rewards/` |
 | **Zhihuishu playback** | Autovisor plays Zhihuishu / Zhida course videos automatically. | `proj-autovisor/` |
 | **WeRead check-in** | Completes the daily reading challenge and verifies the counted minutes through the official read-only API. | `proj-weread-signin/` |
+| **Epic free games** | Claims the weekly Epic Games Store free games, with a prefilled-checkout-link fallback when hCaptcha blocks checkout. | `proj-epic-free-games/` |
 
 One scheduled task is not a program: `AutoShutdown0200` powers the machine off at 02:00 every
 day. Code sources, install paths, machines, schedules, notification channels, credentials, the
@@ -66,6 +68,7 @@ Minimum steps from a fresh clone to something that runs:
 | `proj-weread-signin/` | `npm test` + `node src/index.js status`; a real run needs credentials and the Python vendor |
 | `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
 | `proj-autovisor/` | nothing executable here, config only; the program comes from upstream |
+| `proj-epic-free-games/` | `npm test` + `node src/cli.js status`; a real claim needs `npm install`, `npx patchright install chromium` and one manual browser login |
 
 To rebuild the whole setup on a new machine:
 

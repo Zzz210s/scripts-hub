@@ -18,16 +18,18 @@
 | 本机部署现状(工作区、计划任务、运行器守卫、私有文件) | `docs/local-deployment.md` |
 | 微软积分运行器、通知层与源码改动 | 权威工作区 `%REWARDS_DIR%`(本地 git 仓库,只有 upstream 远端);已跟踪文件由 `scripts/sync-microsoft-rewards.sh` 发布成 `proj-microsoft-rewards/`(完整快照) |
 | 微信读书签到程序 | 代码本体就在本仓库 `proj-weread-signin/`;开发在本地克隆 `%WEREAD_DIR%`,用 `scripts/sync-weread-signin.sh` 发布 |
+| Epic 限免领取 | 代码与薄壳就在本仓库 `proj-epic-free-games/`;领取引擎是上游 `vogler/free-games-claimer` 的快照,固定 commit 记在 `proj-epic-free-games/VENDOR_COMMIT.txt`(不是对外同步的生成快照) |
 | 智慧树刷课配置 | `proj-autovisor/configs.ini` |
 | 上游补丁与贡献状态 | `patches/` |
 
-## 1. 三个程序各一行
+## 1. 四个程序各一行
 
 | 程序 | 干什么 | 代码来源 / 仓库 | 本地路径 | 跑在哪台机器 | 什么时候跑 | 运行时 | 凭据从哪来 | 通知怎么发 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **微软积分** | 每天跑 Microsoft Rewards:搜索、活动、读文章,算完分推送 | 上游 `TheNetsky/Microsoft-Rewards-Script` v4.3.2(GPL-3.0)+ 本机在程序目录里的本地提交(补丁、`scripts/windows/` 运行器、`wechat-bridge/` 通知层);没有远端,`git remote` 只有 upstream | `%REWARDS_DIR%` | 本机 Windows | 登录后 3 分钟(其后 1 小时内每 10 分钟)+ 每天 08:00 起每 2 小时一次,14 小时窗口,一天最多 3 次尝试 | Node.js >= 24(实测 v24.14.0)+ Playwright 驱动浏览器 + SQLite 存登录态 | `%REWARDS_DIR%\.env`:账号邮箱与密码 | 企业微信群机器人;发送层 `wechat-bridge/`,`webhook` 在 `wechat-bridge\data\wecom-webhook.txt` |
 | **微信读书签到** | 每天完成阅读挑战打卡(读满当日目标,单日上限 120 分钟),再用官方只读 API 回读校验时长真被计入 | 本仓库 `proj-weread-signin/`(MIT;开发在本地克隆 `%WEREAD_DIR%`,无远端);底座 `funnyzak/weread-bot` 固定在 `vendor/`,commit 记在 `VENDOR_COMMIT.txt` | `%WEREAD_DIR%` | 本机 Windows | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | Node.js >= 20.11(实测 v24.14.0)+ Python 3(vendor 依赖 `requests` / `httpx` / `PyYAML` / `urllib3` / `croniter` / `apprise`) | `%WEREAD_DIR%\secrets\`:网页 cookie、官方只读 Key、App 渠道凭据 | 企业微信群机器人;`secrets\wecom-webhook.txt`,发送层 `src/notify.js` |
 | **智慧树刷课** | Autovisor 自动播放智慧树/知到的共享课视频 | 上游 `CXRunfree/Autovisor` v3.17.3(MIT),代码未改,只改配置 | `%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`) | **只在本机 Windows**(需要本机 Chrome 与图形会话) | **手动**跑 `Autovisor.exe`;没有计划任务 | 打包好的 exe(PyInstaller;内嵌 Python 3.10 + Playwright)+ 本机标准路径的 Chrome | 运行时手动登录一次,登录态落 `app\data\cookies.json`;`configs.ini` 的账号密码留空 | 程序自带界面与日志,不接企业微信 |
+| **Epic 限免领取** | 每周四探测 Epic 免费清单,只有存在没领过的项才用 Playwright 引擎自动领取;被 hCaptcha 挡住时推预置结账链接 | 上游 `vogler/free-games-claimer` 的 `epic-games.js` + `src/`(AGPL-3.0)逐字节收编在 `proj-epic-free-games/vendor/`,commit 记在 `VENDOR_COMMIT.txt`;探测/状态/通知薄壳自研,同在本仓库 | `proj-epic-free-games/`(就在仓库里,无需另建工作区) | 本机 Windows | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 每天 09:00 起每 240 分钟一次,14 小时窗口,一天最多真跑 2 次;**默认不注册,人工登录一次后在配置里打开** | Node.js >= 20.11 + patchright 驱动的持久化浏览器 | 不存密码:登录态在 `data/browser/`;`secrets/wecom-webhook.txt` 只是通知地址 | 企业微信群机器人;`secrets/wecom-webhook.txt`,发送层 `src/notify.js` |
 
 表里的「什么时候跑」是默认值,真实时刻由 [`../config/schedule.json`](../config/schedule.json) 决定
 (见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节):改完跑 `node scripts/apply-schedule.mjs --apply --yes`。
@@ -40,7 +42,7 @@
 
 | 仓库 | 可见性 | 作用 | 现状备注 |
 | --- | --- | --- | --- |
-| `Zzz210s/scripts-hub` | PUBLIC | 多个完整项目的合集,每个项目一个隔离子目录(`proj-microsoft-rewards/`、`proj-weread-signin/`、`proj-autovisor/`),外加合集层的约定文档、补丁存档、向导与同步脚本。同时是两个没 origin 的权威工作区(`%REWARDS_DIR%`、`%WEREAD_DIR%`)的远程落点。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
+| `Zzz210s/scripts-hub` | PUBLIC | 多个完整项目的合集,每个项目一个隔离子目录(`proj-microsoft-rewards/`、`proj-weread-signin/`、`proj-autovisor/`、`proj-epic-free-games/`),外加合集层的约定文档、补丁存档、向导与同步脚本。同时是两个没 origin 的权威工作区(`%REWARDS_DIR%`、`%WEREAD_DIR%`)的远程落点。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
 | `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/proj-weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留 |
 | `Zzz210s/automation-suite` | 已删除(2026-10-04) | 曾是自动化脚本与向导的合集仓库(私有) | 已并入 `scripts-hub/docs/`、`scripts-hub/scripts/` |
 | `Zzz210s/wecom-notify` | 已删除(2026-10-04) | 曾是独立的私有企业微信通知 CLI/库 | 已并入 `scripts-hub/`,又于 2026-10-05 拆分:目录删除,只留 `docs/wecom-rules.md` 规则文档,发送实现分散在各项目 |
@@ -69,6 +71,7 @@
 | 必须本机 | 为什么 |
 | --- | --- |
 | 智慧树刷课 | Autovisor 用 Playwright 驱动**本机 Chrome** 播放视频,依赖图形会话;云主机没有可用桌面 |
+| Epic 限免领取的领取步骤 | 上游引擎刻意跑**可见**的 patchright 浏览器(无头模式更容易触发 hCaptcha),需要图形会话;探测那一步不需要 |
 | Windows 计划任务 | 现状是三个任务(`MicrosoftRewardsScript` / `WeReadSignIn` / `AutoShutdown0200`,见 `docs/local-deployment.md`);搬走要换成 systemd timer |
 | 看门狗、单实例锁、内存闸门 | 现在是 `.bat` / `.js`,读本机内存水位与进程表;云端要改成 `flock` + systemd 超时 |
 | 02:00 无条件关机 | 本机专属任务,云端不需要 |
@@ -108,9 +111,12 @@
   `git apply`。同步会把本机路径改成 `%REWARDS_DIR%`、按机器私有清单脱敏;缺清单脚本拒绝运行。
   完整工作模型见 `docs/workspace-model.md`。
 - 改任一份企业微信发送核心 → 权威实现是 `wecom-core` 标记之间的整块,共享规则见 `docs/wecom-rules.md`;
-  现在两份实现在 `proj-microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `proj-weread-signin/src/notify.js`,
-  再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印各块大小)。改一处必须同步其余各处,只允许外壳
+  现在三份实现在 `proj-microsoft-rewards/wechat-bridge/lib/wecom.js`、`proj-weread-signin/src/notify.js` 与
+  `proj-epic-free-games/src/notify.js`,再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印各块大小)。改一处必须同步其余各处,只允许外壳
   (消息排版、webhook 读取、返回形状)不同,核心必须一致(按 LF 归一后逐字节)。
+- 改 Epic 限免领取 → 代码就在本仓库 `proj-epic-free-games/`(不是生成快照,直接改);
+  但 `proj-epic-free-games/vendor/free-games-claimer/` 是上游快照,**不要就地改上游代码** ——
+  升级按 `VENDOR_COMMIT.txt` 重新取文件。新程序接入的通用步骤见 `docs/scheduling-convention.md` 第 6 节。
 - 换机或全新克隆后想先确认某个项目能不能跑 → 看项目目录的 `QUICKSTART.md`(前置条件 / 三条命令 /
   凭据 / 验证 / 常见失败),或直接跑 `scripts/setup-<项目>.sh` 自检。改了自检脚本或项目步骤时,
   把 `scripts/README.md` 与对应 `QUICKSTART.md` 一起更新。
@@ -129,6 +135,7 @@
 | `%REWARDS_DIR%` | 微软积分的权威工作区:本机本地 git 仓库(上游 v4.3.2 + 本地改造,只有 upstream 远端);它的已跟踪文件由 `scripts/sync-microsoft-rewards.sh` 发布成 `proj-microsoft-rewards/` |
 | `%AUTOVISOR_DIR%` | Autovisor 安装目录(其下有 `app\`) |
 | `%WEREAD_DIR%` | 微信读书的开发克隆 —— 一个本地 git 克隆,它的已跟踪文件由 `scripts/sync-weread-signin.sh` 发布成 `proj-weread-signin/` |
+| `%EPIC_DIR%` | Epic 限免领取的项目目录 —— 它就在本仓库里(`proj-epic-free-games/`),默认无需单独设置;只有把项目挪出仓库时才需要在私有文件里指向新位置 |
 
 运行器脚本都用 `%~dp0` 相对定位,整个目录可以原样挪到任何路径。必须留在本机、不入库的路径写在
 私有文件 `~/.config/automation-suite/local-paths.env`(在仓库之外);那里的 `automation-suite`
@@ -144,6 +151,10 @@
 `proj-weread-signin/` 是 **MIT**(继承自底座 `funnyzak/weread-bot`),保留自己的 `LICENSE`。
 `proj-autovisor/configs.ini` 同样来自 MIT 上游。MIT 与 GPL-3.0 单向兼容,所以它们能放进本仓库,
 内部文件仍按 MIT。
+
+`proj-epic-free-games/` 是 **AGPL-3.0-only**:它收编并衍生自上游 `vogler/free-games-claimer`
+(AGPL-3.0),上游 `LICENSE` 一并随快照收编。GPLv3 §13 允许 GPL-3.0 与 AGPL-3.0 组合,
+所以它能和本仓库其余部分同处一仓;该子目录对外按 AGPL-3.0。
 
 原 `wecom-notify/`(本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`)已于 2026-10-05 拆分删除:
 代码不再保留,只留 `docs/wecom-rules.md` 规则文档,发送实现分散在各项目。

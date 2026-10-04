@@ -3,7 +3,7 @@
 真实值只在各程序自己的目录里;本仓库只有模板和这份说明。`.gitignore` 已排除 `.env`、
 `secrets/*`、`*webhook*.txt`、`data/`、`sessions/`、`logs/`。换机恢复时按本表逐个补齐即可。
 
-路径占位符 `%REWARDS_DIR%` / `%AUTOVISOR_DIR%` / `%WEREAD_DIR%` 见根 README 的「路径约定」。
+路径占位符 `%REWARDS_DIR%` / `%AUTOVISOR_DIR%` / `%WEREAD_DIR%` / `%EPIC_DIR%` 见根 README 的「路径约定」。
 
 ## 微软积分(`%REWARDS_DIR%`)
 
@@ -31,6 +31,16 @@
 | --- | --- | --- | --- |
 | 登录态 | `app\data\cookies.json` | 运行 `Autovisor.exe` 时手动登录一次后自动生成 | 站点会话过期即失效;重跑程序手动登录(登录态不在浏览器里,换浏览器不用重登) |
 | 账号密码 | 不存文件,`configs.ini` 的 `username` / `password` 留空 | — | 每次手动输入 |
+
+## Epic 限免领取(`proj-epic-free-games/`)
+
+| 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
+| --- | --- | --- | --- |
+| 浏览器登录态 | `data\browser\`(目录,不是单个文件) | 跑 `node src/cli.js login`,在打开的浏览器里人工登录一次 | 会话级,可长期保持;失效会推「需要你处理」,重跑 `login` 即可 |
+| 企业微信群机器人 webhook | `secrets\wecom-webhook.txt` | 同上,企业微信群机器人 | 文件不存在时不推送 |
+
+**没有密码类凭据**:程序刻意不向引擎传 `EG_EMAIL` / `EG_PASSWORD`,所以不存在「密码泄漏」这条路径。
+上游支持存密码,本项目不用。
 
 ## 与本仓库无关的私有文件
 

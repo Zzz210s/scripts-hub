@@ -3,7 +3,8 @@
   "timezone": "Asia/Shanghai",
   "order": [
     "microsoft-rewards",
-    "weread-signin"
+    "weread-signin",
+    "epic-free-games"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -37,6 +38,19 @@
       "runScript": "",
       "enabled": true,
       "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
+    },
+    "epic-free-games": {
+      "taskName": "EpicFreeGames",
+      "startTime": "auto",
+      "intervalMinutes": 240,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 2,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": false,
+      "actionVbs": "%EPIC_DIR%\\scripts\\windows\\run-daily.vbs"
     }
   }
 }

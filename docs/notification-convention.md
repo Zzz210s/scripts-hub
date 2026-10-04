@@ -1,6 +1,6 @@
 # 通知约定:两个自动化程序共用的消息架构
 
-本机两个每天自动跑的程序(微软积分、微信读书签到)都往同一个企业微信群机器人推送。
+本机三个无人值守程序(微软积分、微信读书签到、Epic 限免领取)都往同一个企业微信群机器人推送。
 它们各自独立开发,推送风格一度完全不同 —— 这条约定把「会发哪些消息」「消息叫什么名字」
 「开始消息长什么样」固定下来,避免以后再各写各的。
 
@@ -10,18 +10,19 @@
 | --- | --- | --- |
 | 微软积分 | `%REWARDS_DIR%\wechat-bridge\` | `wechat-bridge\data\wecom-webhook.txt` |
 | 微信读书签到 | `%WEREAD_DIR%\src\notify*.js`、`run-notice.js` | `secrets/wecom-webhook.txt` |
+| Epic 限免领取 | `proj-epic-free-games/src/{notify,policy,messages}.js`、`run.js` | `secrets/wecom-webhook.txt` |
 
 ## 1. 消息类型表
 
 **类型名统一,分工统一**;每条消息只属于一个类型。子形态(例如"结果成功"与"结果有失败")
 只是同一类型的不同文案,不再另起类型名。
 
-| 类型名 | 含义 | 微软积分 | 微信读书签到 |
-| --- | --- | --- | --- |
-| `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 |
-| `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 |
-| `skip` 正常跳过 | 触发被规则拦下,这次不跑;说清原因、会不会自动重试、不需要你做什么 | `wechat-bridge/notify-skip.js` `memory` / `handled` / `exhausted` | `src/notify-policy.js` 的 `buildSkipMessage`,reason 不属于 `action` |
-| `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` |
+| 类型名 | 含义 | 微软积分 | 微信读书签到 | Epic 限免领取 |
+| --- | --- | --- | --- | --- |
+| `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 | `src/run.js` 调 `messages.js` 的 `buildStartMessage` |
+| `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 | `src/messages.js` 的 `buildResultMessage`,由 `src/run.js` 发送 |
+| `skip` 正常跳过 | 触发被规则拦下,这次不跑;说清原因、会不会自动重试、不需要你做什么 | `wechat-bridge/notify-skip.js` `memory` / `handled` / `exhausted` | `src/notify-policy.js` 的 `buildSkipMessage`,reason 不属于 `action` | `src/policy.js` 的 `isSilentSkip` + `src/messages.js` 的 `buildSkipMessage`,由 `src/run.js` 发送 |
+| `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` | 同上,`kind=captcha` / `login` / `blocked`;`captcha` 与 `blocked` 带预置结账链接 |
 
 「正常跳过」还分两档(2026-10-04 定):**不需要人做任何事**的那些只写运行日志、不推送;
 可能让今天白丢的那些照旧推送 —— 见下面的「静音的跳过」。
@@ -48,8 +49,8 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 
 | 档位 | 处理 | 原因 |
 | --- | --- | --- |
-| 静音 | **只写运行日志,不推送** | 微软 `handled`;微信读书 `done`、`peer-running`、`quiet-hours` |
-| 照旧推送 | 推一条,同因同日最多一条 | 微软 `memory`、`exhausted`;微信读书 `low-memory`、`attempts-exhausted`、`before-shutdown`、`paused` |
+| 静音 | **只写运行日志,不推送** | 微软 `handled`;微信读书 `done`、`peer-running`、`quiet-hours`;Epic `nothing-new`、`already-attempted`、`peer-running`、`quiet-hours` |
+| 照旧推送 | 推一条,同因同日最多一条 | 微软 `memory`、`exhausted`;微信读书 `low-memory`、`attempts-exhausted`、`before-shutdown`、`paused`;Epic `low-memory`、`probe-failed`、`paused` |
 
 - 静音不等于消失:文案照旧整条写进运行日志(微软 `logs\runner.log` 与 `logs\last-run.log`,
   微信读书 `logs\last-run.log` / `logs\runner.log`),事后可查「这次为什么没跑」。
@@ -67,6 +68,9 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 - 微信读书签到:`done` 已达标(静音)、`peer-running` 同伴在跑(静音)、`quiet-hours` 安静时段(静音)、
   `before-shutdown` 临近关机、`attempts-exhausted` 尝试用尽、`paused` 已手动暂停、
   `credential-invalid` 凭据失效、`stats-unavailable` 读不到官方统计、`low-memory` 内存不足。
+- Epic 限免领取:`nothing-new` 当期免费项都领过了(静音)、`already-attempted` 今天的尝试次数用尽(静音)、
+  `peer-running` 同伴在跑(静音)、`quiet-hours` 安静时段(静音)、`shutdown-soon` 临近关机(静音)、
+  `low-memory` 内存不足、`probe-failed` 读免费清单失败、`paused` 已手动暂停。
 
 ## 2. 开始消息模板(`start`)
 
@@ -124,7 +128,7 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 
 | 时机 | 动作词 |
 | --- | --- |
-| `start` | 微软 `开始运行` / 微信读书 `开始自动阅读` |
+| `start` | 微软 `开始运行` / 微信读书 `开始自动阅读` / Epic `开始领取` |
 | `result` 成功 | `运行成功` |
 | `result` 有失败 | `运行有失败` |
 | `skip` | `正常跳过` |

@@ -13,9 +13,10 @@
 | --- | --- | --- | --- |
 | 微软积分 | `proj-microsoft-rewards/wechat-bridge/lib/wecom.js`(分发在 `lib/channels.js`,排版在 `lib/report.js`、`lib/start.js`、`lib/skip.js`) | `start` / `result` / `skip` / `action` | 每次运行 |
 | 微信读书签到 | `proj-weread-signin/src/notify.js`(策略在 `src/notify-policy.js`,发送时机在 `src/run-notice.js`、`src/run.js`) | `start` / `result` / `skip` / `action` | 每次运行 |
+| Epic 限免领取 | `proj-epic-free-games/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 探测到当期还有没领过的免费游戏时 |
 
-两份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
-由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外壳层
+三份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
+由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外层
 (消息排版、webhook 读取、返回形状)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。
 
@@ -85,6 +86,8 @@
 ## 8. 一致性要求
 
 - 各实现的 `wecom-core` 块必须**逐字节一致**;改任何一处,都要把整块同步到其余各处。
+  块内有一行注释只列了最早的两份实现(那两处是生成快照,不能就地改);实际比对的文件清单
+  以 `scripts/check-wecom-drift.mjs` 的 `FILES` 为准。
 - 提交前跑漂移检测:
 
   ```bash
@@ -92,10 +95,10 @@
   node scripts/check-wecom-drift.mjs --verbose  # 打印各块大小与首个差异位置
   ```
 
-- 两份实现都是**生成快照**:`proj-microsoft-rewards/` 来自 `%REWARDS_DIR%`,
-  `proj-weread-signin/` 来自 `%WEREAD_DIR%`。改发送核心要先改权威工作区并提交,再跑
-  `scripts/sync-microsoft-rewards.sh` / `scripts/sync-weread-signin.sh` 发布,直接改快照会被
-  下次同步覆盖。工作模型见 [workspace-model.md](workspace-model.md)。
+- 三份实现里,`proj-microsoft-rewards/` 来自 `%REWARDS_DIR%`、`proj-weread-signin/` 来自 `%WEREAD_DIR%`,
+  两者都是**生成快照**;`proj-epic-free-games/` 的权威副本就在本仓库里。改发送核心要先改共享核心的权威来源
+  (两份快照要改各自的工作区),再跑 `scripts/sync-microsoft-rewards.sh` / `scripts/sync-weread-signin.sh`
+  发布,直接改快照会被下次同步覆盖。工作模型见 [workspace-model.md](workspace-model.md)。
 
 ## Key points (English)
 

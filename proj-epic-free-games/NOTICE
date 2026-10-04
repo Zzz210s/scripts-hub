@@ -1,0 +1,16 @@
+# 来源与许可
+
+本目录整体按 **AGPL-3.0-only** 授权,见同目录的 `LICENSE`。原因是它包含并衍生自
+[vogler/free-games-claimer](https://github.com/vogler/free-games-claimer)(AGPL-3.0-only,
+作者 Ralf Vogler)的 Epic 领取引擎。
+
+| 内容 | 来源 | 许可 |
+| --- | --- | --- |
+| `vendor/free-games-claimer/` | 上游仓库 `epic-games.js` + `src/` 的逐字节快照,commit 见 `VENDOR_COMMIT.txt` | AGPL-3.0-only,上游 `LICENSE` 一并收编 |
+| `src/`、`test/`、`scripts/` | 本仓库自研(探测、状态、通知、调度、Windows 运行器) | AGPL-3.0-only,随本目录 |
+
+本仓库其余部分按 **GPL-3.0** 授权(见仓库根 `LICENSE`)。GPLv3 §13 允许 GPL-3.0 与 AGPL-3.0
+组合,所以两者可以同处一个仓库;本目录对外仍按 AGPL-3.0。
+
+上游没有 copy-left 之外的要求;我们没有修改上游代码一行,只把它当子进程调用。
+改代码请在 `vendor/` 之外做,升级上游按 `VENDOR_COMMIT.txt` 重新取文件。

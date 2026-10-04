@@ -11,17 +11,17 @@
 
 | 字段 | 含义 | 默认值 |
 | --- | --- | --- |
-| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` |
+| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` |
 | `stagger.baseStartTime` / `slotMinutes` | 第一个程序的每日起始时间 / 相邻程序的间隔 | `08:00` / `30` |
 | `stagger.logonBaseMinutes` / `logonStepMinutes` | 登录后延迟的起点 / 步进 | `3` / `7` |
 | `programs.<id>.startTime` | 每日起始时间 `HH:MM`;`auto` = 按 order+stagger 推导 | `auto` |
-| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60` |
+| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60`、Epic `240` |
 | `programs.<id>.windowHours` | 每日触发窗口长度(小时) | `14` |
 | `programs.<id>.maxAttemptsPerDay` | 程序内部一天最多真跑几次(不是触发次数) | `3` |
 | `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10) |
 | `programs.<id>.logonRetryMinutes` / `logonRetryWindowMinutes` | 登录触发的重复间隔 / 总时长 | `10` / `60` |
 | `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` 占位符 | 占位符形式 |
-| `programs.<id>.enabled` | `false` = 不注册它的触发 | `true` |
+| `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic 默认 `false`,人工登录一次后打开 |
 
 两条路径都读这份配置:
 
@@ -47,10 +47,10 @@
 | --- | --- | --- | --- |
 | 微软积分 | 登录后 3 分钟(其后 1 小时内每 10 分钟重试)+ 08:00 起每 120 分钟一次 | `microsoft-rewards.timer` 08:00,每天一次 | `logs\last-run.state` 记 `日期 9` = 当天已完成 |
 | 微信读书签到 | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 08:30 起每 60 分钟一次 | `weread-signin.timer` 08:30,每天一次 | `data\state.json` 的 `done` 与尝试次数 |
-| (下一个程序) | 登录后 17 分钟 + 09:00 起 | 09:00,每天一次 | 同上 |
+| Epic 限免领取 | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 09:00 起每 240 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,人工登录一次后在配置里打开** | `epic-free-games.timer` 09:00,每天一次 | `data\state.json` 的已领记录与当日尝试次数 |
 
-- 每个程序占一个 **30 分钟槽位**,新程序顺延(08:00 → 08:30 → 09:00)。
-- 本机的登录延迟按 **7 分钟步进**错开(3 → 10 → 17),因为开机瞬间网络与系统未必就绪。
+- 每个程序占一个 **30 分钟槽位**,新程序顺延(08:00 微软 -> 08:30 微信读书 -> 09:00 Epic)。
+- 本机的登录延迟按 **7 分钟步进**错开(3 -> 10 -> 17),因为开机瞬间网络与系统未必就绪。
 - 本机白天用「14 小时时间窗 + 周期重复」给多次机会:关机或忙碌时错过的那次直接丢失
   (Windows 计划任务不补跑),靠窗口内的下一次补上。
 - 云端 7×24 在线,定时器一定触发,所以重点是**幂等**,不是抢时间窗:程序自己看状态文件,
@@ -88,6 +88,7 @@
 | --- | --- | --- |
 | 微软积分 | `run-watchdog.bat` 默认 150 分钟 | 超时强杀整棵进程树,发通知说明;当天剩余触发重试未完成的账号 |
 | 微信读书签到 | `RUN_TIMEOUT_MINUTES=100` | 同理,单次运行上限 100 分钟 |
+| Epic 限免领取 | 引擎 30 分钟(`EPIC_ENGINE_TIMEOUT_MINUTES`) | 超时就强杀引擎进程树并推失败通知;探测那一步是 20 秒超时 |
 
 配套余量:微软积分最近一次实测 44.3 分钟(5 个账号),150 分钟的超时线留得很足。
 

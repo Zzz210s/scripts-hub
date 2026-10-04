@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-// 漂移检测:两份企业微信发送实现(proj-microsoft-rewards / proj-weread-signin)里
-// 标了 `wecom-core` 的核心块必须彼此逐字节一致(按 LF 归一后比对,不受 checkout 行尾影响)。
-// 规则见 docs/wecom-rules.md;不一致就报错并退出 1。
+// 漂移检测:各项目里标了 `wecom-core` 的核心块必须彼此逐字节一致(按 LF 归一后比对,不受
+// checkout 行尾影响)。规则见 docs/wecom-rules.md;不一致就报错并退出 1。
 //
 // 用法:node scripts/check-wecom-drift.mjs
 //       node scripts/check-wecom-drift.mjs --verbose   打印各块大小与首个差异位置
 //
-// 为什么不用跨目录 import:两个程序是无人值守的计划任务,各自独立部署,
+// 为什么不用跨目录 import:这些是无人值守的计划任务,各自独立部署,
 // 改运行时依赖风险高;所以这里用「各实现内嵌同一块 + 漂移检测」。
 import fs from 'node:fs'
 import path from 'node:path'
@@ -16,10 +15,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const BEGIN = '// >>> wecom-core begin'
 const END = '// <<< wecom-core end'
 
-/** 两份实现:核心块必须彼此一致。 */
+/** 各实现:核心块必须彼此一致。 */
 const FILES = [
     'proj-microsoft-rewards/wechat-bridge/lib/wecom.js',
-    'proj-weread-signin/src/notify.js'
+    'proj-weread-signin/src/notify.js',
+    'proj-epic-free-games/src/notify.js'
 ]
 
 /** 取出 `wecom-core begin` 到 `wecom-core end` 之间(含两行标记)的整块源码。 */

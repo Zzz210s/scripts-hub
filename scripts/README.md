@@ -56,6 +56,7 @@
 | `setup-weread-signin.sh` | Node >= 20.11、Python、`.env`/`config.yaml` 模板、`secrets/` 凭据、底座 vendor、218 条离线测试、本地 `status` 干跑 | 默认不联网;`--vendor` 才克隆底座 |
 | `setup-microsoft-rewards.sh` | Node >= 24、`npm ci`、patchright chromium、`.env` 模板、`npm run build`、26 条离线测试 | 默认联网(依赖与浏览器);`--no-install --no-browser --no-build` 可只跑离线测试 |
 | `setup-autovisor.sh` | `configs.ini` 是否存在、课程链接是否受支持、账号密码是否留空、程序本体是否解压 | 不联网 |
+| `setup-epic-free-games.sh` | Node >= 20.11、项目文件与上游引擎、离线测试、`status` 干跑、引擎依赖、登录态与 webhook | 不联网(测试与干跑都不发请求) |
 
 ## 调度(时间来自 `config/schedule.json`)
 
@@ -74,7 +75,7 @@
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `check-wecom-drift.mjs` | 比对两份企业微信发送实现(`proj-microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `proj-weread-signin/src/notify.js`)里 `wecom-core` 核心块是否彼此逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印各块大小与差异位置;规则见 `../docs/wecom-rules.md` |
+| `check-wecom-drift.mjs` | 比对三份企业微信发送实现(`proj-microsoft-rewards/wechat-bridge/lib/wecom.js`、`proj-weread-signin/src/notify.js`、`proj-epic-free-games/src/notify.js`)里 `wecom-core` 核心块是否彼此逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印各块大小与差异位置;规则见 `../docs/wecom-rules.md` |
 | `check-privacy.mjs` | 扫 `git ls-files` 的每个文件:本机路径、真实邮箱、`wrk-` 真 key、webhook 真 key、手机号、机器私有标识清单里的词 | 提交前、发布前,或定期体检 | `node scripts/check-privacy.mjs` 命中退出 1;`--verbose` 打印规则数;私有清单读 `SENSITIVE_PATTERNS_FILE`(默认 `~/.config/automation-suite/sensitive-patterns.txt`),读不到只跑通用规则 |
 
 ## 路径与凭据
@@ -84,7 +85,7 @@
 
 | 变量 | 作用 |
 | --- | --- |
-| `WEREAD_SIGNIN_DIR` / `REWARDS_DIR` | 微信读书、微软积分的权威工作区路径 |
+| `WEREAD_SIGNIN_DIR` / `REWARDS_DIR` / `EPIC_DIR` | 微信读书、微软积分、Epic 限免的工作区路径 |
 | `HOME_AUTOMATION_CONFIGS_DIR` | 本仓库本地路径 |
 | `SENSITIVE_PATTERNS_FILE` | 换一个私有个人标识清单位置(默认 `~/.config/automation-suite/sensitive-patterns.txt`);`sync-microsoft-rewards.sh` 找不到它就直接报错退出,`check-privacy.mjs` 找不到则只跑通用规则 |
 | `HAC_BACKUP_GLOB` / `HAC_BACKUP_OLD_GLOB` | 删库前的镜像备份 glob(新名优先、旧名兼容) |

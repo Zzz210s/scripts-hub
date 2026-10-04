@@ -4,6 +4,7 @@
     "怎么改": "改本机实际配置 config/schedule.json(本文件只是默认值文档 + 缺失时的回退),改完跑 bash scripts/apply-schedule.sh --dry-run 看生成的触发器,满意再加 --apply --yes 注册。",
     "时区": "timezone 供云端 systemd timer 参考;Windows 计划任务一律按主机本地时区。",
     "顺序": "order = 错峰顺序(谁先跑)。下标 0 最先,起始时间与登录延迟都按 stagger 依次顺延。",
+    "节假日": "Epic 限免在 12 月中旬至 1 月初的 Holiday Sale 期间每天换一批;那时把 epic-free-games.intervalMinutes 改成 360 再跑 apply-schedule.mjs。",
     "auto": "startTime / logonDelayMinutes 写 \"auto\" 表示由 order + stagger 推导;写具体值则覆盖推导结果。",
     "字段": {
       "stagger.baseStartTime": "第一个程序的每日起始时间 HH:MM。",
@@ -20,14 +21,15 @@
       "programs.<id>.logonRetryWindowMinutes": "登录触发器的重复总时长(分钟)。",
       "programs.<id>.runScript": "云端 systemd service 的 ExecStart;留空则由部署脚本填。",
       "programs.<id>.enabled": "false 表示不注册它的触发(仍会列在报告里)。",
-      "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。"
+      "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% / %EPIC_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。"
     }
   },
   "version": 1,
   "timezone": "Asia/Shanghai",
   "order": [
     "microsoft-rewards",
-    "weread-signin"
+    "weread-signin",
+    "epic-free-games"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -61,6 +63,19 @@
       "runScript": "",
       "enabled": true,
       "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
+    },
+    "epic-free-games": {
+      "taskName": "EpicFreeGames",
+      "startTime": "auto",
+      "intervalMinutes": 240,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 2,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": false,
+      "actionVbs": "%EPIC_DIR%\\scripts\\windows\\run-daily.vbs"
     }
   }
 }

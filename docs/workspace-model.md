@@ -12,6 +12,7 @@
 | 微软积分 | `%REWARDS_DIR%`(本机本地 git 仓库,只有 upstream 远端) | `proj-microsoft-rewards/` | `bash scripts/sync-microsoft-rewards.sh` |
 | 微信读书签到 | `%WEREAD_DIR%`(本机本地克隆,无远端) | `proj-weread-signin/` | `bash scripts/sync-weread-signin.sh` |
 | 智慧树刷课 | 无代码可改:程序本体是上游 Windows 打包程序,本仓库只存配置 | `proj-autovisor/`(只有 `configs.ini` 与 README) | 直接改配置 |
+| Epic 限免领取 | 代码就在本仓库 `proj-epic-free-games/`(薄壳自研 + 上游引擎快照),不要另建工作区 | 同左 | 直接改;上游引擎按 `proj-epic-free-games/VENDOR_COMMIT.txt` 重新取文件升级 |
 
 企业微信发送不再是独立项目:实现分散在各项目内,共享约束与规则见
 [`docs/wecom-rules.md`](wecom-rules.md),一致性由 `scripts/check-wecom-drift.mjs` 守住。
@@ -63,6 +64,10 @@ git commit && git push
 | `scripts/sync-weread-signin.sh` | `%WEREAD_DIR%` | `proj-weread-signin/` | 发布 `git ls-files`;README 顶部重写快照说明;机器相关的 `WORKSPACE.md` 不发布 |
 
 两个脚本都带 `--dry-run`(只报告差异)、都写 `SNAPSHOT.txt`(记录源提交),都可重复运行(幂等)。
+
+`proj-epic-free-games/` **没有**对应的 `sync-*` 脚本:它的权威副本就在本仓库里(与 `proj-autovisor/` 同类),
+所以没有「工作区 -> 仓库」这个方向。将来若把它拆成独立工作区,同步脚本照
+`scripts/sync-weread-signin.sh` 的形态写(发布 `git ls-files` + 写 `SNAPSHOT.txt`)。
 
 ## 5. 项目隔离规则
 

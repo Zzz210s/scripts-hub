@@ -34,6 +34,7 @@
 | 微软积分 | `%REWARDS_DIR%`(默认盘符路径见机器私有文件) | `proj-microsoft-rewards/`(完整快照) | `bash scripts/deploy-microsoft-rewards.sh --apply` |
 | 微信读书签到 | `%WEREAD_DIR%` | `proj-weread-signin/`(完整快照) | `bash scripts/deploy-weread-signin.sh --apply` |
 | 智慧树刷课 | `%AUTOVISOR_DIR%\app` | `proj-autovisor/`(只有配置) | 手动:复制 `configs.ini` 到 `app\` |
+| Epic 限免领取 | 就是 `%EPIC_DIR%`(默认等于仓库里的 `proj-epic-free-games/`,无需另建工作区) | `proj-epic-free-games/`(代码本体) | 不需要部署:直接在项目目录里跑;真跑前 `npm install` + `npx patchright install chromium` + `node src/cli.js login` |
 
 换机恢复的顺序:克隆本仓库 → 建机器私有文件(第 5 节) → 从上游装程序本体 → 跑对应 `deploy-*.sh --apply`
 把仓库里的配置与运行器刷进工作区 → 按 `credentials.md` 填凭据 → 注册计划任务 → 跑 `setup-*.sh` 自检。
@@ -80,6 +81,9 @@
 (字段与默认值见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节);上面列的是默认值。
 
 - 登录触发按 7 分钟步进错开:微软 3 分钟、微信读书 10 分钟。
+- **Epic 限免领取(`EpicFreeGames`)尚未注册**:`config/schedule.json` 里它的条目写着 `enabled: false`,
+  因为领取要先人工登录一次浏览器(`node src/cli.js login`)。登录后把 `enabled` 改成 `true`,
+  再跑 `node scripts/apply-schedule.mjs --apply --yes`,它会是登录后 17 分钟 + 09:00 起每 240 分钟一次。
 - 白天的周期重复只为「给多次机会」:开机晚、机器忙、关机,错过的那次直接丢失(计划任务不补跑),
   靠窗口内的下一次补上;程序自己的幂等守卫保证重复触发无害。
 - 智慧树刷课**没有**计划任务,手动运行。
