@@ -65,7 +65,9 @@ scripts-hub/
 4. 按 `docs/credentials.md` 填真实凭据。
 5. 注册计划任务;任务名与命令见 `docs/local-deployment.md`。
 
-云主机(尚未开通):先跑 `scripts/wizard-oracle.sh`,再读 `docs/cloud-vm.md`。
+云主机(2026-10-04 起已部署):两个程序已容器化跑在腾讯云上,顺序由宿主 systemd timer 触发 ——
+先读 [`docs/docker-deployment.md`](docs/docker-deployment.md),落地文件在 [`scripts/linux/`](scripts/linux/);
+为什么选云主机见 [`docs/cloud-vm.md`](docs/cloud-vm.md)。
 
 ## 文档索引
 
@@ -78,6 +80,7 @@ scripts-hub/
 | [`docs/notification-convention.md`](docs/notification-convention.md) | 四种企业微信消息类型与文案硬规则 |
 | [`docs/wecom-rules.md`](docs/wecom-rules.md) | 企业微信 webhook 的共享规则:字节上限、超时与重试、errcode 处理、发送频率 |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | 为什么要云主机、哪些方案被否定 |
+| [`docs/docker-deployment.md`](docs/docker-deployment.md) | 云主机上的容器化部署:分工、布局、顺序编排、守卫、启动时间优化、凭据与运维 |
 | [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
 | [`docs/local-deployment.md`](docs/local-deployment.md) | 本机部署现状:工作区、计划任务、运行器守卫、本机私有文件 |
 | [`scripts/README.md`](scripts/README.md) | 向导、快照同步、项目自检引导与检查(企业微信漂移、隐私扫描) |

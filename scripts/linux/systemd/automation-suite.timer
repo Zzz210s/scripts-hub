@@ -1,0 +1,15 @@
+[Unit]
+Description=每天 08:00 与 12:00 触发自动化套件(顺序执行)
+
+[Timer]
+# 08:00 主力,12:00 兜底:上午那次失败/没跑成时,中午还有一次机会。
+# 两次都触发也不怕 —— 幂等守卫会让已完成的那天一秒跳过。
+OnCalendar=*-*-* 08:00:00
+OnCalendar=*-*-* 12:00:00
+# 关机/重启期间错过的触发,开机后补跑一次(云主机重启不影响当天那一次)
+Persistent=true
+AccuracySec=1min
+Unit=automation-suite.service
+
+[Install]
+WantedBy=timers.target

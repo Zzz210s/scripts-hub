@@ -76,8 +76,9 @@ To rebuild the whole setup on a new machine:
 4. Fill in the real credentials listed in `docs/credentials.md`.
 5. Register the scheduled tasks; `docs/local-deployment.md` lists the names and the commands.
 
-For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
-`docs/cloud-vm.md`.
+The cloud VM (deployed 2026-10-04): both programs run containerised on Tencent Cloud,
+sequenced by a host systemd timer -- start with [`docs/docker-deployment.md`](docs/docker-deployment.md),
+the files live in [`scripts/linux/`](scripts/linux/). Why a VM at all: [`docs/cloud-vm.md`](docs/cloud-vm.md).
 
 ## Documentation index
 
@@ -90,6 +91,7 @@ For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
 | [`docs/notification-convention.md`](docs/notification-convention.md) | The four WeCom message types and the wording rules |
 | [`docs/wecom-rules.md`](docs/wecom-rules.md) | The shared WeCom webhook rules: byte limits, timeout/retry, errcode handling, rate limits |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | Why a cloud VM, and which options were rejected |
+| [`docs/docker-deployment.md`](docs/docker-deployment.md) | Containerised deployment on the cloud VM: layering, layout, sequential orchestration, guards, startup-time tuning, credentials and operations |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
 | [`docs/local-deployment.md`](docs/local-deployment.md) | What is deployed on this machine: workspaces, scheduled tasks, runner guards, private local files |
 | [`scripts/README.md`](scripts/README.md) | Wizards, snapshot syncs, project self-check scripts and checks (WeCom drift, privacy scan) |

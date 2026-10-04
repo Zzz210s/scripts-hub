@@ -1,0 +1,15 @@
+[Unit]
+Description=自动化套件(微软积分 + 微信读书签到),顺序执行
+Documentation=https://github.com/Zzz210s/scripts-hub/blob/main/docs/docker-deployment.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/apps/automation
+EnvironmentFile=-/srv/apps/automation/suite.env
+ExecStart=/srv/apps/automation/run-all.sh
+# 一次编排最长可能跑 4 小时(微软积分 150 分钟 + 微信读书 100 分钟),不要中途掐断
+TimeoutStartSec=infinity
+Nice=5

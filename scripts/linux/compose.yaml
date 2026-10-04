@@ -1,0 +1,54 @@
+# 自动化套件(微软积分 + 微信读书签到)的容器定义
+#
+# 两个服务都是"跑一次就退出"的一次性容器:宿主侧的 run-all.sh / systemd timer 顺序触发,
+# 容器里没有常驻进程、没有 cron —— 顺序由编排脚本保证(一项结束才启动下一项)。
+# 代码在镜像里,配置/状态/凭据挂宿主目录。
+#
+# 用法(宿主):
+#   docker compose -f /srv/apps/automation/compose.yaml run --rm -T rewards-run
+#   docker compose -f /srv/apps/automation/compose.yaml run --rm -T weread-run
+# 正常路径不要手敲这两条,用 run-all.sh(它带守卫、看门狗与通知)。
+
+services:
+  rewards-run:
+    image: automation-rewards:local
+    container_name: rewards-run
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/deploy/run-once.sh"]
+    env_file:
+      - ./rewards/.env
+    environment:
+      TZ: Asia/Shanghai
+      # 一次性运行:不让上游 entrypoint 起 cron,也不让容器启动就跑
+      RUN_ON_START: "false"
+      CRON_SCHEDULE: "0 0 31 2 *"
+      SKIP_RANDOM_SLEEP: "true"
+      STUCK_PROCESS_TIMEOUT_HOURS: "3"
+    volumes:
+      - ./rewards/config:/usr/src/microsoft-rewards-script/config
+      - ./rewards/sessions:/usr/src/microsoft-rewards-script/sessions
+      - ./rewards/deploy:/opt/deploy:ro
+    security_opt:
+      - no-new-privileges:true
+    # 一次运行约 1~1.5 GB(2 集群 = 4 个 headless Chromium);留够余量,超了让容器自己 OOM,不拖垮宿主
+    mem_limit: 2600m
+
+  weread-run:
+    image: automation-weread:local
+    container_name: weread-run
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/deploy/run-once.sh"]
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./weread/.env:/opt/weread/.env:ro
+      - ./weread/config.yaml:/opt/weread/config.yaml
+      - ./weread/secrets:/opt/weread/secrets
+      - ./weread/data:/opt/weread/data
+      - ./weread/logs:/opt/weread/logs
+      # 同伴(微软积分)的单实例锁:错峰判定要用(.env 的 BUSY_PEERS 指到这里)
+      - ./rewards/logs:/peers/rewards:ro
+      - ./weread/deploy:/opt/deploy:ro
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 800m
