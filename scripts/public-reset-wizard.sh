@@ -7,6 +7,8 @@
 # 以新名 Zzz210s/scripts-hub 重建为 PUBLIC(旧对象随旧库一起消失),再把本地
 # 干净历史推过去、origin 改指新地址。
 # 本地目录名沿用 home-automation-configs(只改远程仓库名,免得带偏本机计划任务)。
+# 备份镜像:优先新名 scripts-hub-backup-*.git,同时接受更名前的旧名
+# home-automation-configs-backup-*.git —— 两种名字都算合格备份。
 # weread-signin 已并入本仓库的 weread-signin/ 快照,不再有独立仓库要处理。
 #
 # 不重领微信读书 API Key:Key 片段进过 git 历史,但仓库当时是私有的、旧 SHA 从未公开,
@@ -210,7 +212,10 @@ OLD_SLUG="$OWNER/home-automation-configs"   # 待删除的旧名仓库
 NEW_SLUG="$OWNER/scripts-hub"               # 重建后的新名仓库
 WEREAD_DIR="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 HAC_DIR="${HOME_AUTOMATION_CONFIGS_DIR:-$HOME/home-automation-configs}"  # 本地目录名不改
-HAC_BACKUP_GLOB="${HAC_BACKUP_GLOB:-$HOME/home-automation-configs-backup-*.git}"
+# 备份镜像:新名优先(scripts-hub),旧名兼容(home-automation-configs)。
+HAC_BACKUP_GLOB="${HAC_BACKUP_GLOB:-$HOME/scripts-hub-backup-*.git}"
+HAC_BACKUP_OLD_GLOB="${HAC_BACKUP_OLD_GLOB:-$HOME/home-automation-configs-backup-*.git}"
+HAC_BACKUP_GLOBS=("$HAC_BACKUP_GLOB" "$HAC_BACKUP_OLD_GLOB")
 KEY_FILE="${WEREAD_API_KEY_FILE:-$WEREAD_DIR/secrets/weread-api-key.txt}"
 SHA_DIR="${TMPDIR:-/tmp}/public-reset-old-shas"
 SHA_FILE="$SHA_DIR/home-automation-configs.txt"          # 删除前记下的旧 SHA
@@ -240,15 +245,33 @@ wsh_bad()  { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1"; }
 wsh_die()  { printf '\n%s[停止]%s %s\n' "$RED" "$RESET" "$1" >&2; shift || true
              for l in "$@"; do printf '       %s\n' "$l" >&2; done; exit 1; }
 
-# check_backup <glob> <label> <varname>:备份必须存在且是可读、有提交的 git 仓库。
+# find_backups <glob>...:列出匹配的备份镜像目录,最新的排最前。
+find_backups() {
+  local pattern m i
+  local -a found=() out=()
+  for pattern in "$@"; do
+    while IFS= read -r m; do found+=("$m"); done < <(compgen -G "$pattern" || true)
+  done
+  for m in "${found[@]}"; do
+    i=${#out[@]}
+    while (( i > 0 )) && [[ "$m" -nt "${out[i-1]}" ]]; do i=$((i - 1)); done
+    out=("${out[@]:0:i}" "$m" "${out[@]:i}")
+  done
+  (( ${#out[@]} )) && printf '%s\n' "${out[@]}"
+  return 0
+}
+
+# check_backup <label> <varname> <glob>...:备份必须存在且是可读、有提交的 git 仓库。
+# 可传多个候选模式(新名在前、旧名在后),取最新的一份。
 check_backup() {
-  local pattern="$1" label="$2" varname="$3" count dir
+  local label="$1" varname="$2" count dir
+  shift 2
   local -a matches=()
-  while IFS= read -r m; do matches+=("$m"); done < <(compgen -G "$pattern" || true)
-  (( ${#matches[@]} )) || wsh_die "找不到 $label 的备份(模式:$pattern)。" \
+  while IFS= read -r m; do matches+=("$m"); done < <(find_backups "$@")
+  (( ${#matches[@]} )) || wsh_die "找不到 $label 的备份(已试模式:$*)。" \
     "重建前必须有镜像备份,否则拒绝继续 —— 一条命令都不会执行。" \
     "先做一份:git clone --mirror <仓库URL> <路径>.git"
-  dir="${matches[${#matches[@]}-1]}"
+  dir="${matches[0]}"
   [[ -d "$dir" ]] || wsh_die "$label 的备份路径不是目录:$dir" "删库前先修好备份。"
   count=$(git --git-dir="$dir" rev-list --count --all 2>/dev/null) \
     || wsh_die "$label 的备份不是可读的 git 仓库:$dir" "删库前先修好备份。"
@@ -273,7 +296,11 @@ capture_old_shas() {
   : > "$file"
   git ls-remote "https://github.com/$OLD_SLUG.git" 2>/dev/null \
     | awk '{print $1}' >> "$file" || true
-  git --git-dir="$HAC_BACKUP" rev-list --all 2>/dev/null | head -n 5 >> "$file" || true
+  # 新名与旧名镜像都算,每个抽 5 个提交(重写前的旧对象在旧名镜像里)
+  local m
+  while IFS= read -r m; do
+    git --git-dir="$m" rev-list --all 2>/dev/null | head -n 5 >> "$file" || true
+  done < <(find_backups "${HAC_BACKUP_GLOBS[@]}")
   sort -u -o "$file" "$file"
   note "$OLD_SLUG 记下 $(grep -c . "$file" || true) 个旧 SHA(线上 ref + 备份里的旧提交)"
 }
@@ -448,7 +475,8 @@ command -v gh >/dev/null 2>&1 || wsh_die "没装 gh CLI。" "装好并 gh auth l
 gh auth status >/dev/null 2>&1 || wsh_die "gh 未登录。" "先跑 gh auth login。"
 wsh_ok "gh 已登录:$(gh api user --jq .login)"
 say "home-automation-configs 要删库重建为 scripts-hub,删之前必须有可用的镜像备份;缺了就停下。"
-check_backup "$HAC_BACKUP_GLOB" "home-automation-configs" HAC_BACKUP
+say "备份按新名 scripts-hub-backup-*.git 查找,同时接受旧名 home-automation-configs-backup-*.git。"
+check_backup "scripts-hub / home-automation-configs" HAC_BACKUP "${HAC_BACKUP_GLOBS[@]}"
 [[ -d "$HAC_DIR/.git" ]] || wsh_die "找不到本地仓库:$HAC_DIR" "重建后要推的就是它,缺了先克隆一份。"
 wsh_ok "旧名 $OLD_SLUG · 本地克隆在 $HAC_DIR($(git -C "$HAC_DIR" rev-list --count main) 个提交,工作区 $(git -C "$HAC_DIR" status --porcelain | wc -l) 处改动)"
 [[ -f "$HAC_DIR/weread-signin/README.md" ]] || wsh_die "$HAC_DIR/weread-signin 里没有快照。" \
