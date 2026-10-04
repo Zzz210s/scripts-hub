@@ -65,6 +65,9 @@
 机器相关路径不写死:脚本默认读 `~/.config/automation-suite/local-paths.env`(在本仓库之外,永不入库),
 也支持环境变量覆盖(`WEREAD_SIGNIN_DIR`、`HOME_AUTOMATION_CONFIGS_DIR` 等)。
 
+`automation-suite` 是历史遗留的本机目录名(`~/.config/automation-suite/`、`~/.local/state/automation-suite/`),
+早于本仓库出现,与同名的远程仓库无关(那个仓库已删除)。
+
 ## 路径约定
 
 文档里用三个占位符代指程序本体的安装目录,**按你的实际路径替换**(仓库不绑定任何盘符):
@@ -129,7 +132,8 @@
 `weread-signin/` 下的文件仍按原始 MIT 条款。`autovisor/configs.ini` 同理(来自 MIT 上游)。
 
 另一个 MIT 子目录是 `wecom-notify/`:它原为独立私有仓库 `Zzz210s/wecom-notify`(本项目自研),
-2026-10-04 并入本仓库,保留自己的 MIT `LICENSE`,目录内文件按 MIT 条款。
+2026-10-04 并入本仓库;该独立仓库随后已删除,这里是唯一副本。目录保留自己的 MIT `LICENSE`,
+目录内文件按 MIT 条款。
 
 内含的上游来源与许可:
 
@@ -141,6 +145,6 @@
 | `microsoft-rewards/scripts-windows/`、`microsoft-rewards/wechat-bridge/` | 本项目自研(不来自上游) | GPL-3.0 |
 | `autovisor/configs.ini` | [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) 的配置模板,填了本机取值 | MIT |
 | `weread-signin/**` | 本项目自研(底座 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
-| `wecom-notify/**` | 本项目自研,原独立私有仓库 `Zzz210s/wecom-notify` | MIT |
+| `wecom-notify/**` | 本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`(2026-10-04 删除后并入本仓库) | MIT |
 | `patches/weread-bot/*.patch` | 针对 [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) 的 PR #53 diff,存档不应用 | MIT |
 | `docs/`、`scripts/`、`tasks/`、`secrets/README.md`、两份 README | 本项目自研 | GPL-3.0 |

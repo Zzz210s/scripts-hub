@@ -201,7 +201,7 @@ npm test        # node --test,8 个用例:字节截断、地址校验与脱敏�
 
 ## 来源与关系
 
-本目录原为独立私有仓库 `Zzz210s/wecom-notify`,2026-10-04 并入本仓库(scripts-hub)。并入后:
+本目录原为独立私有仓库 `Zzz210s/wecom-notify`,2026-10-04 并入本仓库(scripts-hub);原独立仓库已删除,这里是唯一副本。并入后:
 
 - **权威实现在这里**:`src/wecom.js` + `src/webhook.js` + `cli.js`,是本仓库里功能最完整的
   企业微信发送实现(文本与 Markdown、超时、指数退避重试、webhook 解析与脱敏)。

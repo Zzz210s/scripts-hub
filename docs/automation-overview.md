@@ -37,6 +37,8 @@
 | --- | --- | --- | --- |
 | `Zzz210s/scripts-hub` | PUBLIC(用户跑 `public-reset-wizard.sh` 删库重建后) | 唯一的配置与文档仓库:三个程序的配置、运行器脚本、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 的代码本体。由 `Zzz210s/home-automation-configs` 删库重建更名而来,本机目录名仍是 `home-automation-configs` | 同时是恢复包;删库重建用于清掉旧对象 |
 | `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留,用 `scripts/sync-weread-signin.sh` 发布 |
+| `Zzz210s/automation-suite` | 已删除(2026-10-04) | 曾是本机自动化脚本与向导的合集仓库(私有) | 文档与向导已并入 `scripts-hub/docs/`、`scripts-hub/scripts/`;本机克隆 `automation-suite/` 仅作历史存档 |
+| `Zzz210s/wecom-notify` | 已删除(2026-10-04) | 曾是独立的私有企业微信通知 CLI/库 | 已并入 `scripts-hub/wecom-notify/`;原仓库删除后此处是唯一副本 |
 | `Zzz210s/weread-bot` | PUBLIC(fork) | `funnyzak/weread-bot` 的 fork,只是贡献协议的上游通道 | 带开放 PR #53 与 issue #52,见第 8 节 |
 
 ## 3. 调度约定

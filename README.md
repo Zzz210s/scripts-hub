@@ -74,6 +74,10 @@ Machine-specific paths are never hard-coded. The scripts read
 `~/.config/automation-suite/local-paths.env` (outside this repository, never committed)
 and accept environment overrides (`WEREAD_SIGNIN_DIR`, `HOME_AUTOMATION_CONFIGS_DIR`, …).
 
+`automation-suite` is a legacy local directory name (`~/.config/automation-suite/`,
+`~/.local/state/automation-suite/`); it predates this repository and is unrelated to the
+Git repository of the same name, which has been deleted.
+
 ## Path convention
 
 The docs use three placeholders for the program install directories. **Replace them with
@@ -176,8 +180,9 @@ inside a GPL-3.0 repository; the files under `weread-signin/` retain their origi
 terms. The same applies to `autovisor/configs.ini`, which comes from an MIT upstream.
 
 Another MIT subdirectory is `wecom-notify/`: it was the standalone private repository
-`Zzz210s/wecom-notify` (original to this project) and was merged here on 2026-10-04, keeping
-its own MIT `LICENSE`; the files inside are under MIT terms.
+`Zzz210s/wecom-notify` (original to this project) and was merged here on 2026-10-04; that
+repository has since been deleted, so this copy is the only one. It keeps its own MIT
+`LICENSE`; the files inside are under MIT terms.
 
 **Three notification senders.** The authoritative, most complete WeCom sender is
 `wecom-notify/` (text and Markdown, timeout, exponential-backoff retry, webhook resolution
@@ -196,6 +201,6 @@ Upstream sources and their licenses:
 | `microsoft-rewards/scripts-windows/`, `microsoft-rewards/wechat-bridge/` | Original to this repository (not from upstream) | GPL-3.0 |
 | `autovisor/configs.ini` | Configuration template from [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) with local values filled in | MIT |
 | `weread-signin/**` | Original to this repository (base: [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
-| `wecom-notify/**` | Original to this repository; formerly the standalone private repository `Zzz210s/wecom-notify` | MIT |
+| `wecom-notify/**` | Original to this repository; formerly the standalone private repository `Zzz210s/wecom-notify` (deleted 2026-10-04 after the merge) | MIT |
 | `patches/weread-bot/*.patch` | PR #53 diff against [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot), archived and not applied | MIT |
 | `docs/`, `scripts/`, `tasks/`, `secrets/README.md`, both READMEs | Original to this repository | GPL-3.0 |
