@@ -15,8 +15,7 @@
 | 企业微信发送的共享规则(字节上限、超时重试、errcode、频率) | `docs/wecom-rules.md`;实现分散在各项目 |
 | 为什么考虑云主机、卡在哪 | `docs/cloud-vm.md` |
 | 每个凭据去哪拿、有效期、失效后怎么恢复 | `docs/credentials.md` |
-| 本机计划任务清单与停用命令 | `machine/scheduled-tasks.md` |
-| 本机微信读书部署现状 | `machine/weread-deployment.md` |
+| 本机部署现状(工作区、计划任务、运行器守卫、私有文件) | `docs/local-deployment.md` |
 | 微软积分运行器、通知层与源码改动 | 权威工作区 `%REWARDS_DIR%`(本地 git 仓库,只有 upstream 远端);已跟踪文件由 `scripts/sync-microsoft-rewards.sh` 发布成 `proj-microsoft-rewards/`(完整快照) |
 | 微信读书签到程序 | 代码本体就在本仓库 `proj-weread-signin/`;开发在本地克隆 `%WEREAD_DIR%`,用 `scripts/sync-weread-signin.sh` 发布 |
 | 智慧树刷课配置 | `proj-autovisor/configs.ini` |
@@ -67,7 +66,7 @@
 | 必须本机 | 为什么 |
 | --- | --- |
 | 智慧树刷课 | Autovisor 用 Playwright 驱动**本机 Chrome** 播放视频,依赖图形会话;云主机没有可用桌面 |
-| Windows 计划任务 | 现状是三个任务(`MicrosoftRewardsScript` / `WeReadSignIn` / `AutoShutdown0200`,见 `machine/scheduled-tasks.md`);搬走要换成 systemd timer |
+| Windows 计划任务 | 现状是三个任务(`MicrosoftRewardsScript` / `WeReadSignIn` / `AutoShutdown0200`,见 `docs/local-deployment.md`);搬走要换成 systemd timer |
 | 看门狗、单实例锁、内存闸门 | 现在是 `.bat` / `.js`,读本机内存水位与进程表;云端要改成 `flock` + systemd 超时 |
 | 02:00 无条件关机 | 本机专属任务,云端不需要 |
 
@@ -115,7 +114,7 @@
 - 提交前跑 `node scripts/check-privacy.mjs`(本机路径、真实邮箱、凭据形状与机器私有标识,命中退出 1)。
 - 改微信读书签到代码 → **在本机开发克隆 `%WEREAD_DIR%` 里改并提交**,再跑
   `scripts/sync-weread-signin.sh` 发布到本仓库的 `proj-weread-signin/`。直接改那个目录必被下次同步覆盖。
-- 凭据相关文件(`docs/credentials.md`、各子 README、`machine/scheduled-tasks.md`)在换机恢复时
+- 凭据相关文件(`docs/credentials.md`、各子 README、`docs/local-deployment.md`)在换机恢复时
   是唯一线索,移动路径或换文件名时一起更新。
 
 ## 10. 路径约定

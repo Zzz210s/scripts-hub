@@ -39,7 +39,7 @@ git commit && git push
 覆盖回去。要改的说明文档、约定、补丁不进快照:
 
 - 跨项目约定 → `docs/`
-- 本机部署现状 → `machine/`
+- 本机部署现状 → `docs/local-deployment.md`
 - 上游补丁 → `patches/`(每个项目快照里不再放 `patches/`)
 - 开通、同步、漂移检测脚本 → `scripts/`
 
@@ -69,7 +69,7 @@ git commit && git push
 - 每个项目目录**自带** README、依赖清单、测试入口、许可(`LICENSE` 或指向根 `LICENSE` 的说明)。
 - 项目之间**不共享代码**,也不做跨项目的相对路径引用;需要通知层这类共同逻辑时**内嵌同一块**并靠
   `scripts/check-wecom-drift.mjs` 锁住逐字节一致(不是 import 另一个项目)。
-- `docs/`、`machine/`、`patches/`、`scripts/` 属于**合集层**,项目目录里不再复制它们的职责内容。
+- `docs/`、`patches/`、`scripts/` 属于**合集层**,项目目录里不再复制它们的职责内容。
 - 一个项目一个目录,目录名对应程序或组件,不按语言或文件类型分层。
 
 ## 6. 相关文档

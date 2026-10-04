@@ -19,7 +19,6 @@ scripts-hub/
 ├── proj-autovisor/           智慧树刷课:只有 Autovisor 配置(程序本体是上游 Windows 包)
 ├── proj-weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
 ├── docs/                     跨项目约定与总览 —— 先看 docs/README.md
-├── machine/                  本机部署现状:计划任务、本机目录,换机恢复时对照
 ├── patches/                  所有上游补丁,按上游项目分目录
 ├── scripts/                  开通、同步与漂移检测工具 —— 见 scripts/README.md
 ├── LICENSE                   仓库整体 GPL-3.0;proj-weread-signin/ 内为 MIT
@@ -58,7 +57,7 @@ scripts-hub/
 2. 先读 `docs/README.md` 了解约定,再读 `docs/automation-overview.md` 看全貌。
 3. 从上游安装三个程序本体,按各程序的 README 把本仓库的配置与运行器脚本覆盖进程序目录。
 4. 按 `docs/credentials.md` 填真实凭据。
-5. 注册计划任务;任务名与命令见 `machine/scheduled-tasks.md`。
+5. 注册计划任务;任务名与命令见 `docs/local-deployment.md`。
 
 云主机(尚未开通):先跑 `scripts/wizard-oracle.sh`,再读 `docs/cloud-vm.md`。
 
@@ -74,5 +73,5 @@ scripts-hub/
 | [`docs/wecom-rules.md`](docs/wecom-rules.md) | 企业微信 webhook 的共享规则:字节上限、超时与重试、errcode 处理、发送频率 |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | 为什么要云主机、哪些方案被否定 |
 | [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
-| [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | 本机计划任务清单,以及查看与停用命令 |
+| [`docs/local-deployment.md`](docs/local-deployment.md) | 本机部署现状:工作区、计划任务、运行器守卫、本机私有文件 |
 | [`scripts/README.md`](scripts/README.md) | 向导、快照同步、项目自检引导与检查(企业微信漂移、隐私扫描) |

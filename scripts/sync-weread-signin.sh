@@ -7,7 +7,7 @@
 # 快照目录里由本脚本生成的文件(见 KEEP)不会被动,开发克隆里机器相关的文件(见 SKIP)不发布;
 # 其余非源文件会被清掉,保证快照 == 源仓库。
 # README 顶部每次都重写一遍快照说明;除此之外快照与源仓库逐字节一致。
-# 本机部署说明已移出快照目录(仓库里的 machine/weread-deployment.md),不再需要 KEEP 例外。
+# 本机部署说明在合集层(docs/local-deployment.md),不在快照目录里,不再需要 KEEP 例外。
 #
 # 用法:bash scripts/sync-weread-signin.sh [--dry-run]
 # 源目录:环境变量 WEREAD_SIGNIN_DIR,或机器私有文件

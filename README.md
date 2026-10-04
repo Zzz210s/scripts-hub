@@ -24,7 +24,6 @@ scripts-hub/
 ├── proj-autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
 ├── proj-weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
 ├── docs/                     Cross-project conventions and overviews -- read docs/README.md first
-├── machine/                  What is deployed on the author's machine: scheduled tasks, local paths
 ├── patches/                  Every upstream patch, one folder per upstream project
 ├── scripts/                  Provisioning, sync and drift-check utilities -- see scripts/README.md
 ├── LICENSE                   GPL-3.0 for the repository; MIT inside proj-weread-signin/
@@ -66,7 +65,7 @@ To rebuild the whole setup on a new machine:
 3. Install the programs from upstream; copy this repo's config and runner scripts into the
    program directories as each program README describes.
 4. Fill in the real credentials listed in `docs/credentials.md`.
-5. Register the scheduled tasks; `machine/scheduled-tasks.md` lists the names and the commands.
+5. Register the scheduled tasks; `docs/local-deployment.md` lists the names and the commands.
 
 For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
 `docs/cloud-vm.md`.
@@ -83,5 +82,5 @@ For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
 | [`docs/wecom-rules.md`](docs/wecom-rules.md) | The shared WeCom webhook rules: byte limits, timeout/retry, errcode handling, rate limits |
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | Why a cloud VM, and which options were rejected |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
-| [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | This machine's scheduled tasks and how to inspect or disable them |
+| [`docs/local-deployment.md`](docs/local-deployment.md) | What is deployed on this machine: workspaces, scheduled tasks, runner guards, private local files |
 | [`scripts/README.md`](scripts/README.md) | Wizards, snapshot syncs, project self-check scripts and checks (WeCom drift, privacy scan) |

@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | `wizard-*` | 交互式向导:一步步带你做需要人工判断的事 | 交互,可 Ctrl-C 续跑 |
 | `sync-*` | 把权威工作区的已跟踪文件发布成仓库里的项目快照 | 非交互,幂等,带 `--dry-run` |
+| `deploy-*` | 把仓库里的项目快照刷回本机工作区,并体检本机部署 | 非交互,默认 `--dry-run`,`--apply` 才写 |
 | `setup-*` | 从全新克隆自检某个项目能不能跑(装依赖 / 建模板 / 跑测试 / 干跑) | 非交互,可重复跑,退出码即结论 |
 | `check-*` | 只读检查,命中不一致或敏感内容就退出 1 | 非交互,可进 CI 或提交前钩子 |
 
@@ -24,6 +25,18 @@
 | --- | --- | --- | --- |
 | `sync-weread-signin.sh` | 把本机开发克隆 `%WEREAD_DIR%` 的已跟踪文件同步成仓库 `proj-weread-signin/` 的快照 | 每次改完微信读书代码、准备提交前 | 只复制 `git ls-files` 列出的文件;`KEEP` 里的 `QUICKSTART.md` 不被触碰;README 顶部快照说明每次重写 |
 | `sync-microsoft-rewards.sh` | 把权威工作区 `%REWARDS_DIR%` 的已跟踪文件同步成仓库 `proj-microsoft-rewards/` 的快照 | 每次改完微软积分代码或运行器、准备提交前 | 只复制 `git ls-files` + 白名单 `config.json`;跳过 `patches/`;去本机化 + 按机器私有清单脱敏;`--dry-run` 只报告差异 |
+
+## 部署(把快照刷回本机)
+
+从仓库恢复/刷新本机工作区,并体检本机部署(凭据、运行时、计划任务)。默认 `--dry-run` 只报告,
+`--apply` 才写文件;**不碰计划任务**,只检查并给出注册命令。`--dest=<目录>` 可写到别处(验证用)。
+
+| 脚本 | 干什么 | 什么时候用 | 关键说明 |
+| --- | --- | --- | --- |
+| `deploy-weread-signin.sh` | 把 `proj-weread-signin/` 刷进 `%WEREAD_DIR%`,检查 `.env`/`config.yaml`/`secrets`/底座/Node/`WeReadSignIn` | 换机恢复、同步后刷新工作区 | 只回写源仓库本来就有的文件;不改工作区里的 `.env`、`secrets/`、`vendor/` |
+| `deploy-microsoft-rewards.sh` | 把 `proj-microsoft-rewards/` 刷进 `%REWARDS_DIR%`,检查 `.env`/webhook/`sessions`/浏览器/`dist`/`MicrosoftRewardsScript`/`AutoShutdown0200` | 换机恢复、同步后刷新工作区 | 合集层文件(README/QUICKSTART/SNAPSHOT)不部署;快照 `README.upstream.md` 还原成工作区 `README.md`;工作区已有的 `config.json` 绝不覆盖 |
+
+本机现状盘点与恢复步骤见 [`../docs/local-deployment.md`](../docs/local-deployment.md)。
 
 ## 自检引导(全新克隆到能跑)
 
@@ -58,11 +71,14 @@
 `local-paths.env` **不是**凭据文件(具体凭据清单见 `../docs/credentials.md`)。文件名与目录名
 `automation-suite` 是历史遗留值,改了本机脚本就失效,保持不动。
 
+两个机器私有文件都有模板:复制 `scripts/local-paths.env.example` 到 `~/.config/automation-suite/local-paths.env`,
+复制 `scripts/sensitive-patterns.txt.example` 到 `~/.config/automation-suite/sensitive-patterns.txt` 并填自己的标识。
+缺 `sensitive-patterns.txt` 时 `sync-microsoft-rewards.sh` **拒绝同步** —— 这是安全属性,不要绕过。
+
 ## 改动这些脚本时
 
 - `sync-weread-signin.sh` 的 `KEEP` 列表决定快照目录里哪些文件不被同步触碰(现在只有 `SNAPSHOT.txt`
-  与 `QUICKSTART.md`)。往 `proj-weread-signin/` 放手写文件会让快照目录不再「纯生成」,应改放到 `machine/`
-  或 `docs/`。
+  与 `QUICKSTART.md`)。往 `proj-weread-signin/` 放手写文件会让快照目录不再「纯生成」,应改放到 `docs/`。
 - `sync-microsoft-rewards.sh` 的 `KEEP`/`SKIP`/`EXTRA`/`RENAMES` 是一张显式清单:`KEEP` 是本目录
   自维护、不写不删的文件,`SKIP` 是源仓库里不发布的路径前缀,`EXTRA` 是源仓库未跟踪但要发布的文件,
   `RENAMES` 是路径改名。脱敏标识从不写进脚本,而是运行时从机器私有 `sensitive-patterns.txt` 读;

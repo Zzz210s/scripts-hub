@@ -2,7 +2,7 @@
 
 ## 现状:还没上云
 
-三个程序现在**全部跑在本机的 Windows 计划任务**上(见 [../machine/scheduled-tasks.md](../machine/scheduled-tasks.md))。
+三个程序现在**全部跑在本机的 Windows 计划任务**上(见 [local-deployment.md](local-deployment.md))。
 搬到 Oracle Cloud 只是**规划**,尚未开通任何云主机 —— 卡在 Oracle 注册风控,见文末。
 
 ## 问题:这些程序需要一台「每天都在线、但没人操作」的机器
