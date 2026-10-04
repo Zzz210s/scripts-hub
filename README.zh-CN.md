@@ -11,6 +11,11 @@ Autovisor、**微信读书签到**)。一个项目一个文件夹,各自带 READ
 `%REWARDS_DIR%`(微软积分)与 `%WEREAD_DIR%`(微信读书);代码改动怎么进仓库看
 [`docs/workspace-model.md`](docs/workspace-model.md)。内容已脱敏,不含任何真实凭据。
 
+> **快照只出不进。** `proj-microsoft-rewards/` 与 `proj-weread-signin/` 是两个本地工作区的**脱敏快照**
+> (本机绝对路径 -> 占位符,个人标识 -> `sample`),**不是可回灌的部署件**:写回工作区会用占位符覆盖
+> 真实值。刷新仓库走 `scripts/sync-*.sh`(工作区 -> 仓库);`scripts/deploy-*.sh` 只用于换机恢复,
+> 对与快照同源的工作区默认拒绝覆盖,除非显式加 `--allow-authoritative`(先预览、再输入 yes 确认、自动备份)。
+
 ## 30 秒地图
 
 ```

@@ -32,8 +32,12 @@
 `--apply` 才写文件;**不碰计划任务**,只检查并给出注册命令。`--dest=<目录>` 可写到别处(验证用)。
 
 用途是**换机恢复**:快照是脱敏发布件(本机路径 → 占位符、个人标识 → `sample`),把它写回权威工作区会把
-占位符带回去。所以工作区 HEAD 与快照源提交一致时脚本判“同源”、跳过刷新,`--apply` 直接报错(除非 `--force`);
-日常刷新用 `sync-*` 走反方向。
+占位符带回去。所以工作区 HEAD 与快照源提交一致时脚本判“同源”、跳过刷新,`--apply` 直接报错;
+日常刷新用 `sync-*` 走反方向。确需反向覆盖一份同源工作区时加 `--allow-authoritative`(旧名 `--force`,
+现等同):它会先逐文件预览 `新增/覆盖/跳过/保留`、再警告这是有损覆盖、要求交互输入 `yes`
+(非交互必须再加 `--yes`),执行前把被覆盖文件备份到 `~/.config/automation-suite/backups/<快照名>-<时间戳>/`
+并打印恢复命令。共享实现拆在 `scripts/lib/deploy-common.sh`(参数/同源检测)与 `scripts/lib/deploy-plan.sh`
+(文件计划/备份/确认),两个 `deploy-*.sh` 都 source 它们。
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
@@ -89,5 +93,7 @@
   **找不到该文件或脱敏规则自检失败时脚本会拒绝同步**,不要为了省事跳过这个防线。
 - `wizard-public-reset.sh` 与 `wizard-oracle.sh` 顶部是跨向导共用的库段(`# ───` 之上),
   改行为改库段,改步骤在 `STAGES` 之下。
-- 提交前 `bash -n scripts/*.sh` 与 `shellcheck scripts/*.sh` 都应无输出;`node --check scripts/*.mjs`
-  与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过。
+- `scripts/lib/` 是 `deploy-*.sh` 共用的片段:`deploy-common.sh` 管输出/参数/同源检测/授权闸门,
+  `deploy-plan.sh` 管文件计划/备份/二次确认/落盘。改部署行为改这两处,不要在单个 `deploy-*.sh` 里另写一份。
+- 提交前 `bash -n scripts/*.sh scripts/lib/*.sh` 与 `shellcheck scripts/*.sh scripts/lib/*.sh` 都应无输出;
+  `node --check scripts/*.mjs` 与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过。

@@ -16,6 +16,14 @@ workspaces that have no origin of their own: `%REWARDS_DIR%` (Microsoft Rewards)
 [`docs/workspace-model.md`](docs/workspace-model.md). Everything is sanitized: no real
 credentials.
 
+> **Snapshots are publish-only.** `proj-microsoft-rewards/` and `proj-weread-signin/` are
+> sanitized snapshots of two local workspaces (real paths -> placeholders, personal
+> identifiers -> `sample`). They are **not** deployment artifacts: pushing them back into a
+> workspace would overwrite real values with placeholders. Refresh the repository with
+> `scripts/sync-*.sh` (workspace -> repo); `scripts/deploy-*.sh` exists for restoring a fresh
+> machine and refuses to overwrite a same-source workspace unless you pass
+> `--allow-authoritative` (preview + typed confirmation + automatic backup).
+
 ## 30-second map
 
 ```

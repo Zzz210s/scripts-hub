@@ -17,6 +17,10 @@
 #   * 源仓库的 patches/ 不进快照 —— 补丁由合集层 ../patches/microsoft-rewards/ 统一存档。
 #   * 源仓库的 README.md 发布为 README.upstream.md(本目录自己的 README.md 由人维护)。
 #
+# 快照是脱敏发布件(本机路径 -> 占位符,个人标识 -> sample),只能这个方向刷新:不要把
+# 快照写回权威工作区(那会用占位符覆盖真实值)。反方向只在换机恢复时用 deploy-*.sh,
+# 且对与快照同源的工作区默认拒绝覆盖。
+#
 # 用法:bash scripts/sync-microsoft-rewards.sh [--dry-run]
 # 源目录:环境变量 REWARDS_DIR,或机器私有文件
 #         ~/.config/automation-suite/local-paths.env(不进仓库)
