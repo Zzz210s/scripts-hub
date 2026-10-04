@@ -121,9 +121,12 @@ test('patchAccountName 改写底座里的用户名,缺失时不动文件', () =>
 test('loadConfig 解析错峰同伴列表', () => {
     const dir = tmp()
     const env = path.join(dir, '.env')
-    fs.writeFileSync(env, ['BUSY_PEERS=/tmp/a/run-state.js, /tmp/b/run-state.js', 'ACCOUNT_NAME=测试名', ''].join('\n'), 'utf8')
+    // 路径用 os.tmpdir() 拼:这个仓库要同时能在 Windows 与 Linux 上跑,不写死盘符
+    const peerA = path.join(os.tmpdir(), 'weread-peer-a', 'run-state.js')
+    const peerB = path.join(os.tmpdir(), 'weread-peer-b', 'run-state.js')
+    fs.writeFileSync(env, [`BUSY_PEERS=${peerA}, ${peerB}`, 'ACCOUNT_NAME=测试名', ''].join('\n'), 'utf8')
     const config = loadConfig(env)
-    assert.deepEqual(config.busyPeers, ['/tmp/a/run-state.js', '/tmp/b/run-state.js'])
+    assert.deepEqual(config.busyPeers, [peerA, peerB])
     assert.equal(config.accountName, '测试名')
 })
 

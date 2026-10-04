@@ -10,6 +10,7 @@
 //   * 文案必须回答三个问题:发生了什么 / 为什么 / 接下来会怎样
 //   * 真正需要人工处理的情况不受频率限制,每次都要说
 //   * 2026-10-03:skip 与 action 曾长得几乎一样,现在标题与正文都分开写
+//   * 2026-10-04:正常跳过(已达标 / 同伴在跑 / 安静时段)不再推送,只写运行日志
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -18,6 +19,16 @@ import { writeJsonAtomic } from './atomic.js'
 const ALWAYS_NOTIFY = new Set(['credential-invalid', 'stats-unavailable'])
 // 不处理就一直不跑:凭据失效、读不到官方统计。其余原因下次触发都会自动重试
 const ACTION_REASONS = new Set(['credential-invalid', 'stats-unavailable'])
+// 不需要人做任何事的那些原因:程序下次触发会自己重试,推了只是噪音。
+// 2026-10-04 用户反馈:「今天已经跑过」「已达标」「同伴在跑」这类消息不必再推企业微信。
+// 反过来,可能让今天白丢的原因(内存不足 / 尝试次数用尽 / 临近关机 / 凭据失效 /
+// 统计读不到 / 已手动暂停)照旧推送,别把人训练成忽略通知。
+const SILENT_SKIP_REASONS = new Set(['done', 'peer-running', 'quiet-hours'])
+
+/** 这条跳过是否只记运行日志、不推企业微信。 */
+export function isSilentSkip(reason) {
+    return SILENT_SKIP_REASONS.has(reason)
+}
 
 export function buildSkipMessage({ reason, detail, plan, config, date, accountName }) {
     const action = ACTION_REASONS.has(reason)

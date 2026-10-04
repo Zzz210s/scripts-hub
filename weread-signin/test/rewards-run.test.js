@@ -8,7 +8,8 @@ import test from 'node:test'
 import { collectRewards, logWeekly, weeklyForReport, weeklyLogLine, weeklyRecord } from '../src/rewards-run.js'
 
 const CONFIG = { curlFile: 'secrets/read-request.curl' }
-const CWD = '/tmp/weread-rewards'
+// 平台无关:Windows 与 Linux 上都能跑,快照不需要按盘符做任何替换
+const CWD = path.join(os.tmpdir(), 'weread-rewards')
 
 function baseDeps(overrides = {}) {
     return {

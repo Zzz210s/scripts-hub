@@ -1,12 +1,15 @@
 // collectRewards 里挑战与余额的接线:共用一枚凭据、各自独立兜底、历史落盘形状。
 import assert from 'node:assert/strict'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 
 import { balanceRecord, challengeLogLine, challengeRecord, collectRewards, logChallenge, memberCardRecord } from '../src/rewards-run.js'
 import { peekChallengeAndBalance } from '../src/rewards-coins.js'
 
 const CONFIG = { curlFile: 'secrets/read-request.curl' }
-const CWD = '/tmp/weread-rewards'
+// 平台无关:Windows 与 Linux 上都能跑,快照不需要按盘符做任何替换
+const CWD = path.join(os.tmpdir(), 'weread-rewards')
 
 function baseDeps(overrides = {}) {
     return {

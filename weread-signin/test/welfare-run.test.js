@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 
 import { claimWelfareOnce, logWelfare, welfareForReport, welfareLogLine, welfareRecord } from '../src/welfare-run.js'
@@ -43,7 +45,7 @@ test('welfareForReport:领取失败受每天一条额度,其余原样返回', ()
 })
 
 test('claimWelfareOnce:拿不到凭据时如实报告原因,不因此触发告警', async () => {
-    const ctx = { cwd: '/tmp/weread-signin', config: { curlFile: 'secrets/read-request.curl' }, bot: { bookId: 'book-1', chapterUid: 0 } }
+    const ctx = { cwd: path.join(os.tmpdir(), 'weread-signin'), config: { curlFile: 'secrets/read-request.curl' }, bot: { bookId: 'book-1', chapterUid: 0 } }
     const skipped = await claimWelfareOnce({
         ...ctx,
         ensureToken: async () => ({ ok: false, error: '换取失败 HTTP 401:refreshToken 已过期' })
@@ -70,7 +72,7 @@ test('claimWelfareOnce:拿不到凭据时如实报告原因,不因此触发告�
 })
 
 test('claimWelfareOnce:凭据或领取抛错都不冒泡,只返回错误结果', async () => {
-    const ctx = { cwd: '/tmp/weread-signin', config: { curlFile: 'x' }, bot: {} }
+    const ctx = { cwd: path.join(os.tmpdir(), 'weread-signin'), config: { curlFile: 'x' }, bot: {} }
     const tokenBoom = await claimWelfareOnce({ ...ctx, ensureToken: async () => { throw new Error('网络断了') } })
     assert.equal(tokenBoom.ok, false)
     assert.equal(tokenBoom.claimed, false)

@@ -5,7 +5,7 @@
 #
 # 只同步 `git ls-files` 列出的文件:凭据、运行数据、vendor/ 等未跟踪内容一概不进快照。
 # 本目录里手写的文件(见 KEEP)不会被动;其余非源文件会被清掉,保证快照 == 源仓库。
-# README 顶部每次都重写一遍快照说明。
+# README 顶部每次都重写一遍快照说明;除此之外快照与源仓库逐字节一致。
 #
 # 用法:bash scripts/sync-weread-signin.sh [--dry-run]
 # 源目录:环境变量 WEREAD_SIGNIN_DIR,或机器私有文件
@@ -67,12 +67,6 @@ emit() {
   case "$rel" in
     README.md) banner_en ;;
     README.zh-CN.md) banner_zh ;;
-    test/*.js)
-      # 源仓库(公开)的测试夹具里写死了本机盘符(如 `X:/...`),快照里换成中性路径,
-      # 避免公开仓出现个人盘符;夹具与断言一起改,测试仍全绿(215 项)。
-      # 只认“行首或非字母数字后跟盘符:/”的形状,不会误伤 https:// 里的 s:/。
-      sed -E 's@(^|[^A-Za-z0-9])[A-Za-z]:/tmp/@\1/tmp/@g; s@(^|[^A-Za-z0-9])[A-Za-z]:/@\1/tmp/@g' "$SOURCE/$rel"
-      return ;;
   esac
   cat "$SOURCE/$rel"
 }
@@ -120,7 +114,7 @@ find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
   printf 'source commit: %s\n' "$(git -C "$SOURCE" rev-parse HEAD)"
   printf 'source commit date: %s\n' "$(git -C "$SOURCE" log -1 --format=%cI)"
   printf 'synced file count: %s\n' "${#src_files[@]}"
-  printf 'notes: test/*.js 里写死的本机盘符已替换为 /tmp/(源仓库是公开仓,避免快照带个人盘符)\n'
+  printf 'notes: test/*.js 里的路径不写死盘符(用 os.tmpdir()),快照与源逐字节一致\n'
   printf 'synced at: %s\n' "$(date -Iseconds 2>/dev/null || date)"
 } > "$DEST/SNAPSHOT.txt"
 
