@@ -1,0 +1,104 @@
+--- a/src/browser/BrowserUtils.ts
++++ b/src/browser/BrowserUtils.ts
+@@ -109,6 +109,67 @@ export default class BrowserUtils {
+         }
+     }
+ 
++    /**
++     * Reload the current page while tolerating aborted navigations.
++     *
++     * Playwright turns a reload that collides with an in-flight navigation, with an
++     * error page, or with a dropped connection into a rejection (`net::ERR_ABORTED`,
++     * "maybe frame was detached?", `net::ERR_CONNECTION_RESET`). Those are transient,
++     * but when they escaped the login state loop they killed the whole account run.
++     * Retry a few times, fall back to a plain navigation of the current http(s) URL,
++     * and report the outcome instead of throwing.
++     */
++    async reloadPageResilient(page: Page, label = 'RELOAD'): Promise<boolean> {
++        const maxAttempts = 3
++        const transient =
++            /ERR_ABORTED|ERR_CONNECTION_RESET|ERR_CONNECTION_CLOSED|ERR_CONNECTION_ABORTED|ERR_NETWORK_CHANGED|ERR_EMPTY_RESPONSE|ERR_TIMED_OUT|ERR_FAILED|frame was detached|interrupted by another navigation|has been closed/i
++
++        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++            if (page.isClosed()) return false
++
++            try {
++                await page.reload({ waitUntil: 'domcontentloaded' })
++                return true
++            } catch (error) {
++                const message = error instanceof Error ? error.message : String(error)
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    label,
++                    `Reload failed, treating it as a transient navigation | attempt=${attempt}/${maxAttempts} | error=${message}`
++                )
++                if (!transient.test(message)) return false
++            }
++
++            await this.bot.utils.wait(1500)
++
++            // A reload that lost its frame leaves the old document detached; navigating to
++            // the current http(s) URL rebuilds it. Error pages have no address to retry, so
++            // for those the caller's state loop recovers on its own.
++            const currentUrl = page.url()
++            if (!/^https?:/i.test(currentUrl)) continue
++
++            try {
++                await page.goto(currentUrl, { waitUntil: 'domcontentloaded' })
++                return true
++            } catch (error) {
++                const message = error instanceof Error ? error.message : String(error)
++                this.bot.logger.warn(
++                    this.bot.isMobile,
++                    label,
++                    `Fallback navigation failed | attempt=${attempt}/${maxAttempts} | error=${message}`
++                )
++                await this.bot.utils.wait(1500)
++            }
++        }
++
++        this.bot.logger.warn(
++            this.bot.isMobile,
++            label,
++            `Page could not be reloaded after ${maxAttempts} attempts; continuing without a refresh`
++        )
++        return false
++    }
++
+     async reloadBadPage(page: Page): Promise<boolean> {
+         try {
+             const html = await page.content().catch(() => '')
+@@ -116,11 +177,7 @@ export default class BrowserUtils {
+ 
+             if (isBadPage) {
+                 this.bot.logger.info(this.bot.isMobile, 'RELOAD-BAD-PAGE', 'Bad page detected, reloading!')
+-                try {
+-                    await page.reload({ waitUntil: 'load' })
+-                } catch {
+-                    await page.reload().catch(() => {})
+-                }
++                await this.reloadPageResilient(page, 'RELOAD-BAD-PAGE')
+                 return true
+             } else {
+                 return false
+--- a/src/browser/auth/Login.ts
++++ b/src/browser/auth/Login.ts
+@@ -136,7 +136,17 @@ export class Login {
+                             'LOGIN',
+                             `Stuck in state "${state}" for 4 loops, refreshing page`
+                         )
+-                        await page.reload({ waitUntil: 'domcontentloaded' })
++                        // An unguarded reload here used to abort the whole account when the page
++                        // was mid-navigation or sitting on a chrome error page; refreshing is a
++                        // recovery attempt, so its failure must only skip this step.
++                        const refreshed = await this.bot.browser.utils.reloadPageResilient(page, 'LOGIN')
++                        if (!refreshed) {
++                            this.bot.logger.warn(
++                                this.bot.isMobile,
++                                'LOGIN',
++                                `Could not refresh the page while stuck in "${state}"; continuing state checks`
++                            )
++                        }
+                         await this.bot.utils.wait(3000)
+                         sameStateCount = 0
+                         previousState = 'UNKNOWN'
