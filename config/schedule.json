@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "timezone": "Asia/Shanghai",
+  "order": [
+    "microsoft-rewards",
+    "weread-signin"
+  ],
+  "stagger": {
+    "baseStartTime": "08:00",
+    "slotMinutes": 30,
+    "logonBaseMinutes": 3,
+    "logonStepMinutes": 7
+  },
+  "programs": {
+    "microsoft-rewards": {
+      "taskName": "MicrosoftRewardsScript",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 3,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": true,
+      "actionVbs": "%REWARDS_DIR%\\scripts\\windows\\run-daily.vbs"
+    },
+    "weread-signin": {
+      "taskName": "WeReadSignIn",
+      "startTime": "auto",
+      "intervalMinutes": 60,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 3,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": true,
+      "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
+    }
+  }
+}

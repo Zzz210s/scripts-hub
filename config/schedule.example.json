@@ -1,0 +1,66 @@
+{
+  "_readme": {
+    "用途": "所有自动化程序的『什么时候跑』都由这份配置决定:计划任务的触发器、systemd timer 的 OnCalendar 都从它生成,不再写死在注册脚本里。",
+    "怎么改": "改本机实际配置 config/schedule.json(本文件只是默认值文档 + 缺失时的回退),改完跑 bash scripts/apply-schedule.sh --dry-run 看生成的触发器,满意再加 --apply --yes 注册。",
+    "时区": "timezone 供云端 systemd timer 参考;Windows 计划任务一律按主机本地时区。",
+    "顺序": "order = 错峰顺序(谁先跑)。下标 0 最先,起始时间与登录延迟都按 stagger 依次顺延。",
+    "auto": "startTime / logonDelayMinutes 写 \"auto\" 表示由 order + stagger 推导;写具体值则覆盖推导结果。",
+    "字段": {
+      "stagger.baseStartTime": "第一个程序的每日起始时间 HH:MM。",
+      "stagger.slotMinutes": "相邻程序起始时间的间隔(分钟),即错峰槽位宽度。",
+      "stagger.logonBaseMinutes": "第一个程序的登录后延迟(分钟)。",
+      "stagger.logonStepMinutes": "相邻程序登录延迟的间隔(分钟)。",
+      "programs.<id>.taskName": "Windows 计划任务名;systemd 的 unit 前缀。",
+      "programs.<id>.startTime": "每日起始时间 HH:MM 或 \"auto\"。",
+      "programs.<id>.intervalMinutes": "窗口内每隔多少分钟给一次触发机会。",
+      "programs.<id>.windowHours": "每日触发窗口长度(小时);窗口外没有触发。",
+      "programs.<id>.maxAttemptsPerDay": "程序内部一天最多真跑几次(守卫用,不是触发次数)。",
+      "programs.<id>.logonDelayMinutes": "登录后延迟几分钟触发;整数或 \"auto\"(0 = 登录即触发)。",
+      "programs.<id>.logonRetryMinutes": "登录触发器的重复间隔(分钟)。",
+      "programs.<id>.logonRetryWindowMinutes": "登录触发器的重复总时长(分钟)。",
+      "programs.<id>.runScript": "云端 systemd service 的 ExecStart;留空则由部署脚本填。",
+      "programs.<id>.enabled": "false 表示不注册它的触发(仍会列在报告里)。",
+      "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。"
+    }
+  },
+  "version": 1,
+  "timezone": "Asia/Shanghai",
+  "order": [
+    "microsoft-rewards",
+    "weread-signin"
+  ],
+  "stagger": {
+    "baseStartTime": "08:00",
+    "slotMinutes": 30,
+    "logonBaseMinutes": 3,
+    "logonStepMinutes": 7
+  },
+  "programs": {
+    "microsoft-rewards": {
+      "taskName": "MicrosoftRewardsScript",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 3,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": true,
+      "actionVbs": "%REWARDS_DIR%\\scripts\\windows\\run-daily.vbs"
+    },
+    "weread-signin": {
+      "taskName": "WeReadSignIn",
+      "startTime": "auto",
+      "intervalMinutes": 60,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 3,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": true,
+      "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
+    }
+  }
+}
