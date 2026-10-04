@@ -2,8 +2,7 @@
 .env
 .env.*
 !.env.example
-secrets/*
-!secrets/README.md
+secrets/
 *.webhook
 *webhook*.txt
 wecom-webhook.txt

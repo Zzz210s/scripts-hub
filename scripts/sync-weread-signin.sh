@@ -4,9 +4,10 @@
 # 本仓库 weread-signin/ 下的快照 —— 那是该程序对外发布的那一份,没有独立仓库。
 #
 # 只同步 `git ls-files` 列出的文件:凭据、运行数据、vendor/ 等未跟踪内容一概不进快照。
-# 本目录里手写的文件(见 KEEP)不会被动,开发克隆里机器相关的文件(见 SKIP)不发布;
+# 快照目录里由本脚本生成的文件(见 KEEP)不会被动,开发克隆里机器相关的文件(见 SKIP)不发布;
 # 其余非源文件会被清掉,保证快照 == 源仓库。
 # README 顶部每次都重写一遍快照说明;除此之外快照与源仓库逐字节一致。
+# 本机部署说明已移出快照目录(仓库里的 machine/weread-deployment.md),不再需要 KEEP 例外。
 #
 # 用法:bash scripts/sync-weread-signin.sh [--dry-run]
 # 源目录:环境变量 WEREAD_SIGNIN_DIR,或机器私有文件
@@ -23,8 +24,8 @@ if [[ -f "$LOCAL_PATHS_FILE" ]]; then
 fi
 SOURCE="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 
-# 本仓库自己维护、不参与同步的文件
-KEEP=(LOCAL-DEPLOYMENT.md SNAPSHOT.txt)
+# 本脚本自己生成、不参与同步的文件
+KEEP=(SNAPSHOT.txt)
 
 # 只留在开发克隆里、不发布进快照的文件(机器相关的工作区说明)
 SKIP=(WORKSPACE.md)
@@ -44,9 +45,8 @@ banner_en() {
 > development clone at `%WEREAD_DIR%` by `scripts/sync-weread-signin.sh`; the commit it
 > was taken from is recorded in `SNAPSHOT.txt`. To change the code, edit and commit in
 > that clone, then run the script and commit the result here. The program has no separate
-> repository: this directory is its published copy. `LOCAL-DEPLOYMENT.md` is
-> hand-written and exempt from the sync. The files in this directory are MIT-licensed
-> (see `LICENSE`); the rest of this repository is GPL-3.0.
+> repository: this directory is its published copy. The files in this directory are
+> MIT-licensed (see `LICENSE`); the rest of this repository is GPL-3.0.
 
 EOF
 }
@@ -56,8 +56,7 @@ banner_zh() {
 > **自动生成的快照,不要直接改这里。** 本目录由 `scripts/sync-weread-signin.sh` 从本机开发克隆
 > `%WEREAD_DIR%` 发布而来;取快照时的提交记录在 `SNAPSHOT.txt`。要改代码,在那个克隆里改并提交,
 > 再跑该脚本、在这里提交结果。这个程序没有独立仓库 —— 本目录就是它对外发布的那一份。
-> 本目录手写的 `LOCAL-DEPLOYMENT.md` 不参与同步。本目录文件为 MIT 许可(见 `LICENSE`),
-> 本仓库其余部分为 GPL-3.0。
+> 本目录文件为 MIT 许可(见 `LICENSE`),本仓库其余部分为 GPL-3.0。
 
 EOF
 }

@@ -2,9 +2,8 @@
 > development clone at `%WEREAD_DIR%` by `scripts/sync-weread-signin.sh`; the commit it
 > was taken from is recorded in `SNAPSHOT.txt`. To change the code, edit and commit in
 > that clone, then run the script and commit the result here. The program has no separate
-> repository: this directory is its published copy. `LOCAL-DEPLOYMENT.md` is
-> hand-written and exempt from the sync. The files in this directory are MIT-licensed
-> (see `LICENSE`); the rest of this repository is GPL-3.0.
+> repository: this directory is its published copy. The files in this directory are
+> MIT-licensed (see `LICENSE`); the rest of this repository is GPL-3.0.
 
 # WeRead Daily Sign-in
 
