@@ -4,7 +4,7 @@
 凭据放哪。**本文是索引**,细节指向真源文件,不复制它们的正文。
 
 - 所在仓库:`Zzz210s/scripts-hub`(公开;本机克隆目录名沿用 `home-automation-configs`)
-- 内容核对时间:2026-10-03(计划任务状态、上游 PR/issue 状态均为当时实查)
+- 内容核对时间:2026-10-04(计划任务状态、上游 PR/issue 状态均为当时实查)
 
 ## 0. 真源在哪(改东西先看这张表)
 
@@ -19,7 +19,7 @@
 | 微软积分运行器与通知层 | 开发目录 `%REWARDS_DIR%`(本地 git 仓库);同步副本在 `microsoft-rewards/` |
 | 微信读书签到程序 | 代码本体就在本仓库 `weread-signin/`;开发在本地克隆 `%WEREAD_DIR%`,用 `scripts/sync-weread-signin.sh` 发布 |
 | 智慧树刷课配置 | `autovisor/configs.ini` |
-| 上游补丁与 fork 说明 | `patches/` |
+| 上游补丁与贡献状态 | `patches/` |
 
 ## 1. 三个程序各一行
 
@@ -41,7 +41,7 @@
 | `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留 |
 | `Zzz210s/automation-suite` | 已删除(2026-10-04) | 曾是自动化脚本与向导的合集仓库(私有) | 已并入 `scripts-hub/docs/`、`scripts-hub/scripts/` |
 | `Zzz210s/wecom-notify` | 已删除(2026-10-04) | 曾是独立的私有企业微信通知 CLI/库 | 已并入 `scripts-hub/wecom-notify/`;此处是唯一副本 |
-| `Zzz210s/weread-bot` | PUBLIC(fork) | `funnyzak/weread-bot` 的 fork,只是贡献协议的上游通道 | 带开放 PR #53 与 issue #52,见第 6 节与 `patches/weread-bot/` |
+| `Zzz210s/weread-bot` | 已删除(2026-10-04) | 曾是 `funnyzak/weread-bot` 的 fork,只是贡献协议的上游通道 | 开放中的 PR #53 随删除被关闭;补丁存档在 `patches/weread-bot/`,镜像备份在 `%USERPROFILE%\weread-bot-backup-2026-10-04.git` |
 
 ## 3. 调度
 
@@ -78,14 +78,19 @@
 2. **GitHub Actions 云端方案:已评估否定。** 理由见 `docs/cloud-vm.md` 的备选方案表。
 3. **智慧树不能上云**:需要图形会话与本机 Chrome,上游也不支持无头播放课件。
 
-## 8. 上游贡献状态(`funnyzak/weread-bot`,2026-10-03 实查)
+## 8. 上游贡献状态(`funnyzak/weread-bot`,2026-10-04 实查)
+
+我们向该上游提过一条修复与一条 issue。**贡献用的 fork `Zzz210s/weread-bot` 已于 2026-10-04 删除**:
+删除前已确认内容全部有落点(fork 的 `main` 与上游 `main` 同为 `0cc9b5c`,无自研改动;有价值的
+`fix/cookie-persist-after-renewal` diff 已逐字节存进补丁),并做了镜像备份。代价是 **PR #53 因 head
+分支随 fork 消失而被关闭**(`closedAt=2026-10-04T07:25:37Z`)。
 
 | 条目 | 状态 | 详情 |
 | --- | --- | --- |
-| PR [#53](https://github.com/funnyzak/weread-bot/pull/53) | **OPEN,未合并** | 标题「fix: 凭据续期后把新 cookie 原子写回来源文件」;`reviewDecision` 为空、0 条评论 —— 维护者还没看过 |
+| PR [#53](https://github.com/funnyzak/weread-bot/pull/53) | **已关闭(2026-10-04,因 fork 删除)** | 标题「fix: 凭据续期后把新 cookie 原子写回来源文件」;完整 diff 存于 `patches/weread-bot/pr-53-cookie-persist-after-renewal.patch`,可重新 fork 后 `git apply` 再提 |
 | issue [#52](https://github.com/funnyzak/weread-bot/issues/52) | **open** | 标题「已经成功:自动领取奖励」;1 条评论(我们自己发的实测协议),维护者未回复 |
 
-补丁与 fork 的保留原因见 `patches/weread-bot/README.md`。
+补丁、删除经过与重新提交步骤见 `patches/weread-bot/README.md`。
 
 ## 9. 维护须知
 
@@ -94,7 +99,38 @@
   (文案断言已锁住「不带圆括号」与标题行形状)。
 - 改微软积分的运行器或通知层 → **在 `%REWARDS_DIR%\` 里改并提交**(那才是开发目录),再把
   `wechat-bridge/` 与 `scripts/windows/` 覆盖回本仓库。两处都改必分叉。
+- 改任一份企业微信发送核心 → 权威实现是 `wecom-notify/src/wecom.js` 里 `wecom-core` 标记之间的整块;
+  改完把该块整段同步到 `microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `weread-signin/src/notify.js`,
+  再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印块大小)。三份只允许外壳
+  (消息排版、webhook 读取、返回形状)不同,核心必须逐字节一致。
 - 改微信读书签到代码 → **在本机开发克隆 `%WEREAD_DIR%` 里改并提交**,再跑
   `scripts/sync-weread-signin.sh` 发布到本仓库的 `weread-signin/`。直接改那个目录必被下次同步覆盖。
 - 凭据相关文件(`docs/credentials.md`、各子 README、`machine/scheduled-tasks.md`)在换机恢复时
   是唯一线索,移动路径或换文件名时一起更新。
+
+## 10. 路径约定
+
+文档不写死任何盘符。三个占位符指程序本体的安装目录,**按实际路径替换**:
+
+| 占位符 | 指什么 |
+| --- | --- |
+| `%REWARDS_DIR%` | 微软积分程序本体的根目录(解压上游 release 后的目录) |
+| `%AUTOVISOR_DIR%` | Autovisor 安装目录(其下有 `app\`) |
+| `%WEREAD_DIR%` | 微信读书的开发克隆 —— 一个本地 git 克隆,它的已跟踪文件由 `scripts/sync-weread-signin.sh` 发布成 `weread-signin/` |
+
+运行器脚本都用 `%~dp0` 相对定位,整个目录可以原样挪到任何路径。必须留在本机、不入库的路径写在
+私有文件 `~/.config/automation-suite/local-paths.env`(在仓库之外);那里的 `automation-suite`
+是历史遗留的本机目录名,与任何 git 仓库无关。
+
+## 11. 许可与来源
+
+仓库整体按 **GPL-3.0** 授权(见 `LICENSE`),因为其中一部分是 GPL-3.0 上游的衍生作品:
+微软积分的补丁是针对上游 TypeScript 源码的 diff,`microsoft-rewards/env.example` 是上游原版文件,
+`microsoft-rewards/config.json` 由上游配置改写而来。
+
+两个子目录是 **MIT**,各自保留 `LICENSE`:`weread-signin/`(继承自底座 `funnyzak/weread-bot`)
+与 `wecom-notify/`(本项目自研,原独立私有仓库 `Zzz210s/wecom-notify`)。`autovisor/configs.ini`
+同样来自 MIT 上游。MIT 与 GPL-3.0 单向兼容,所以它们能放进本仓库,内部文件仍按 MIT。
+
+`patches/weread-bot/` 是上游贡献补丁的存档;那个 fork 已于 2026-10-04 删除,PR #53 随之关闭,
+重新提交步骤见该目录的 README 与本文第 8 节。
