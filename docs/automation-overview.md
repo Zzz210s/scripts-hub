@@ -15,7 +15,7 @@
 | 通知 4 类型、频率限制、文案硬规则 | `docs/notification-convention.md` |
 | 为什么上云、云端分工与代价 | `docs/cloud-vm.md` |
 | 微软积分运行器与通知层 | 开发目录 `%REWARDS_DIR%\`(本地 git 仓库);同步副本在 `microsoft-rewards/` |
-| 微信读书签到程序 | 权威仓库 `Zzz210s/weread-signin`(已归档);本仓库 `weread-signin/` 是快照 |
+| 微信读书签到程序 | 代码本体就在本仓库 `weread-signin/`;开发在本地克隆 `%WEREAD_DIR%`,用 `scripts/sync-weread-signin.sh` 发布 |
 | 智慧树刷课配置 | `autovisor/configs.ini` |
 | 本机计划任务清单与停用命令 | `tasks/inventory.md` |
 | 每个凭据「去哪拿」 | `secrets/README.md` |
@@ -25,7 +25,7 @@
 | 程序 | 干什么 | 代码来源 / 仓库 | 本地路径 | 跑在哪台机器 | 什么时候跑 | 运行时 | 凭据从哪来 | 通知怎么发 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **微软积分** | 每天跑 Microsoft Rewards:搜索、活动、读文章,算完分推送 | 上游 `TheNetsky/Microsoft-Rewards-Script` v4.3.2(GPL-3.0)+ 本机在程序目录里的本地提交(补丁、`scripts/windows/` 运行器、`wechat-bridge/` 通知层);**没有远端**,`git remote` 只有 upstream | `%REWARDS_DIR%` | 本机 Windows | 登录后 3 分钟(其后 1 小时内每 10 分钟)+ 每天 08:00 起每 2 小时一次,14 小时窗口,一天最多 3 次尝试 | Node.js >= 24(实测 v24.14.0)+ Playwright 驱动浏览器 + SQLite 存登录态 | `%REWARDS_DIR%\.env`:5 个账号的邮箱与密码(当前 0 个账号配 TOTP) | 企业微信群机器人;发送层 `wechat-bridge/`,`webhook` 在 `wechat-bridge\data\wecom-webhook.txt` |
-| **微信读书签到** | 每天完成阅读挑战打卡(读满当日目标,按剩余进度自动算,单日上限 120 分钟;例 2026-10-03 目标是 60 分钟),再用官方只读 API 回读校验时长真被计入 | `Zzz210s/weread-signin`(公开,MIT);底座 `funnyzak/weread-bot` 固定在 `vendor/`,commit 记在 `VENDOR_COMMIT.txt` | `%WEREAD_DIR%` | 本机 Windows | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | Node.js >= 20.11(实测 v24.14.0)+ Python 3(实测 3.14.6,vendor 依赖 `requests` / `httpx` / `PyYAML` / `urllib3` / `croniter` / `apprise`) | `%WEREAD_DIR%\secrets\`:`read-request.curl`(网页 cookie)、`weread-api-key.txt`(官方只读 Key)、`app-credentials.json` + `app-token.json`(App 渠道) | 企业微信群机器人;`secrets\wecom-webhook.txt`,发送层 `src/notify.js` |
+| **微信读书签到** | 每天完成阅读挑战打卡(读满当日目标,按剩余进度自动算,单日上限 120 分钟;例 2026-10-03 目标是 60 分钟),再用官方只读 API 回读校验时长真被计入 | 本仓库 `weread-signin/`(MIT;开发在本地克隆 `%WEREAD_DIR%`,无远端);底座 `funnyzak/weread-bot` 固定在 `vendor/`,commit 记在 `VENDOR_COMMIT.txt` | `%WEREAD_DIR%` | 本机 Windows | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | Node.js >= 20.11(实测 v24.14.0)+ Python 3(实测 3.14.6,vendor 依赖 `requests` / `httpx` / `PyYAML` / `urllib3` / `croniter` / `apprise`) | `%WEREAD_DIR%\secrets\`:`read-request.curl`(网页 cookie)、`weread-api-key.txt`(官方只读 Key)、`app-credentials.json` + `app-token.json`(App 渠道) | 企业微信群机器人;`secrets\wecom-webhook.txt`,发送层 `src/notify.js` |
 | **智慧树刷课** | Autovisor 自动播放智慧树/知到的共享课视频 | 上游 `CXRunfree/Autovisor` v3.17.3(MIT),**代码未改**,只改配置 | `%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`) | **只在本机 Windows**(需要本机 Chrome 与图形会话) | **手动**:跑 `Autovisor.exe`;**没有计划任务** | 打包好的 exe(PyInstaller;内嵌 Python 3.10 + Playwright)+ 本机标准路径的 Chrome | 运行时手动登录一次,登录态落 `app\data\cookies.json`;`configs.ini` 的账号密码**留空** | 程序自带界面与日志(`app\logs\LogN.txt`),**不接企业微信** |
 
 第三个任务不属于「程序」但同属这套自动化:计划任务 `AutoShutdown0200` 每天 02:00 无条件真关机
@@ -35,8 +35,8 @@
 
 | 仓库 | 可见性 | 作用 | 现状备注 |
 | --- | --- | --- | --- |
-| `Zzz210s/home-automation-configs` | PUBLIC(用户跑 `public-reset-wizard.sh` 删库重建后) | 唯一的配置与文档仓库:三个程序的配置、运行器脚本、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 的代码快照 | 同时是恢复包;删库重建用于清掉旧对象 |
-| `Zzz210s/weread-signin` | PUBLIC,已归档(只读) | 微信读书签到的程序本体(源码、模板、Windows 调度脚本) | 权威开发来源,历史留档;`home-automation-configs/weread-signin/` 是它的快照,用 `scripts/sync-weread-signin.sh` 同步 |
+| `Zzz210s/home-automation-configs` | PUBLIC(用户跑 `public-reset-wizard.sh` 删库重建后) | 唯一的配置与文档仓库:三个程序的配置、运行器脚本、通知层、换机恢复说明、约定文档、向导脚本,以及 `weread-signin/` 的代码本体 | 同时是恢复包;删库重建用于清掉旧对象 |
+| `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `home-automation-configs/weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留,用 `scripts/sync-weread-signin.sh` 发布 |
 | `Zzz210s/weread-bot` | PUBLIC(fork) | `funnyzak/weread-bot` 的 fork,只是贡献协议的上游通道 | 带开放 PR #53 与 issue #52,见第 8 节 |
 
 ## 3. 调度约定
@@ -174,7 +174,7 @@
   (文案断言已经锁住「不带圆括号」与标题行形状)。
 - 改微软积分的运行器或通知层 → **在 `%REWARDS_DIR%\` 里改并提交**
   (那才是开发目录),再把 `wechat-bridge/` 与 `scripts/windows/` 覆盖回本仓库。两处都改必分叉。
-- 改微信读书签到代码 → **在权威仓库的本地克隆里改并提交**,再跑 `scripts/sync-weread-signin.sh`
-  刷新本仓库的 `weread-signin/` 快照。直接改快照必被下次同步覆盖。
+- 改微信读书签到代码 → **在本机开发克隆 `%WEREAD_DIR%` 里改并提交**,再跑
+  `scripts/sync-weread-signin.sh` 发布到本仓库的 `weread-signin/`。直接改那个目录必被下次同步覆盖。
 - 三处凭据相关文件(`secrets/README.md`、各子 README、`tasks/inventory.md`)在换机恢复时
   是唯一线索,移动路径或换文件名时一起更新。

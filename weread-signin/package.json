@@ -8,7 +8,8 @@
   "author": "Zzz210s",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Zzz210s/weread-signin.git"
+    "url": "git+https://github.com/Zzz210s/home-automation-configs.git",
+    "directory": "weread-signin"
   },
   "engines": {
     "node": ">=20.11.0"

@@ -1,7 +1,6 @@
-> **快照,不是开发来源。** 本目录是权威仓库
-> [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin)(已归档只读)已跟踪文件的副本,
-> 其本地开发克隆在 `%WEREAD_DIR%`;取快照时的提交记录在 `SNAPSHOT.txt`。
-> 不要直接改这里的文件 —— 跑 `scripts/sync-weread-signin.sh` 从权威克隆刷新;
+> **自动生成的快照,不要直接改这里。** 本目录由 `scripts/sync-weread-signin.sh` 从本机开发克隆
+> `%WEREAD_DIR%` 发布而来;取快照时的提交记录在 `SNAPSHOT.txt`。要改代码,在那个克隆里改并提交,
+> 再跑该脚本、在这里提交结果。这个程序没有独立仓库 —— 本目录就是它对外发布的那一份。
 > 本目录手写的 `LOCAL-DEPLOYMENT.md` 不参与同步。本目录文件为 MIT 许可(见 `LICENSE`),
 > 本仓库其余部分为 GPL-3.0。
 

@@ -1,7 +1,8 @@
 # 微信读书签到:本机部署说明
 
-本目录是权威仓库 **[Zzz210s/weread-signin](https://github.com/Zzz210s/weread-signin)**(MIT,已归档只读)的
-**代码快照**;程序本体、配置模板、调度脚本、完整文档都在这里的 `README.md` / `README.zh-CN.md`。
+本目录是微信读书签到程序的**代码本体**(MIT),由 `scripts/sync-weread-signin.sh` 从本机开发克隆
+`%WEREAD_DIR%` 生成;程序本体、配置模板、调度脚本、完整文档都在这里的 `README.md` / `README.zh-CN.md`。
+原独立仓库 `Zzz210s/weread-signin` 已于 2026-10-04 删除,本目录是它对外发布的那一份。
 
 本文件只记「这台机器上怎么跑」,内容与本仓库的 `docs/`、`tasks/` 互补。
 文件由人工维护,`scripts/sync-weread-signin.sh` 不会覆盖它。
@@ -13,12 +14,11 @@
 - 底座:[`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)(MIT),固定在 `vendor/` 下,commit 记在 `VENDOR_COMMIT.txt`
 - 本程序自己补的三块:读回校验、按剩余进度算每日目标、Windows 无人值守调度
 
-## 部署步骤(权威做法以本目录 `README.md` 为准)
+## 部署步骤(完整做法以本目录 `README.md` 为准)
 
 ```powershell
-# 1. 克隆权威仓库到 %WEREAD_DIR%(路径约定见仓库根 README);也可以直接用本目录的快照
-git clone https://github.com/Zzz210s/weread-signin.git %WEREAD_DIR%
-
+# 1. 把本仓库的 weread-signin/ 目录复制到 %WEREAD_DIR%(路径约定见仓库根 README);
+#    本机开发机上 %WEREAD_DIR% 已经是那个开发克隆,跳过这步
 # 2. 在 %WEREAD_DIR% 里复制配置模板
 #    .env.example -> .env,config.yaml.example -> config.yaml
 

@@ -7,8 +7,8 @@
 | `%REWARDS_DIR%\.env` | 每个账号的邮箱与密码(`ACCOUNT_N_EMAIL` / `ACCOUNT_N_PASSWORD`) | 自己的微软账号;密码只写在此文件,不入库 |
 | `%REWARDS_DIR%\wechat-bridge\data\wecom-webhook.txt` | 企业微信群机器人 webhook 地址 | 企业微信群 → 添加群机器人 → 复制 webhook |
 | `%AUTOVISOR_DIR%\app\data\cookies.json` | 智慧树登录态(首次手动登录后自动生成) | 运行 Autovisor 时手动登录一次 |
-| `%WEREAD_DIR%\.env` | 挑战起止日期与守卫参数 | 从 `Zzz210s/weread-signin` 仓库复制 `.env.example` |
-| `%WEREAD_DIR%\config.yaml` | 底座配置(书籍、目标区间、通知 webhook) | 从 `Zzz210s/weread-signin` 仓库复制 `config.yaml.example` |
+| `%WEREAD_DIR%\.env` | 挑战起止日期与守卫参数 | 从本仓库 `weread-signin/` 复制 `.env.example` |
+| `%WEREAD_DIR%\config.yaml` | 底座配置(书籍、目标区间、通知 webhook) | 从本仓库 `weread-signin/` 复制 `config.yaml.example` |
 | `%WEREAD_DIR%\secrets\read-request.curl` | 网页版 `read` 请求的 cURL(含 cookie) | 浏览器对 `https://weread.qq.com/web/book/read` 请求 Copy as cURL (bash) |
 | `%WEREAD_DIR%\secrets\weread-api-key.txt` | 形如 `wrk-xxxx` 的官方 API Key | https://weread.qq.com/r/weread-skills |
 | `%WEREAD_DIR%\secrets\wecom-webhook.txt` | 企业微信群机器人 webhook | 企业微信群 → 添加群机器人 |

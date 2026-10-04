@@ -21,7 +21,7 @@ which machine it runs on, how it is scheduled and notified.
 - [The three programs](#the-three-programs)
 - [Deployment and maintenance scripts](#deployment-and-maintenance-scripts)
 - [Path convention](#path-convention)
-- [WeRead code snapshot](#weread-code-snapshot)
+- [WeRead code](#weread-code)
 - [Shared conventions](#shared-conventions)
 - [Restoring on a new machine](#restoring-on-a-new-machine)
 - [Credentials](#credentials)
@@ -32,10 +32,10 @@ which machine it runs on, how it is scheduled and notified.
 | Path | What it is |
 | --- | --- |
 | `docs/` | Cross-cutting notes: automation overview and index, why a cloud VM, the cloud scheduling convention, the notification convention |
-| `scripts/` | Deployment / provisioning wizards (Oracle Cloud, public reset, WeRead snapshot sync) |
+| `scripts/` | Deployment / provisioning wizards (Oracle Cloud, public reset, WeRead code sync) |
 | `microsoft-rewards/` | Config snapshot, Windows runner scripts, WeCom bridge, patch archive for the upstream source |
 | `autovisor/` | Zhihuishu configuration (course URLs, **no account or password**) |
-| `weread-signin/` | Full code snapshot of the authoritative WeRead repository (see [below](#weread-code-snapshot)) |
+| `weread-signin/` | The complete WeRead program code (see [below](#weread-code)) |
 | `tasks/` | Windows scheduled-task inventory plus the local staggering / notification / guard conventions |
 | `secrets/README.md` | Credentials checklist: which value goes where and where to get it, never the value |
 
@@ -45,7 +45,7 @@ which machine it runs on, how it is scheduled and notified.
 | --- | --- | --- | --- |
 | **Microsoft Rewards** | Runs the daily Microsoft Rewards tasks (searches, activities, read-to-earn) and pushes the points result to WeCom | Upstream [`TheNetsky/Microsoft-Rewards-Script`](https://github.com/TheNetsky/Microsoft-Rewards-Script) v4.3.2 plus this repo's patches, installed at `%REWARDS_DIR%` | `microsoft-rewards/` |
 | **Zhihuishu playback** | Autovisor: plays Zhihuishu / Zhida course videos automatically | Upstream [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) v3.17.3, installed at `%AUTOVISOR_DIR%` | `autovisor/` |
-| **WeRead check-in** | Completes the WeRead daily reading challenge (reads the minutes the day requires), then verifies the counted minutes through the official read-only API | Authoritative repo [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin), built on [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot), checked out at `%WEREAD_DIR%` | `weread-signin/` (code snapshot) |
+| **WeRead check-in** | Completes the WeRead daily reading challenge (reads the minutes the day requires), then verifies the counted minutes through the official read-only API | Built on [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot); the code itself lives in this repository at `weread-signin/`, developed in the local clone at `%WEREAD_DIR%` | `weread-signin/` (the code itself) |
 
 One scheduled task is not a program: `AutoShutdown0200` powers the machine off
 unconditionally at 02:00 every day (script at
@@ -57,8 +57,8 @@ task through its own installer script.
 | Script | What it does |
 | --- | --- |
 | `scripts/oracle-setup-wizard.sh` | Interactive wizard to register and provision the Oracle Cloud Always Free ARM VM, open both firewall layers, write SSH config and verify connectivity |
-| `scripts/public-reset-wizard.sh` | Deletes and recreates `home-automation-configs` as a clean public repository (old objects really disappear only this way), archives the now-read-only `Zzz210s/weread-signin`, then re-verifies the pushed history |
-| `scripts/sync-weread-signin.sh` | Refreshes `weread-signin/` from the authoritative clone, copying `git ls-files` only (`--dry-run` available) |
+| `scripts/public-reset-wizard.sh` | Deletes and recreates `home-automation-configs` as a clean public repository (old objects really disappear only this way), then re-verifies the pushed history |
+| `scripts/sync-weread-signin.sh` | Publishes `weread-signin/` from the local development clone, copying `git ls-files` only (`--dry-run` available) |
 
 Machine-specific paths are never hard-coded. The scripts read
 `~/.config/automation-suite/local-paths.env` (outside this repository, never committed)
@@ -73,24 +73,29 @@ your own paths**; the repository hard-codes no drive letter.
 | --- | --- |
 | `%REWARDS_DIR%` | Root of the Microsoft Rewards program (where the upstream release was unpacked) |
 | `%AUTOVISOR_DIR%` | Autovisor install directory (it contains `app\`) |
-| `%WEREAD_DIR%` | The `Zzz210s/weread-signin` checkout |
+| `%WEREAD_DIR%` | The WeRead development clone (a plain local git repository; its tracked files are what `scripts/sync-weread-signin.sh` publishes into `weread-signin/`) |
 
 Every Microsoft Rewards runner script resolves paths relative to itself through `%~dp0`,
 so a whole directory can be moved anywhere without edits.
 
-## WeRead code snapshot
+## WeRead code
 
-The WeRead code is deliberately stored in two places: the authoritative repository
-[`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin) (now archived,
-read-only) and `weread-signin/` here.
+The WeRead code lives in `weread-signin/` in this repository — there is no separate
+repository for it. Development happens in a local clone at `%WEREAD_DIR%` (a plain local
+git repository with no remote); `scripts/sync-weread-signin.sh` publishes its tracked
+files into `weread-signin/`.
 
-- **Authoritative source**: `Zzz210s/weread-signin` and its local development clone at
-  `%WEREAD_DIR%`. Development happens there.
-- **This folder is a snapshot**, taken from the tracked files of that repository; the
-  source commit is recorded in `weread-signin/SNAPSHOT.txt`.
+- **Published source**: `weread-signin/` in this repository. The former standalone
+  `Zzz210s/weread-signin` repository has been deleted, so this directory is the only copy
+  that ships with the project.
+- **Local development**: edit and commit in the clone at `%WEREAD_DIR%`. When you are done,
+  run `bash scripts/sync-weread-signin.sh`, review `git status` here, and commit — that
+  commit is what publishes the change.
+- **This folder is generated** from the tracked files of that clone; the source commit is
+  recorded in `weread-signin/SNAPSHOT.txt`.
 - **How it is kept in sync**: `bash scripts/sync-weread-signin.sh` copies `git ls-files`
-  from the authoritative clone and rewrites the snapshot banner at the top of
-  `weread-signin/README.md` and `README.zh-CN.md`. Do not edit snapshot files directly —
+  from the development clone and rewrites the snapshot banner at the top of
+  `weread-signin/README.md` and `README.zh-CN.md`. Do not edit files here directly —
   the next sync overwrites them.
 - `weread-signin/LOCAL-DEPLOYMENT.md` is hand-written in this repository (machine-specific
   run notes) and is exempt from the sync.
@@ -118,9 +123,9 @@ This repository doubles as a restore kit. The order that worked:
 
 1. Clone this repository
 2. Install the programs themselves: unpack the Microsoft Rewards upstream release into
-   `%REWARDS_DIR%`; unpack Autovisor into `%AUTOVISOR_DIR%`; put the WeRead code at
-   `%WEREAD_DIR%` — either clone `Zzz210s/weread-signin` or copy this repo's
-   `weread-signin/` snapshot
+   `%REWARDS_DIR%`; unpack Autovisor into `%AUTOVISOR_DIR%`; copy this repo's
+   `weread-signin/` directory to `%WEREAD_DIR%` — it is the published source of the
+   WeRead program (see `weread-signin/LOCAL-DEPLOYMENT.md`)
 3. Copy this repo's templates and scripts into the program directories: for Microsoft
    Rewards that is `config.json`, `scripts-windows/`, `wechat-bridge/` and `patches/` from
    `microsoft-rewards/` (apply the patches in order after upgrading upstream)
@@ -148,12 +153,11 @@ GPL-3.0 across the whole repository keeps it consistent with that upstream and a
 license conflict. The remaining files (runner scripts, notification layer, scripts,
 documentation) ship under GPL-3.0 as well.
 
-**One subdirectory is MIT, not GPL-3.0**: `weread-signin/` is a snapshot of
-[`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin), which is MIT-licensed,
-and it keeps its own `LICENSE` file. MIT is one-way compatible with GPL-3.0, so the
-snapshot can be redistributed inside a GPL-3.0 repository; the files under
-`weread-signin/` retain their original MIT terms. The same applies to
-`autovisor/configs.ini`, which comes from an MIT upstream.
+**One subdirectory is MIT, not GPL-3.0**: `weread-signin/` ships its own MIT `LICENSE`,
+inherited from its upstream base [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot),
+and keeps that file. MIT is one-way compatible with GPL-3.0, so it can be redistributed
+inside a GPL-3.0 repository; the files under `weread-signin/` retain their original MIT
+terms. The same applies to `autovisor/configs.ini`, which comes from an MIT upstream.
 
 Upstream sources and their licenses:
 
@@ -164,5 +168,5 @@ Upstream sources and their licenses:
 | `microsoft-rewards/config.json` | Adapted from the upstream config example | GPL-3.0 |
 | `microsoft-rewards/scripts-windows/`, `microsoft-rewards/wechat-bridge/` | Original to this repository (not from upstream) | GPL-3.0 |
 | `autovisor/configs.ini` | Configuration template from [`CXRunfree/Autovisor`](https://github.com/CXRunfree/Autovisor) with local values filled in | MIT |
-| `weread-signin/**` | Snapshot of [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin), whose base is [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot) | MIT |
+| `weread-signin/**` | Original to this repository (base: [`funnyzak/weread-bot`](https://github.com/funnyzak/weread-bot)) | MIT |
 | `docs/`, `scripts/`, `tasks/`, `secrets/README.md`, both READMEs | Original to this repository | GPL-3.0 |

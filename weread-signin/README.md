@@ -1,12 +1,10 @@
-> **Snapshot, not the source of truth.** This directory is a copy of the tracked
-> files of the authoritative repository
-> [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin) (archived,
-> read-only), whose local development clone is `%WEREAD_DIR%`. The commit it was
-> taken from is recorded in `SNAPSHOT.txt`. Do not edit files here: run
-> `scripts/sync-weread-signin.sh` to refresh them from the authoritative clone.
-> `LOCAL-DEPLOYMENT.md` is hand-written and exempt from the sync. The files in
-> this directory are MIT-licensed (see `LICENSE`); the rest of this repository
-> is GPL-3.0.
+> **Generated snapshot — do not edit here.** This directory is published from the local
+> development clone at `%WEREAD_DIR%` by `scripts/sync-weread-signin.sh`; the commit it
+> was taken from is recorded in `SNAPSHOT.txt`. To change the code, edit and commit in
+> that clone, then run the script and commit the result here. The program has no separate
+> repository: this directory is its published copy. `LOCAL-DEPLOYMENT.md` is
+> hand-written and exempt from the sync. The files in this directory are MIT-licensed
+> (see `LICENSE`); the rest of this repository is GPL-3.0.
 
 # WeRead Daily Sign-in
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# sync-weread-signin.sh:把权威仓库(默认本地克隆 %WEREAD_DIR%)的已跟踪文件同步成
-# 本仓库 weread-signin/ 下的快照。
+# sync-weread-signin.sh:把本机开发克隆(默认 %WEREAD_DIR%)的已跟踪文件同步成
+# 本仓库 weread-signin/ 下的快照 —— 那是该程序对外发布的那一份,没有独立仓库。
 #
 # 只同步 `git ls-files` 列出的文件:凭据、运行数据、vendor/ 等未跟踪内容一概不进快照。
-# 本目录里手写的文件(见 KEEP)不会被动;其余非源文件会被清掉,保证快照 == 源仓库。
+# 本目录里手写的文件(见 KEEP)不会被动,开发克隆里机器相关的文件(见 SKIP)不发布;
+# 其余非源文件会被清掉,保证快照 == 源仓库。
 # README 顶部每次都重写一遍快照说明;除此之外快照与源仓库逐字节一致。
 #
 # 用法:bash scripts/sync-weread-signin.sh [--dry-run]
@@ -25,36 +26,36 @@ SOURCE="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 # 本仓库自己维护、不参与同步的文件
 KEEP=(LOCAL-DEPLOYMENT.md SNAPSHOT.txt)
 
+# 只留在开发克隆里、不发布进快照的文件(机器相关的工作区说明)
+SKIP=(WORKSPACE.md)
+
 DRY=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY=1 ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) printf '未知参数:%s\n' "$arg" >&2; exit 2 ;;
   esac
 done
 
 banner_en() {
   cat <<'EOF'
-> **Snapshot, not the source of truth.** This directory is a copy of the tracked
-> files of the authoritative repository
-> [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin) (archived,
-> read-only), whose local development clone is `%WEREAD_DIR%`. The commit it was
-> taken from is recorded in `SNAPSHOT.txt`. Do not edit files here: run
-> `scripts/sync-weread-signin.sh` to refresh them from the authoritative clone.
-> `LOCAL-DEPLOYMENT.md` is hand-written and exempt from the sync. The files in
-> this directory are MIT-licensed (see `LICENSE`); the rest of this repository
-> is GPL-3.0.
+> **Generated snapshot — do not edit here.** This directory is published from the local
+> development clone at `%WEREAD_DIR%` by `scripts/sync-weread-signin.sh`; the commit it
+> was taken from is recorded in `SNAPSHOT.txt`. To change the code, edit and commit in
+> that clone, then run the script and commit the result here. The program has no separate
+> repository: this directory is its published copy. `LOCAL-DEPLOYMENT.md` is
+> hand-written and exempt from the sync. The files in this directory are MIT-licensed
+> (see `LICENSE`); the rest of this repository is GPL-3.0.
 
 EOF
 }
 
 banner_zh() {
   cat <<'EOF'
-> **快照,不是开发来源。** 本目录是权威仓库
-> [`Zzz210s/weread-signin`](https://github.com/Zzz210s/weread-signin)(已归档只读)已跟踪文件的副本,
-> 其本地开发克隆在 `%WEREAD_DIR%`;取快照时的提交记录在 `SNAPSHOT.txt`。
-> 不要直接改这里的文件 —— 跑 `scripts/sync-weread-signin.sh` 从权威克隆刷新;
+> **自动生成的快照,不要直接改这里。** 本目录由 `scripts/sync-weread-signin.sh` 从本机开发克隆
+> `%WEREAD_DIR%` 发布而来;取快照时的提交记录在 `SNAPSHOT.txt`。要改代码,在那个克隆里改并提交,
+> 再跑该脚本、在这里提交结果。这个程序没有独立仓库 —— 本目录就是它对外发布的那一份。
 > 本目录手写的 `LOCAL-DEPLOYMENT.md` 不参与同步。本目录文件为 MIT 许可(见 `LICENSE`),
 > 本仓库其余部分为 GPL-3.0。
 
@@ -82,10 +83,15 @@ dirty=$(git -C "$SOURCE" status --porcelain --untracked-files=no)
 
 mapfile -d '' -t src_files < <(git -C "$SOURCE" ls-files -z)
 declare -A want=()
-for f in "${src_files[@]}"; do want["$f"]=1; done
+pub_files=()
+for f in "${src_files[@]}"; do
+  want["$f"]=1
+  for s in "${SKIP[@]}"; do [[ "$f" == "$s" ]] && continue 2; done
+  pub_files+=("$f")
+done
 
 changed=0
-for f in "${src_files[@]}"; do
+for f in "${pub_files[@]}"; do
   if (( DRY )); then
     cmp -s <(emit "$f") "$DEST/$f" 2>/dev/null || { printf '更新  %s\n' "$f"; changed=$((changed + 1)); }
   else
@@ -110,13 +116,14 @@ fi
 find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
 {
-  printf 'source repository: Zzz210s/weread-signin (https://github.com/Zzz210s/weread-signin)\n'
+  printf 'source: local development clone %%WEREAD_DIR%%, tracked files only\n'
+  printf 'published in: Zzz210s/home-automation-configs -> weread-signin/\n'
   printf 'source commit: %s\n' "$(git -C "$SOURCE" rev-parse HEAD)"
   printf 'source commit date: %s\n' "$(git -C "$SOURCE" log -1 --format=%cI)"
-  printf 'synced file count: %s\n' "${#src_files[@]}"
+  printf 'synced file count: %s\n' "${#pub_files[@]}"
   printf 'notes: test/*.js 里的路径不写死盘符(用 os.tmpdir()),快照与源逐字节一致\n'
   printf 'synced at: %s\n' "$(date -Iseconds 2>/dev/null || date)"
 } > "$DEST/SNAPSHOT.txt"
 
-printf '同步完成:%s -> %s(%s 个文件)\n' "$SOURCE" "$DEST" "${#src_files[@]}"
+printf '同步完成:%s -> %s(%s 个文件)\n' "$SOURCE" "$DEST" "${#pub_files[@]}"
 printf '记得 git add weread-signin && git status 复核。\n'
