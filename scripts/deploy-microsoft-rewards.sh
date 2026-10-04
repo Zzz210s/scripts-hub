@@ -4,11 +4,17 @@
 # 默认 --dry-run(只报告差异与缺项,不写任何文件);--apply 才写入。
 # 不碰计划任务 —— 只检查 MicrosoftRewardsScript / AutoShutdown0200;缺了给出注册命令。
 #
-# 用法:bash scripts/deploy-microsoft-rewards.sh [--dry-run|--apply] [--dest=<目录>] [--force]
+# 快照是脱敏发布件(路径 -> 占位符、个人标识 -> sample),不能回灌权威工作区:日常刷新走
+# scripts/sync-microsoft-rewards.sh(工作区 -> 仓库);确需反向覆盖用 --allow-authoritative。
+#
+# 用法:bash scripts/deploy-microsoft-rewards.sh [--dry-run|--apply] [--dest=<目录>]
+#        [--allow-authoritative] [--yes] [--force]
 #   --dest=<目录>  写到别处(验证用临时目录);默认写回权威工作区 %REWARDS_DIR%
-#   --apply 写文件;工作区 HEAD 与快照源提交不一致时拒绝覆盖,--force 可跳过
+#   --apply 写文件;--allow-authoritative 才允许覆盖与快照同源的工作区(会先预览、再确认、自动备份)
+#   --yes 非交互环境确认覆盖(配合 --allow-authoritative);--force 是它的旧名,现等同
 # 退出码:--dry-run 恒为 0;--apply 有阻塞项时为 1。“缺什么”都以 [缺] 行给出下一步。
 #
+# shellcheck disable=SC2034  # KEEP/PROTECT/GEN_FROM/RENAME_MAP 由 source 的 deploy-plan.sh 使用
 # 只回写源仓库本来就有的文件:快照里由合集层维护的 README.md / QUICKSTART.md / SNAPSHOT.txt
 # 不部署;快照里的 README.upstream.md 还原成工作区的 README.md;工作区已有的 config.json
 # 是机器相关配置,绝不覆盖(缺了才由 config.example.json 生成)。
@@ -26,46 +32,19 @@ if [[ -f "$LOCAL_PATHS_FILE" ]]; then
 fi
 SOURCE="${REWARDS_DIR:-$HOME/Microsoft-Rewards-Script-4.3.2}"
 
-# 合集层维护、不部署的文件;以及部署时的改名
+# 合集层维护、不部署的文件;部署时的改名;机器相关配置的保护与生成源
 KEEP=(README.md SNAPSHOT.txt QUICKSTART.md)
 PROTECT=(config.json)
+declare -A GEN_FROM=([config.json]="$SNAP/config.example.json")
+declare -A RENAME_MAP=([README.upstream.md]=README.md)
 
-APPLY=0
-FORCE=0
-DEST=""
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) APPLY=0 ;;
-    --apply) APPLY=1 ;;
-    --force) FORCE=1 ;;
-    --dest=*) DEST="${arg#*=}" ;;
-    -h | --help) sed -n '2,13p' "$0"; exit 0 ;;
-    *) printf '未知参数:%s\n' "$arg" >&2; exit 2 ;;
-  esac
-done
+usage() { sed -n '2,18p' "$0"; }
+# shellcheck source=/dev/null
+. "$REPO_DIR/scripts/lib/deploy-common.sh"
+# shellcheck source=/dev/null
+. "$REPO_DIR/scripts/lib/deploy-plan.sh"
+deploy_parse_args "$@"
 TARGET="${DEST:-$SOURCE}"
-
-BLOCK=0
-SAME_SOURCE=0
-ok() { printf '[通过] %s\n' "$*"; }
-info() { printf '[提示] %s\n' "$*"; }
-miss() { printf '[缺]   %s\n' "$*"; }
-bad() {
-  printf '[阻塞] %s\n' "$*"
-  BLOCK=1
-}
-step() { printf '\n== %s ==\n' "$*"; }
-in_list() {
-  local needle="$1"
-  shift
-  local item
-  for item in "$@"; do [[ "$item" == "$needle" ]] && return 0; done
-  return 1
-}
-task_line() {
-  command -v powershell.exe >/dev/null 2>&1 || return 1
-  powershell.exe -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; \$t=Get-ScheduledTask -TaskName '$1' -ErrorAction SilentlyContinue; if(-not \$t){exit 3}; \$tr=(\$t.Triggers|ForEach-Object{\$_.CimClass.CimClassName}) -join ','; Write-Output (\$t.State.ToString()+' '+\$tr)" 2>/dev/null
-}
 
 printf '== 部署 %s 到 %s(%s)==\n' "$SNAP_REL" "$TARGET" "$([[ $APPLY == 1 ]] && echo apply || echo dry-run)"
 [[ -d "$SNAP" ]] || {
@@ -89,73 +68,31 @@ fi
 
 step '2/6 目标工作区'
 if [[ -d "$TARGET" ]]; then
-  ok "目标目录存在"
+  ok '目标目录存在'
 elif ((APPLY)); then
   if mkdir -p "$TARGET"; then ok '已创建目标目录'; else bad "建不了目标目录:$TARGET"; fi
 else
-  info "目标目录不存在,apply 时会创建"
+  info '目标目录不存在,apply 时会创建'
 fi
-if [[ -d "$TARGET/.git" ]]; then
-  ok '目标是一个 git 仓库(权威工作区)'
-  snap_commit=$(sed -n 's/^source commit: //p' "$SNAP/SNAPSHOT.txt" 2>/dev/null | head -1)
-  have_commit=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || echo '')
-  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" == "$have_commit" ]]; then
-    SAME_SOURCE=1
-    info "工作区与快照同源($have_commit)—— 它是权威工作区,快照里的占位符不应写回去"
-    info '要更新仓库请用 scripts/sync-microsoft-rewards.sh;确要用快照覆盖加 --force'
-    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖与快照同源的工作区(--force 可跳过)'; fi
-  elif [[ -n "$snap_commit" && -n "$have_commit" ]]; then
-    info "工作区在 $have_commit,快照源提交 $snap_commit —— 按恢复流程刷新"
-  fi
-else
-  info '目标不是 git 仓库'
-fi
+deploy_same_source
+deploy_authoritative_gate
 if [[ -d "$TARGET/patches" ]]; then info '工作区 patches/ 保留(补丁不在快照里,合集层统一存档)'; fi
 
 step '3/6 刷新快照文件'
-if ((SAME_SOURCE)) && ((!FORCE)); then
-  info '跳过文件刷新:工作区与快照同源,它是权威副本;恢复时才用快照覆盖(--force 可强制)'
+if ((SAME_SOURCE)) && ((!ALLOW_AUTH)); then
+  info '跳过文件刷新:工作区与快照同源,它是权威副本;恢复时才用快照覆盖(--allow-authoritative 可强制)'
 else
-changed=0
-added=0
-same=0
-total=0
-mapfile -t files < <(git -C "$REPO_DIR" ls-files -- "$SNAP_REL" | sed "s|^$SNAP_REL/||")
-for rel in "${files[@]}"; do
-  in_list "$rel" "${KEEP[@]}" && continue
-  dst_rel="$rel"
-  [[ "$rel" == README.upstream.md ]] && dst_rel=README.md
-  if in_list "$rel" "${PROTECT[@]}"; then
-    if [[ -e "$TARGET/$dst_rel" ]]; then
-      info "保留  $dst_rel(机器相关配置,不覆盖)"
-    else
-      total=$((total + 1))
-      added=$((added + 1))
-      printf '  生成  %s(由 config.example.json)\n' "$dst_rel"
-      if ((APPLY)); then cp "$SNAP/config.example.json" "$TARGET/$dst_rel"; fi
-    fi
-    continue
-  fi
-  total=$((total + 1))
-  src="$SNAP/$rel"
-  dst="$TARGET/$dst_rel"
-  if [[ ! -e "$dst" ]]; then
-    added=$((added + 1))
-    printf '  新增  %s\n' "$dst_rel"
-  elif cmp -s "$src" "$dst"; then
-    same=$((same + 1))
-    continue
-  else
-    changed=$((changed + 1))
-    printf '  更新  %s\n' "$dst_rel"
-  fi
+  deploy_plan_build
+  deploy_plan_show
+  deploy_authoritative_warn
   if ((APPLY)); then
-    mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
+    if ((SAME_SOURCE)) && ((ALLOW_AUTH)); then
+      deploy_confirm || deploy_finish
+    fi
+    deploy_plan_apply
+  else
+    info 'dry-run 未写任何文件'
   fi
-done
-info "共 $total 个文件:未变 $same,更新 $changed,新增 $added"
-if ((APPLY)); then info '已写入目标'; else info 'dry-run 未写任何文件'; fi
 fi
 
 step '4/6 凭据与配置'
@@ -202,13 +139,4 @@ for pair in 'MicrosoftRewardsScript:登录触发 + 每日触发' 'AutoShutdown02
   fi
 done
 
-printf '\n结论:'
-if ((APPLY)); then
-  if ((BLOCK)); then
-    printf '有阻塞项,见上方 [阻塞]。\n'
-    exit 1
-  fi
-  printf '部署完成;上方 [缺] 项按提示补齐后即可真跑。\n'
-else
-  printf 'dry-run 结束(退出码恒 0);要写入加 --apply。\n'
-fi
+deploy_finish

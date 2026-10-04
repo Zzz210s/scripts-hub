@@ -4,10 +4,17 @@
 # 默认 --dry-run(只报告差异与缺项,不写任何文件);--apply 才写入。
 # 不碰计划任务 —— 只检查 WeReadSignIn 是否存在、触发器是否符合约定;缺了给出注册命令。
 #
-# 用法:bash scripts/deploy-weread-signin.sh [--dry-run|--apply] [--dest=<目录>] [--force]
+# 快照是脱敏发布件(路径 -> 占位符、个人标识 -> sample),不能回灌权威工作区:日常刷新走
+# scripts/sync-weread-signin.sh(工作区 -> 仓库);确需反向覆盖用 --allow-authoritative。
+#
+# 用法:bash scripts/deploy-weread-signin.sh [--dry-run|--apply] [--dest=<目录>]
+#        [--allow-authoritative] [--yes] [--force]
 #   --dest=<目录>  写到别处(验证用临时目录);默认写回权威工作区 %WEREAD_DIR%
-#   --apply 写文件;工作区 HEAD 与快照源提交不一致时拒绝覆盖,--force 可跳过
+#   --apply 写文件;--allow-authoritative 才允许覆盖与快照同源的工作区(会先预览、再确认、自动备份)
+#   --yes 非交互环境确认覆盖(配合 --allow-authoritative);--force 是它的旧名,现等同
 # 退出码:--dry-run 恒为 0;--apply 有阻塞项时为 1。“缺什么”都以 [缺] 行给出下一步。
+#
+# shellcheck disable=SC2034  # KEEP/PROTECT/GEN_FROM/RENAME_MAP 由 source 的 deploy-plan.sh 使用
 set -euo pipefail
 
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -26,45 +33,17 @@ SOURCE="${WEREAD_SIGNIN_DIR:-$HOME/weread-signin}"
 
 # 合集层维护、不部署的文件(不是源仓库里的文件)
 KEEP=(SNAPSHOT.txt QUICKSTART.md)
+PROTECT=()
+declare -A GEN_FROM=()
+declare -A RENAME_MAP=()
 
-APPLY=0
-FORCE=0
-DEST=""
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) APPLY=0 ;;
-    --apply) APPLY=1 ;;
-    --force) FORCE=1 ;;
-    --dest=*) DEST="${arg#*=}" ;;
-    -h | --help) sed -n '2,10p' "$0"; exit 0 ;;
-    *) printf '未知参数:%s\n' "$arg" >&2; exit 2 ;;
-  esac
-done
+usage() { sed -n '2,16p' "$0"; }
+# shellcheck source=/dev/null
+. "$REPO_DIR/scripts/lib/deploy-common.sh"
+# shellcheck source=/dev/null
+. "$REPO_DIR/scripts/lib/deploy-plan.sh"
+deploy_parse_args "$@"
 TARGET="${DEST:-$SOURCE}"
-
-BLOCK=0
-SAME_SOURCE=0
-ok() { printf '[通过] %s\n' "$*"; }
-info() { printf '[提示] %s\n' "$*"; }
-miss() { printf '[缺]   %s\n' "$*"; }
-bad() {
-  printf '[阻塞] %s\n' "$*"
-  BLOCK=1
-}
-step() { printf '\n== %s ==\n' "$*"; }
-in_list() {
-  local needle="$1"
-  shift
-  local item
-  for item in "$@"; do [[ "$item" == "$needle" ]] && return 0; done
-  return 1
-}
-
-# "Ready MSFT_TaskLogonTrigger,MSFT_TaskDailyTrigger" 或空(不存在/不可查)
-task_line() {
-  command -v powershell.exe >/dev/null 2>&1 || return 1
-  powershell.exe -NoProfile -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; \$t=Get-ScheduledTask -TaskName '$1' -ErrorAction SilentlyContinue; if(-not \$t){exit 3}; \$tr=(\$t.Triggers|ForEach-Object{\$_.CimClass.CimClassName}) -join ','; Write-Output (\$t.State.ToString()+' '+\$tr)" 2>/dev/null
-}
 
 printf '== 部署 %s 到 %s(%s)==\n' "$SNAP_REL" "$TARGET" "$([[ $APPLY == 1 ]] && echo apply || echo dry-run)"
 [[ -d "$SNAP" ]] || {
@@ -88,59 +67,30 @@ fi
 
 step '2/6 目标工作区'
 if [[ -d "$TARGET" ]]; then
-  ok "目标目录存在"
+  ok '目标目录存在'
 elif ((APPLY)); then
   if mkdir -p "$TARGET"; then ok '已创建目标目录'; else bad "建不了目标目录:$TARGET"; fi
 else
-  info "目标目录不存在,apply 时会创建"
+  info '目标目录不存在,apply 时会创建'
 fi
-if [[ -d "$TARGET/.git" ]]; then
-  ok '目标是一个 git 仓库'
-  snap_commit=$(sed -n 's/^source commit: //p' "$SNAP/SNAPSHOT.txt" 2>/dev/null | head -1)
-  have_commit=$(git -C "$TARGET" rev-parse HEAD 2>/dev/null || echo '')
-  if [[ -n "$snap_commit" && -n "$have_commit" && "$snap_commit" == "$have_commit" ]]; then
-    SAME_SOURCE=1
-    info "工作区与快照同源($have_commit)—— 它是权威工作区,快照里的占位符不应写回去"
-    info '要更新仓库请用 scripts/sync-weread-signin.sh;确要用快照覆盖加 --force'
-    if ((APPLY)) && ((!FORCE)); then bad '拒绝覆盖与快照同源的工作区(--force 可跳过)'; fi
-  elif [[ -n "$snap_commit" && -n "$have_commit" ]]; then
-    info "工作区在 $have_commit,快照源提交 $snap_commit —— 按恢复流程刷新"
-  fi
-else
-  info '目标不是 git 仓库(工作区可以是普通目录;从上游装的本体通常带 .git)'
-fi
+deploy_same_source
+deploy_authoritative_gate
 
 step '3/6 刷新快照文件'
-if ((SAME_SOURCE)) && ((!FORCE)); then
-  info '跳过文件刷新:工作区与快照同源,它是权威副本;恢复时才用快照覆盖(--force 可强制)'
+if ((SAME_SOURCE)) && ((!ALLOW_AUTH)); then
+  info '跳过文件刷新:工作区与快照同源,它是权威副本;恢复时才用快照覆盖(--allow-authoritative 可强制)'
 else
-changed=0
-added=0
-same=0
-total=0
-mapfile -t files < <(git -C "$REPO_DIR" ls-files -- "$SNAP_REL" | sed "s|^$SNAP_REL/||")
-for rel in "${files[@]}"; do
-  in_list "$rel" "${KEEP[@]}" && continue
-  total=$((total + 1))
-  src="$SNAP/$rel"
-  dst="$TARGET/$rel"
-  if [[ ! -e "$dst" ]]; then
-    added=$((added + 1))
-    printf '  新增  %s\n' "$rel"
-  elif cmp -s "$src" "$dst"; then
-    same=$((same + 1))
-    continue
-  else
-    changed=$((changed + 1))
-    printf '  更新  %s\n' "$rel"
-  fi
+  deploy_plan_build
+  deploy_plan_show
+  deploy_authoritative_warn
   if ((APPLY)); then
-    mkdir -p "$(dirname "$dst")"
-    cp "$src" "$dst"
+    if ((SAME_SOURCE)) && ((ALLOW_AUTH)); then
+      deploy_confirm || deploy_finish
+    fi
+    deploy_plan_apply
+  else
+    info 'dry-run 未写任何文件'
   fi
-done
-info "共 $total 个文件:未变 $same,更新 $changed,新增 $added"
-if ((APPLY)); then info '已写入目标'; else info 'dry-run 未写任何文件'; fi
 fi
 
 step '4/6 凭据与配置'
@@ -190,13 +140,4 @@ else
   miss "计划任务 $TASK_NAME 不存在或查不到 —— 注册:powershell -ExecutionPolicy Bypass -File \"$TARGET/scripts/windows/install-autostart.ps1\""
 fi
 
-printf '\n结论:'
-if ((APPLY)); then
-  if ((BLOCK)); then
-    printf '有阻塞项,见上方 [阻塞]。\n'
-    exit 1
-  fi
-  printf '部署完成;上方 [缺] 项按提示补齐后即可真跑。\n'
-else
-  printf 'dry-run 结束(退出码恒 0);要写入加 --apply。\n'
-fi
+deploy_finish
