@@ -20,6 +20,8 @@ export function loadConfig(env = process.env) {
         stateFile: path.join(root, 'data', 'state.json'),
         browserDir: path.join(root, 'data', 'browser'),
         logsDir: path.join(root, 'logs'),
+        secretsDir: path.join(root, 'secrets'),
+        tokensFile: env.EPIC_TOKENS_FILE || path.join(root, 'secrets', 'epic-tokens.json'),
         webhookFile: env.WECOM_WEBHOOK_FILE || path.join(root, 'secrets', 'wecom-webhook.txt'),
         locale: env.EPIC_LOCALE || 'zh-CN',
         country: env.EPIC_COUNTRY || 'CN',

@@ -4,7 +4,9 @@
 //   node src/cli.js probe             只看当期与预告的免费游戏
 //   node src/cli.js status            本地状态与今日尝试次数
 //   node src/cli.js link <slug|序号>  打印预置结账链接(退化路径手动用)
-//   node src/cli.js login             跑一次引擎并放宽登录等待,供人工登录一次
+//   node src/cli.js login             设备授权登录一次,之后自动续期
+//   node src/cli.js login --browser   退路:开浏览器人工登录一次(落 profile)
+//   node src/cli.js auth              看 token 状态与到期时间
 //   node src/cli.js pause / resume    暂停 / 恢复无人值守运行
 import os from 'node:os'
 import path from 'node:path'
@@ -17,6 +19,9 @@ import { loadState, saveState, setPaused, attemptsToday, gameStatus } from './st
 import { peerRunning } from './lock.js'
 import { sendWecom } from './notify.js'
 import { runOnce } from './run.js'
+import { ensureSession } from './auth.js'
+import { deviceLogin, profileLogin } from './login.js'
+import { loadTokens, tokenSummary } from './tokens.js'
 
 const args = process.argv.slice(2)
 const command = args.find((a) => !a.startsWith('-')) ?? 'run'
@@ -95,9 +100,32 @@ async function main() {
             return 0
         }
         case 'login': {
-            log('打开浏览器让你登录一次;登录态落在持久化 profile 里,不保存密码。')
-            const run = await runEpicEngine({ config, env: { NOWAIT: '', LOGIN_TIMEOUT: '600' }, log })
-            return run.code === 0 ? 0 : 1
+            // 默认走设备授权:一次浏览器确认,之后靠 refresh_token 自动续期;
+            // --browser 保留原来的浏览器 profile 登录作为退路。
+            if (flag('--browser')) {
+                const result = await profileLogin({ config, runEngine: runEpicEngine, log })
+                return result.ok ? 0 : 1
+            }
+            const result = await deviceLogin({ config, log })
+            if (!result.ok) fail(`[失败] ${result.error}`)
+            return result.ok ? 0 : 1
+        }
+        case 'auth': {
+            const { tokens, error } = loadTokens(config.tokensFile)
+            if (error) {
+                fail(`[失败] ${error}`)
+                return 1
+            }
+            if (!tokens) {
+                log(`没有 token 文件:${config.tokensFile}`)
+                log('当前使用浏览器 profile 的登录态;要长期免登录,跑 node src/cli.js login')
+                return 0
+            }
+            const summary = tokenSummary(tokens, new Date())
+            log(`账号:${summary.account || '未知'}`)
+            log(`access token:${summary.masked} · ${summary.accessValid ? '有效' : '已过期'} · 至 ${summary.accessExpiresAt || '未知'}`)
+            log(`refresh token:${summary.hasRefresh ? '有' : '无'} · 至 ${summary.refreshExpiresAt || '未知'}`)
+            return 0
         }
         case 'report': {
             const { state } = loadState(config.stateFile)
@@ -116,6 +144,7 @@ async function main() {
                     readDb: readVendorDb,
                     freeMb: () => Math.round(os.freemem() / 1048576),
                     peerRunning: () => peerRunning(config.busyPeers),
+                    ensureSession,
                     send: async (text) => {
                         const sent = await sendWecom(text, { webhookFile: config.webhookFile })
                         if (!sent.ok) fail(`[通知失败] ${sent.error}`)
@@ -130,7 +159,7 @@ async function main() {
             return result.code
         }
         default:
-            fail('用法:node src/cli.js run|probe|status|link <slug|序号>|login|report|pause|resume [--dry-run]')
+            fail('用法:node src/cli.js run|probe|status|link <slug|序号>|login [--browser]|auth|report|pause|resume [--dry-run]')
             return 2
     }
 }
