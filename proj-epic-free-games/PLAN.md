@@ -26,7 +26,7 @@ patchright / otplib / chalk / dotenv / enquirer / lowdb(上游同一套)。
   单条 UTF-8 ≤2048 字节。
 - 企业微信发送核心 `wecom-core` 必须与另两份实现逐字节一致;`scripts/check-wecom-drift.mjs` 纳入第 3 份。
 - 不真连 Epic、不真登录、不真领游戏(测试全部离线,用桩)。
-- 不碰 `E:/weread-signin`、`E:/Microsoft-Rewards-Script-4.3.2`、`scripts/linux/`、本机计划任务。
+- 不碰 `%WEREAD_DIR%`(微信读书工作区)、`%REWARDS_DIR%`(微软积分工作区)、`scripts/linux/`、本机计划任务。
 - 提交用显式路径;不重写历史;推送 `origin`。
 - 时间计算不写死北京时刻:按 `America/New_York` 11:00(UTC-4/-5,DST 自适应)。
 - 目录隔离:项目目录自带 README / 依赖清单 / 测试 / 许可,不跨项目 import。
