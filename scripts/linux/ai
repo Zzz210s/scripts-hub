@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# 在 tmux 里跑 AI 会话:SSH 断线、终端关掉、合盖都不会中断,重连后接着看。
+#
+#   ai                进入(不存在就新建)名为 pi-main 的 tmux 会话并启动 pi
+#   ai <名字>         同上,会话名 pi-<名字>(同时开几个不同的会话)
+#   ai --shell [名字] 只开一个持久 shell(不跑 pi)
+#   ai list           列出当前会话(等价 tmux ls)
+#   ai kill <名字>    结束会话
+#
+# 关键就是 tmux new-session -A:会话在就 attach、不在就新建 —— 断线回来再敲一次 ai 即可。
+set -euo pipefail
+
+cmd="${1:-}"
+case "$cmd" in
+    list|ls)  exec tmux ls ;;
+    kill)     exec tmux kill-session -t "pi-${2:-main}" ;;
+    --shell)  exec tmux new-session -A -s "shell-${2:-main}" ;;
+    # 用登录 shell 起 pi:tmux server 的环境来自第一个客户端,非交互 ssh 的 PATH 里没有 ~/.local/bin
+    ""|*)     exec tmux new-session -A -s "pi-${cmd:-main}" "bash -lc pi" ;;
+esac
