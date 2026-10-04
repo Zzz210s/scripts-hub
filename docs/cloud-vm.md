@@ -37,7 +37,7 @@
 
 - **运维**:系统更新、systemd 服务与定时器、磁盘与内存水位、日志轮转,都得有人看一眼。
 - **网络**:Oracle 默认的安全列表和镜像自带的 iptables 两层防火墙都可能挡 SSH,入口规则要在
-  两处都放(见 `scripts/oracle-setup-wizard.sh` 第 3 阶段)。
+  两处都放(见 `scripts/wizard-oracle.sh` 第 3 阶段)。
 - **ARM 容量**:Always Free 的 ARM 实例在热门区域经常容量不足,创建失败要在别的可用域/区域重试。
 - **凭据**:云主机上也要维护微信读书的 `read-request.curl`、只读 API Key、企业微信群机器人地址
   这些会过期的凭据;私有目录的权限要收紧。
@@ -49,6 +49,6 @@
 (`Enter a valid value for Address Line 1`),与卡种无关。专项调研(结论:ZA Bank × Oracle
 目前零成功案例,但香港扣账卡有成功先例)认为真正卡住的是「国家 / 地址 / 电话 / IP 四者自洽」
 这一层。进展可查:`~/.config/automation-suite/vm.env` 仍是空的,说明
-`scripts/oracle-setup-wizard.sh` 没走完。
+`scripts/wizard-oracle.sh` 没走完。
 
 开通之后的调度与守卫见 [scheduling-convention.md](scheduling-convention.md) 的云端部分。

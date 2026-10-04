@@ -41,8 +41,18 @@ scripts-hub/
 
 ## 快速开始
 
-想用其中一个程序:进它自己的文件夹,读那个文件夹的 README —— 程序本体从上游装,文件夹里写清
-要复制哪些配置与脚本到哪里。
+想用其中一个程序:进它自己的文件夹,读 `QUICKSTART.md`(前置条件 / 三条命令 / 需要填的凭据 /
+怎么验证跑通了 / 常见失败),再按 `README` 看细节。程序本体从上游装,文件夹里写清要复制哪些配置与
+脚本到哪里。想让它自己检查一遍,跑 `bash scripts/setup-<项目名>.sh`(离线自检,不登录、不真跑)。
+
+四个项目各自的最少步骤:
+
+| 项目 | 全新克隆到能跑 |
+| --- | --- |
+| `wecom-notify/` | `npm test` —— 零依赖,克隆即可跑 |
+| `weread-signin/` | `npm test` + `node src/index.js status`;真跑要凭据与 Python 底座 |
+| `microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`;离线测试可跳过前两步 |
+| `autovisor/` | 无可执行代码,只有配置;程序本体从上游下载 |
 
 想在新机器上把整套搭起来:
 
@@ -52,7 +62,7 @@ scripts-hub/
 4. 按 `docs/credentials.md` 填真实凭据。
 5. 注册计划任务;任务名与命令见 `machine/scheduled-tasks.md`。
 
-云主机(尚未开通):先跑 `scripts/oracle-setup-wizard.sh`,再读 `docs/cloud-vm.md`。
+云主机(尚未开通):先跑 `scripts/wizard-oracle.sh`,再读 `docs/cloud-vm.md`。
 
 ## 文档索引
 
@@ -66,4 +76,4 @@ scripts-hub/
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | 为什么要云主机、哪些方案被否定 |
 | [`docs/credentials.md`](docs/credentials.md) | 哪个文件要填什么、去哪拿、失效后怎么恢复 |
 | [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | 本机计划任务清单,以及查看与停用命令 |
-| [`scripts/README.md`](scripts/README.md) | 三个向导、两个快照同步与企业微信漂移检测 |
+| [`scripts/README.md`](scripts/README.md) | 向导、快照同步、项目自检引导与检查(企业微信漂移、隐私扫描) |

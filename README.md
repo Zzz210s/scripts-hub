@@ -46,8 +46,19 @@ cloud-migration status, the path convention and the license details are all in
 
 ## Quick start
 
-To use one program, open its folder and read that folder's README -- the program is installed
-from upstream, and the folder explains what to copy where.
+To use one program, open its folder and read that folder's `QUICKSTART.md` -- prerequisites, three
+commands, credentials to fill, how to verify, common failures -- then the `README` for the details.
+The program itself is installed from upstream, and the folder explains what to copy where. To have
+it check itself, run `bash scripts/setup-<project>.sh` (offline self-check: no login, no real run).
+
+Minimum steps from a fresh clone to something that runs:
+
+| Project | Fresh clone to running |
+| --- | --- |
+| `wecom-notify/` | `npm test` -- zero dependencies, runs straight from the clone |
+| `weread-signin/` | `npm test` + `node src/index.js status`; a real run needs credentials and the Python vendor |
+| `microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
+| `autovisor/` | nothing executable here, config only; the program comes from upstream |
 
 To rebuild the whole setup on a new machine:
 
@@ -58,7 +69,7 @@ To rebuild the whole setup on a new machine:
 4. Fill in the real credentials listed in `docs/credentials.md`.
 5. Register the scheduled tasks; `machine/scheduled-tasks.md` lists the names and the commands.
 
-For the cloud VM (not yet provisioned): `scripts/oracle-setup-wizard.sh`, then
+For the cloud VM (not yet provisioned): `scripts/wizard-oracle.sh`, then
 `docs/cloud-vm.md`.
 
 ## Documentation index
@@ -73,4 +84,4 @@ For the cloud VM (not yet provisioned): `scripts/oracle-setup-wizard.sh`, then
 | [`docs/cloud-vm.md`](docs/cloud-vm.md) | Why a cloud VM, and which options were rejected |
 | [`docs/credentials.md`](docs/credentials.md) | Which file needs which value, where to get it, how to recover it |
 | [`machine/scheduled-tasks.md`](machine/scheduled-tasks.md) | This machine's scheduled tasks and how to inspect or disable them |
-| [`scripts/README.md`](scripts/README.md) | The wizards, the snapshot syncs and the WeCom drift check |
+| [`scripts/README.md`](scripts/README.md) | Wizards, snapshot syncs, project self-check scripts and checks (WeCom drift, privacy scan) |

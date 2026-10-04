@@ -16,4 +16,4 @@
 - 本机计划任务清单与停用命令:`../machine/scheduled-tasks.md`
 - 本机微信读书部署现状:`../machine/weread-deployment.md`
 - 上游补丁存档与说明:`../patches/`
-- 开通与同步向导:`../scripts/README.md`
+- 向导、快照同步、项目自检引导与检查脚本:`../scripts/README.md`
