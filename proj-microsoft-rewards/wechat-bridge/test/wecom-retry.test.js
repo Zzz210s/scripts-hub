@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { sendWecom } from '../lib/wecom.js'
+// 生产入口只保留 url 覆盖;退避注入走测试专用钩子。
+import { __deliverWecom as sendWecom } from '../lib/wecom.js'
 
 const WEBHOOK = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test'
 const ok = () => ({ ok: true, status: 200, text: async () => JSON.stringify({ errcode: 0, errmsg: 'ok' }) })

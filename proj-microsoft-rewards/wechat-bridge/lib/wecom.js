@@ -108,20 +108,29 @@ export function isConfigured() {
 
 /**
  * Send one text message. Throws with the server's errcode when it fails.
- * fetchImpl / sleep / retries / timeoutMs / onRetry 可注入,便于测试退避重试。
+ * Production entry point: the only override is the webhook URL (normally from
+ * WECOM_WEBHOOK_URL or the local file). Transport dependencies (fetch, backoff,
+ * timeout) are fixed to the production defaults and are not part of this API.
  */
-export async function sendWecom(text, options = {}) {
-    const url = options.url ?? webhookUrl()
-    if (!url) throw new Error('未配置企业微信机器人 webhook')
+export async function sendWecom(text, { url } = {}) {
+    return deliver(text, { url })
+}
 
-    await postWecom({
-        url,
-        text,
-        fetchImpl: options.fetchImpl,
-        sleep: options.sleep,
-        retries: options.retries,
-        timeoutMs: options.timeoutMs,
-        onRetry: options.onRetry
-    })
+/**
+ * Test-only hook. The __ prefix marks it as internal: it injects
+ * fetchImpl / sleep / retries / timeoutMs / onRetry to exercise the backoff
+ * rules. Production traffic does not go through it, and both paths share the
+ * single implementation below, so behaviour is identical.
+ */
+export function __deliverWecom(text, transport = {}) {
+    return deliver(text, transport)
+}
+
+/** Shared send implementation; postWecom fills in the production defaults. */
+async function deliver(text, { url, fetchImpl, sleep, retries, timeoutMs, onRetry } = {}) {
+    const target = url ?? webhookUrl()
+    if (!target) throw new Error('未配置企业微信机器人 webhook')
+
+    await postWecom({ url: target, text, fetchImpl, sleep, retries, timeoutMs, onRetry })
     return true
 }

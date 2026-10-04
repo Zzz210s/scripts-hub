@@ -1,11 +1,11 @@
 source: local development clone %REWARDS_DIR%, tracked files only
 published in: Zzz210s/scripts-hub -> proj-microsoft-rewards/
-source commit: 80f8d962c37214d9c097f33108b6bd741faf2684
-source commit date: 2026-10-04T17:44:18+08:00
+source commit: 01bad9af6bff27497a5d09339658247bf9d9c4d3
+source commit date: 2026-10-04T18:18:09+08:00
 published file count: 149
 extra (untracked in source): config.json
 excluded: patches/ (canonical at ../patches/microsoft-rewards/), scripts/windows/_t_logs$t.log
 renamed: README.md -> README.upstream.md
 rewritten: local absolute paths -> %REWARDS_DIR%; automation-suite/docs/ -> docs/
 redacted: 4 personal identifiers from the machine-private list -> sample
-synced at: 2026-10-04T17:47:07+08:00
+synced at: 2026-10-04T18:20:26+08:00
