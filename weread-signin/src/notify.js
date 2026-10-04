@@ -1,8 +1,84 @@
-// 企业微信群机器人推送:脱敏、按 UTF-8 字节截断、超时与退避重试。零依赖。
+// 企业微信群机器人推送:脱敏 + 与 wecom-notify 对齐的发送核心(字节截断、超时、退避重试)。
+// 零依赖。
 import fs from 'node:fs'
 
-const TEXT_LIMIT_BYTES = 2048
-const TIMEOUT_MS = 10000
+// >>> wecom-core begin —— 三份企业微信发送实现的共同核心,改一处必须同步三处
+// 本块在 wecom-notify/src/wecom.js、microsoft-rewards/wechat-bridge/lib/wecom.js、
+// weread-signin/src/notify.js 中逐字节一致,由 scripts/check-wecom-drift.mjs 校验。
+const WECOM_TEXT_MAX_BYTES = 2048
+const WECOM_MARKDOWN_MAX_BYTES = 4096
+const WECOM_TIMEOUT_MS = 10000
+
+/** 服务端明确拒绝的 errcode:重试没有意义。 */
+class WecomError extends Error {
+    constructor(message, errcode) {
+        super(message)
+        this.name = 'WecomError'
+        this.errcode = errcode
+    }
+}
+
+/** 按 UTF-8 字节截断,多字节字符不会被截半;超长时以 ... 结尾。 */
+function clampText(content, maxBytes = WECOM_TEXT_MAX_BYTES) {
+    const buffer = Buffer.from(content, 'utf8')
+    if (buffer.byteLength <= maxBytes) return content
+    // 截断点可能落在多字节字符中间,toString 会用 U+FFFD 占位;去掉末尾占位符才不超上限
+    const head = buffer.subarray(0, Math.max(0, maxBytes - 3)).toString('utf8').replace(/\uFFFD+$/, '')
+    return `${head}...`
+}
+
+async function postOnce(url, body, fetchImpl, timeoutMs) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+        const res = await fetchImpl(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        })
+        const raw = await res.text()
+
+        let parsed = null
+        try {
+            parsed = JSON.parse(raw)
+        } catch {
+            parsed = null
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${raw.slice(0, 120)}`)
+        if (parsed && parsed.errcode !== 0) {
+            throw new WecomError(`企业微信返回 errcode=${parsed.errcode} errmsg=${parsed.errmsg}`, parsed.errcode)
+        }
+        return parsed ?? {}
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+/** 截断 + 组包 + 发送:网络失败按指数退避重试,errcode 拒绝立即失败。 */
+async function postWecom({ url, text, msgtype = 'text', retries = 2, timeoutMs = WECOM_TIMEOUT_MS, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), onRetry }) {
+    const maxBytes = msgtype === 'markdown' ? WECOM_MARKDOWN_MAX_BYTES : WECOM_TEXT_MAX_BYTES
+    const content = clampText(text, maxBytes)
+    const body = msgtype === 'markdown'
+        ? { msgtype: 'markdown', markdown: { content } }
+        : { msgtype: 'text', text: { content } }
+
+    let lastError
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            return await postOnce(url, body, fetchImpl, timeoutMs)
+        } catch (error) {
+            lastError = error
+            if (error instanceof WecomError || attempt === retries) break
+            onRetry?.(error, attempt + 1)
+            await sleep(1000 * 2 ** attempt)
+        }
+    }
+    throw lastError
+}
+// <<< wecom-core end
 
 export function maskSecret(text) {
     return String(text)
@@ -12,16 +88,8 @@ export function maskSecret(text) {
         .replace(/(wrk-)[A-Za-z0-9_-]{6,}/g, '$1****')
 }
 
-export function truncateText(text, limitBytes = TEXT_LIMIT_BYTES) {
-    let out = ''
-    let used = 0
-    for (const char of String(text)) {
-        const size = Buffer.byteLength(char, 'utf8')
-        if (used + size > limitBytes) break
-        out += char
-        used += size
-    }
-    return out
+export function truncateText(text, limitBytes = WECOM_TEXT_MAX_BYTES) {
+    return clampText(text, limitBytes)
 }
 
 export function loadWebhook(file) {
@@ -34,26 +102,20 @@ export async function sendWecom(text, options = {}) {
     if (options.dryRun) return { ok: true, note: 'dry-run 未发送' }
     if (!webhook) return { ok: false, error: '未配置企业微信 webhook' }
 
-    const fetchImpl = options.fetchImpl ?? globalThis.fetch
-    const body = JSON.stringify({ msgtype: 'text', text: { content: truncateText(maskSecret(text)) } })
-    let lastError = ''
-    for (const wait of [0, 1000, 4000, 12000]) {
-        if (wait) await new Promise(resolve => setTimeout(resolve, wait))
-        try {
-            const response = await fetchImpl(webhook, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body,
-                signal: AbortSignal.timeout(TIMEOUT_MS)
-            })
-            const payload = await response.json().catch(() => ({}))
-            if (payload.errcode === 0) return { ok: true }
-            lastError = `errcode=${payload.errcode} ${payload.errmsg ?? ''}`
-        } catch (error) {
-            lastError = error?.message ?? String(error)
-        }
+    try {
+        await postWecom({
+            url: webhook,
+            text: maskSecret(text),
+            fetchImpl: options.fetchImpl,
+            sleep: options.sleep,
+            retries: options.retries,
+            timeoutMs: options.timeoutMs,
+            onRetry: options.onRetry
+        })
+        return { ok: true }
+    } catch (error) {
+        return { ok: false, error: error?.message ?? String(error) }
     }
-    return { ok: false, error: lastError }
 }
 
 function hours(minutes) {

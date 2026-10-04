@@ -193,7 +193,15 @@ npm test        # node --test,8 个用例:字节截断、地址校验与脱敏�
 3. **密钥不入库**:webhook 地址只允许存在于本地文件或环境变量中,仓库内只能出现 `wecom-webhook.txt.example`;任何输出都必须经过 `maskWebhook` 脱敏(不泄露 key 的任何字符)。
 4. **零运行时依赖**:保持无第三方依赖;确需新增依赖时,必须在说明里给出理由。
 5. **改动带测试**:提交前 `npm test` 必须全绿;单文件不超过 200 行。
-6. **文档为中文**:README 与注释使用简体中文(与 `microsoft-rewards/` 一致),不使用 emoji。
+6. **发送核心三处对齐**:`src/wecom.js` 里 `wecom-core` 标记之间的发送核心(字节截断、超时、指数退避重试、`errcode` 处理)是**权威实现**;`microsoft-rewards/wechat-bridge/lib/wecom.js` 与 `weread-signin/src/notify.js` 各自内嵌同一块。改这里以后必须把整块同步到那两份,并跑漂移检测:
+
+   ```bash
+   node scripts/check-wecom-drift.mjs          # 三份核心块逐字节比对,不一致退出 1
+   node scripts/check-wecom-drift.mjs --verbose # 顺带打印各文件块大小
+   ```
+
+   三份的差异只允许在「消息排版 / webhook 读取 / 返回形状」这些外壳层,核心块必须一致。
+7. **文档为中文**:README 与注释使用简体中文(与 `microsoft-rewards/` 一致),不使用 emoji。
 
 ## 贡献
 
@@ -205,14 +213,14 @@ npm test        # node --test,8 个用例:字节截断、地址校验与脱敏�
 
 - **权威实现在这里**:`src/wecom.js` + `src/webhook.js` + `cli.js`,是本仓库里功能最完整的
   企业微信发送实现(文本与 Markdown、超时、指数退避重试、webhook 解析与脱敏)。
-- **与 `microsoft-rewards/wechat-bridge/` 的关系**:那是**另一份独立实现**
-  (`lib/wecom.js` + `lib/channels.js`,只发文本、无重试),不是本目录的副本,也不 import 本目录 ——
-  两边代码相近但各自维护。wechat-bridge 面向「微软积分跑完发一条结果」这一固定场景;本目录是通用
-  CLI/库,面向任意脚本。
-- **与 `weread-signin/` 的关系**:微信读书的发送逻辑同样是自己一份
-  (`weread-signin/src/notify.js`,带密钥脱敏与退避重试),与本目录也没有 import 关系。
-- **现状与取舍**:三份实现协议相同、细节各有取舍,尚未收敛;本次合并只做归档与说明,不改动两个
-  程序里的代码。若以后要收敛,本目录是候选的公共底座。
+- **与 `microsoft-rewards/wechat-bridge/` 的关系**:那是面向「微软积分跑完发一条结果」这一固定
+  场景的独立程序(`lib/wecom.js` + `lib/channels.js`),不 import 本目录;但它内嵌的发送核心与本目录
+  一致(字节截断、超时、指数退避重试、`errcode` 处理),差异只在消息排版与 webhook 读取方式。
+- **与 `weread-signin/` 的关系**:微信读书的发送层 `weread-signin/src/notify.js` 同样不 import
+  本目录,但内嵌的发送核心也与之对齐;它比另两份多一层密钥脱敏(`maskSecret`)。
+- **现状**:三份实现协议相同、外壳各自维护、**发送核心已收敛**为同一块 —— 不跨目录 import,而是
+  在各自文件里内嵌一份逐字节一致的 `wecom-core`,由 `scripts/check-wecom-drift.mjs` 检测漂移。
+  这样两个无人值守程序不新增运行时依赖,改核心时也不会漏掉任何一份。
 
 ## 许可
 
