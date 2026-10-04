@@ -67,10 +67,10 @@ test('全部通过时可运行', () => {
 })
 
 test('同伴程序在跑 -> peer-running', () => {
-    const verdict = decideAll({ now: new Date('2026-10-01T10:00:00'), config, state: idleState, stats: okStats, peerBusy: true, peerDetail: 'microsoft-rewards 正在运行' })
+    const verdict = decideAll({ now: new Date('2026-10-01T10:00:00'), config, state: idleState, stats: okStats, peerBusy: true, peerDetail: 'Microsoft-Rewards-Script-4.3.2 正在运行' })
     assert.equal(verdict.run, false)
     assert.equal(verdict.reason, 'peer-running')
-    assert.match(verdict.detail, /microsoft-rewards/)
+    assert.match(verdict.detail, /Microsoft-Rewards-Script-4.3.2/)
 })
 
 /** 测试适配器:按新的两段式守卫跑一遍,语义与旧的单函数调用一致。 */
