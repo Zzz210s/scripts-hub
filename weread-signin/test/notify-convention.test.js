@@ -1,4 +1,4 @@
-// 通知排版约定的守卫:automation-suite/docs/notification-convention.md。
+// 通知排版约定的守卫:scripts-hub/docs/notification-convention.md。
 //
 // 开始消息一行(名称 · 账号 · 日期 · 动作);结果消息 标题行 / 空行 / 正文;
 // skip 与 action 标题与正文分开写;分隔符统一 · ,禁止圆括号。改动文案时这里会先挡住跑偏。

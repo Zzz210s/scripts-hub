@@ -13,18 +13,31 @@ data/
 *.log
 cookie*
 *.session
+# SSH 私钥与 known_hosts(Oracle 向导与云主机登录会产生)
+*.pem
+*.key
+id_*
+*.pub
+known_hosts
+authorized_keys
 # AI 文件
 AGENTS.md
 CLAUDE.md
 .claude/
 .pi/
+.cursor/
+.aider*
 .codegraph/
 docs/superpowers/
 docs/*-report.md
+CONTRIB-REPORT.md
+**/REBUILD_REPORT.md
 
-# 机器私有文件(路径、敏感词清单):约定放 ~/.config/automation-suite/,万一被挪进来也不入库
+# 机器私有文件(路径、敏感词清单、本机笔记):约定放 ~/.config/automation-suite/,
+# 万一被挪进来也不入库
 local-paths.env
 sensitive-patterns.txt
+docs/oracle-za-bank-notes.md
 # 杂项
 Thumbs.db
 .DS_Store

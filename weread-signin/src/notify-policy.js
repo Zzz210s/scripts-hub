@@ -1,6 +1,6 @@
 // 通知策略:把"为什么不跑"翻译成人话,并限制同类提醒的频率。
 //
-// 排版约定见 automation-suite/docs/notification-convention.md:
+// 排版约定见 scripts-hub/docs/notification-convention.md:
 //   开始消息一行:名称 · 账号 · 日期 · 开始自动阅读,细节交给运行日志与结果消息;
 //   跳过类 标题行 / 空行 / 原因 / 后续 / 你需要做什么;
 //   人工处理类 标题行 / 空行 / 请你 / 原因 / 不处理的后果;分隔符统一 · ,禁止圆括号。
