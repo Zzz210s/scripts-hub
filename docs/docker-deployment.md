@@ -248,6 +248,36 @@ docker builder prune -f                # 清(不影响镜像,只让下次重建�
 
 **`suite-check resources`** 会在宿主上打一份水位(镜像/构建缓存/内存/swap/根分区),只在真该清时提示。
 
+## 7.6 宿主调优(2026-10-05)
+
+先量后调:24 小时均值 `%idle 86.2`、磁盘 `%util 6.3` —— 这台机器平时很闲,尖峰来自 VS Code 的全盘
+搜索与后台构建,不是自动化。所以只做了"隔离与保护",没有堆监控。
+
+| 项 | 改前 | 改后 | 位置 |
+| --- | --- | --- | --- |
+| `vm.swappiness` | 60 | **20** | `/etc/sysctl.d/99-automation-tuning.conf` |
+| `net.ipv4.tcp_fastopen` | 1(仅客户端) | **3**(含服务端) | 同上 |
+| `net.ipv4.tcp_max_syn_backlog` | 256 | **1024** | 同上 |
+| 根分区挂载 | `relatime` | **`noatime`** | `/etc/fstab`(备份 `.bak-20261005`) |
+| 拥塞控制 | cubic | **bbr**(先 `modprobe tcp_bbr` 确认内核支持) | `/etc/sysctl.d/99-bbr.conf` + `/etc/modules-load.d/bbr.conf` |
+| 队列规则 | fq_codel | **fq** | 同上 |
+| OOM 保护 | **无** | **earlyoom**(mem<5% 且 swap<5% 才动手;avoid sshd/systemd/dockerd/containerd,prefer code/node/chrome) | `/etc/default/earlyoom` |
+| 自动化优先级 | `Nice=5`(比后台任务还低) | **`Nice=0` + CPUWeight/IOWeight=200** | `automation-suite.service.d/10-priority.conf` |
+| 后台构建优先级 | `Nice=0`、无限制 | **`Nice=10` + IOSchedulingClass=idle + IO/CPUWeight=50 + MemoryMax=1G** | `blog-rebuild.service.d/10-priority.conf`(drop-in,不动原 unit) |
+| Docker 日志 | `10m×3` | 加 **`compress: true`** | `/etc/docker/daemon.json`(备份 `.bak-20261005`) |
+| 容器资源上限 | 无 | relay **256m/0.5cpu**、blog **512m/0.5cpu** | 各自 `compose.yaml` + 运行中 `docker update` |
+| VS Code 搜索/监听排除 | 7 条 | **19 条**(`/usr` `/var` `/opt` `/snap` `/boot` `/tmp` `node_modules` `.next` `.cache` `.vscode-server` …) | `~/.vscode-server/data/Machine/settings.json`(备份 `.bak-20261005c`) |
+
+两条实测踩坑记下来:
+
+- 改 `/etc/fstab` 的 sed 把选项写进了**文件系统类型**字段(`/ ext4,noatime defaults 0 1`),`findmnt --verify`
+  能查出来。改 fstab 一律先备份再 `findmnt --verify`。
+- `EARLYOOM_ARGS` 里的引号在 heredoc 里写成了 `'` 字面量,earlyoom 只解析到 `-r 3600`(其余参数全丢)。
+  写完要看 `/proc/<pid>/cmdline` 确认。
+
+BBR 生效的验证:`ss -tin state established` 里能看到用 `bbr` 的连接;注意**入向**连接显示的是对端的算法,
+要看本机作发送方的那条。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,
