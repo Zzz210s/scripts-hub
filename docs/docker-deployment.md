@@ -208,6 +208,24 @@ too many login attempts?`),属于设计内的退化路径,不是故障。
 微信读书的 `attempts` 现在按**会话**累加(一次触发内可能 2-3 个),每日上限 3 → 6;
 循环结束后用 `recordMinutes()` 补记最终进度,**不**重复累加 attempts。
 
+## 7.4 服务器侧体检容器(2026-10-05)
+
+仓库里的「基础模块」(`scripts/` + `scripts/lib/`)多数是给 Windows 本机用的;真正在服务器上有价值的是
+四个纯 Node 脚本(零 npm 依赖):`check-wecom-drift.mjs`、`check-privacy.mjs`、`apply-schedule.mjs --emit=systemd`、
+`backup.mjs`。它们被放进**一个按需跑的容器**(compose 服务 `suite-check`,镜像 `automation-suite-check:local`),
+宿主上什么都不用装,平时零进程 —— 更新工具只要在宿主的仓库克隆里 `git pull`,不必重建镜像。
+
+```bash
+gh repo clone Zzz210s/scripts-hub ~/scripts-hub   # 只做一次
+suite-check            # 四项全跑;也可 drift|privacy|units|backup 单跑
+```
+
+服务器侧备份清单:`config/backup.server.json`(本地那份的 sets 是 Windows 路径)。restic 已装进镜像但
+仓库/密码故意留空 —— `--apply` 会拒绝执行,现在只做 `--dry-run` 盘点(18/18 个来源、720 个文件、169MB)。
+
+首次跑抓到两件真事:demo 脚本里写着真实账号昵称(已脱敏,注意它在公开仓库的**历史**里);
+`/etc/systemd/system/` 的 unit 比仓库权威版旧(已按 `scripts/linux/systemd/` 重装)。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,

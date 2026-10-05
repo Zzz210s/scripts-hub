@@ -96,3 +96,36 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 
 容器里跑的是 Xvfb + 可见窗口的 Chromium(上游引擎刻意不用 headless,为了少触发 hCaptcha)。
 `data/state.json` 里 `days.<日期>.attempts` 是当天尝试次数,上限 2;要当天强制重跑就把它改成 0。
+
+## 服务器侧体检:`suite-check`(按需跑,非常驻)
+
+把仓库里的四个「基础模块」放进容器跑 —— 宿主上什么都不用装,平时零进程零内存。
+
+```bash
+# 前置(只做一次):体检工具本体是仓库克隆
+gh repo clone Zzz210s/scripts-hub ~/scripts-hub
+
+suite-check              # 四项全跑
+suite-check drift        # 企业微信发送实现一致性(check-wecom-drift.mjs)
+suite-check privacy      # 脱敏体检(check-privacy.mjs)
+suite-check units        # systemd unit 漂移(仓库权威 vs 已安装 vs config 渲染)
+suite-check backup       # 备份盘点(--dry-run,不推任何东西)
+```
+
+镜像 `automation-suite-check:local`(node + git + restic,497MB),compose 服务 `suite-check`。
+**仓库本体留在宿主挂进来只读** —— 更新工具只要 `cd ~/scripts-hub && git pull`,不必重建镜像;
+只有改 `entrypoint.sh`/`Dockerfile` 才重建。
+
+挂载与私有配置:
+
+| 宿主 | 容器 | 用途 |
+| --- | --- | --- |
+| `~/scripts-hub` | `/repo:ro` | 工具本体(四个纯 Node 脚本,零 npm 依赖) |
+| `~/.config/automation-suite` | `/private:ro` | `sensitive-patterns.txt`(个人标识清单)、`local-paths.env`(路径展开) |
+| `~/.pi`、`~/.config` | 同名路径 `:ro` | 备份盘点要读(清单里的 `%HOME_DIR%` 展开成宿主家目录) |
+| `/srv/apps/automation` | `/data:ro` | 备份盘点的对象 |
+| `/etc/systemd/system` | 同名 `:ro` | unit 对比的基准 |
+
+服务器侧的备份清单是 `config/backup.server.json`(`config/backup.json` 的 sets 是 Windows 本机路径)。
+2026-10-05 首次跑就抓到两件真事:① `scripts/linux/weread/deploy/demo-notify.mjs` 里写着真实账号昵称(已脱敏);
+② `/etc/systemd/system/` 里的 unit 比仓库权威版旧(已重装)。
