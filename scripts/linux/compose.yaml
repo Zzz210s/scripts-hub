@@ -71,6 +71,10 @@ services:
       AUTOMATION_LOCAL_PATHS: /private/local-paths.env
     volumes:
       - ${HOME}/scripts-hub:/repo:ro
+      # 清单里的 %HOME_DIR% 展开成 /home/ubuntu/... ,所以这两个目录要按同样的路径挂进来,
+      # 否则备份盘点会把"存在但没挂"误报成缺失(2026-10-05 实测踩到)
+      - ${HOME}/.pi:/home/ubuntu/.pi:ro
+      - ${HOME}/.config:/home/ubuntu/.config:ro
       - ${HOME}/.config/automation-suite:/private:ro
       - /srv/apps/automation:/data:ro
       - /etc/systemd/system:/etc/systemd/system:ro

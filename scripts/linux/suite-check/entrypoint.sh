@@ -63,18 +63,19 @@ run_units() {
         bad "生成 unit 失败"
         return
     fi
+    # 生成物落在 <dest>/systemd/ 下(见 apply-schedule.mjs 的 --help)
     for f in automation-suite.timer automation-suite.service; do
-        if [ ! -f "$dest/$f" ]; then
-            bad "生成物里没有 $f"
+        if [ ! -f "$dest/systemd/$f" ]; then
+            bad "生成物里没有 systemd/$f"
             continue
         fi
         if [ ! -f "/etc/systemd/system/$f" ]; then
             bad "/etc/systemd/system/$f 不存在(还没安装?)"
-        elif diff -q "$dest/$f" "/etc/systemd/system/$f" >/dev/null; then
+        elif diff -q "$dest/systemd/$f" "/etc/systemd/system/$f" >/dev/null; then
             ok "$f 与仓库生成的一致"
         else
             bad "$f 与仓库生成的不一致"
-            diff -u "$dest/$f" "/etc/systemd/system/$f" | sed 's/^/    /' | head -20
+            diff -u "$dest/systemd/$f" "/etc/systemd/system/$f" | sed 's/^/    /' | head -20
         fi
     done
 }

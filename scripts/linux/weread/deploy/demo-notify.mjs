@@ -12,7 +12,7 @@ import { buildSkipMessage, buildStartMessage } from '/opt/weread/src/notify-poli
 
 const date = new Date().toLocaleDateString('sv-SE')   // YYYY-MM-DD(本地时区)
 const TAG = '【测试】消息类型演示'
-const accountName = '示例标识'
+const accountName = '示例账号'   // 占位符:这个文件会进公开仓库,不放真实昵称
 const webhookFile = '/opt/weread/secrets/wecom-webhook.txt'
 
 // 字段照 src/notify.js 真正会读的来(plan.* / config.*),少一个就会抛错
