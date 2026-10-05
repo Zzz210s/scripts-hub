@@ -1,15 +1,70 @@
 #!/usr/bin/env bash
-# 宿主侧入口:一条命令跑服务器体检(工具在容器里,宿主什么都不用装)。
+# 宿主侧入口:一条命令跑服务器体检(检查工具在容器里,宿主什么都不用装)。
 #
-#   suite-check            # 四项全跑
+#   suite-check              # 资源体检 + 容器里的四项检查
+#   suite-check resources    # 只看宿主资源(磁盘 / 内存 / swap / docker 占用)
 #   suite-check drift|privacy|units|backup
 #
-# 需要 ~/scripts-hub 是 scripts-hub 的克隆(体检工具本体),克隆命令:
+# 需要 ~/scripts-hub 是 scripts-hub 的克隆(检查工具本体):
 #   gh repo clone Zzz210s/scripts-hub ~/scripts-hub
 set -uo pipefail
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
+which="${1:-all}"
+
+# ── 宿主资源体检 ────────────────────────────────────────────────────────────
+# 只能在宿主上做:docker CLI、/proc/meminfo、swapon 容器里都没有。
+# 判据取的是"会咬人"的阈值:构建缓存 >2GB、swap 用掉 >60%、根分区 >80%。
+show_resources() {
+    printf '\n== 宿主资源 ==\n'
+    local warn=0
+
+    local avail swap_used swap_total root_use cache
+    avail=$(awk '/^MemAvailable:/ {printf "%.0f", $2/1024}' /proc/meminfo)
+    swap_used=$(awk '/^SwapTotal:/ {t=$2} /^SwapFree:/ {f=$2} END {printf "%.2f", (t-f)/1048576}' /proc/meminfo)
+    swap_total=$(awk '/^SwapTotal:/ {printf "%.0f", $2/1048576}' /proc/meminfo)
+    root_use=$(df --output=pcent / | tail -1 | tr -d ' %')
+    # 注意:Type 里带空格(Build Cache / Local Volumes),要用 | 分隔才取得到
+    cache=$(docker system df --format '{{.Type}}|{{.Size}}' 2>/dev/null | awk -F'|' '$1=="Build Cache" {print $2}')
+    # 提示依据用 Reclaimable 而不是 Size —— 只有可回收的那部分清得掉(2026-10-05 实测:
+    # 清完 6.6GB 后还剩 3.0GB,但可回收已是 0,再提示"可清"就是误导)
+    cache_free=$(docker system df --format '{{.Type}}|{{.Reclaimable}}' 2>/dev/null | awk -F'|' '$1=="Build Cache" {print $2}' | awk '{print $1}')
+    # docker 的 "RECLAIMABLE" 会把"没有正在运行的容器在用"的镜像也算进去 —— 这台上自动化镜像
+    # 都是一次性容器用完即退,所以那个数字**不能**当清理依据,别照它跑 prune -a。
+    local images
+    images=$(docker system df --format '{{.Type}}|{{.Size}}' 2>/dev/null | awk -F'|' '$1=="Images" {print $2}')
+
+    printf '  docker:镜像 %s · 构建缓存 %s\n' "${images:-?}" "${cache:-?}"
+    printf '  内存:可用 %s MB · swap %s/%s GB\n' "$avail" "$swap_used" "$swap_total"
+    printf '  根分区:已用 %s%%\n' "$root_use"
+
+    [ -n "${cache_free:-}" ] && awk -v c="${cache_free%GB}" 'BEGIN {exit !(c+0 > 1)}' && {
+        printf '  [提示] 构建缓存有 %s 可回收:docker builder prune -f(不影响镜像,只让下次重建慢一点)\n' "$cache_free"
+        warn=1
+    }
+    awk -v u="$swap_used" -v t="$swap_total" 'BEGIN {exit !(t > 0 && u/t > 0.6)}' && {
+        printf '  [提示] swap 用掉超过六成:多半是 VS Code 远端/pi 会话占着,不是自动化\n'
+        warn=1
+    }
+    [ "${root_use:-0}" -gt 80 ] && {
+        printf '  [提示] 根分区超过 80%%:先看 docker system df 与 /srv/apps/automation/*/logs\n'
+        warn=1
+    }
+    [ "$warn" -eq 0 ] && printf '  [通过] 资源水位正常\n'
+    return 0
+}
+
+if [ "$which" = "resources" ]; then
+    show_resources
+    exit 0
+fi
+
+if [ "$which" = "all" ]; then
+    show_resources
+fi
+
 if [ ! -d "$HOME/scripts-hub/scripts" ]; then
     echo "[失败] 缺少 $HOME/scripts-hub —— 先跑:gh repo clone Zzz210s/scripts-hub ~/scripts-hub" >&2
     exit 2
 fi
+
 exec docker compose -f "$SUITE_DIR/compose.yaml" run --rm -T suite-check "$@"

@@ -105,12 +105,20 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 # 前置(只做一次):体检工具本体是仓库克隆
 gh repo clone Zzz210s/scripts-hub ~/scripts-hub
 
-suite-check              # 四项全跑
+suite-check              # 资源体检 + 四项检查
+suite-check resources    # 只看宿主资源(磁盘 / 内存 / swap / docker 占用)
 suite-check drift        # 企业微信发送实现一致性(check-wecom-drift.mjs)
 suite-check privacy      # 脱敏体检(check-privacy.mjs)
 suite-check units        # systemd unit 漂移(仓库权威 vs 已安装 vs config 渲染)
 suite-check backup       # 备份盘点(--dry-run,不推任何东西)
 ```
+
+`resources` 这一步在**宿主**上跑(docker CLI、`/proc/meminfo`、`swapon` 容器里都没有),其余四项在容器里。
+它只在真的可回收时提示:构建缓存的判据用 `Reclaimable` 而不是 `Size` —— 清完一次后总大小可能还有几 GB
+但已无可回收,这时不该再提示"可清"。
+
+> 别照 `docker system df` 的 `RECLAIMABLE` 跑 `docker image prune -a`:那列把"没有正在运行的容器在用"
+> 也算进去,而这台上的自动化镜像都是**一次性容器用完即退**,照它删会把三个镜像全删掉。
 
 镜像 `automation-suite-check:local`(node + git + restic,497MB),compose 服务 `suite-check`。
 **仓库本体留在宿主挂进来只读** —— 更新工具只要 `cd ~/scripts-hub && git pull`,不必重建镜像;

@@ -226,6 +226,28 @@ suite-check            # 四项全跑;也可 drift|privacy|units|backup 单跑
 首次跑抓到两件真事:demo 脚本里写着真实账号昵称(已脱敏,注意它在公开仓库的**历史**里);
 `/etc/systemd/system/` 的 unit 比仓库权威版旧(已按 `scripts/linux/systemd/` 重装)。
 
+## 7.5 容器与磁盘的日常维护(2026-10-05)
+
+**该清的只有构建缓存**。`docker system df` 会把"没有正在运行的容器在用"的镜像算进 `RECLAIMABLE` ——
+这台上三个自动化镜像都是**一次性容器用完即退**,照那个数字跑 `docker image prune -a` 会把它们全删掉。
+真正可回收的是构建缓存(反复重建攒下来的):
+
+```bash
+docker system df                       # 先看:Build Cache 的 Reclaimable 才是可清的
+docker builder prune -f                # 清(不影响镜像,只让下次重建慢一点)
+```
+
+2026-10-05 实测:构建缓存 9.46GB(可回收 6.59GB)→ 清掉后根分区 21G→16G(37%→28%)。
+
+**swap 已加到 4GB**(`/swap.img` 2G + `/swap2.img` 2G,后者 `pri=10`,都写进 `/etc/fstab`)。
+加第二个文件而不是扩容第一个:当时只有 ~390MB 可用内存,`swapoff` 会把在用的 1.5GB 换页挤回内存,
+大概率 OOM。跑批时的峰值内存 1.6-2.6GB,多一档 swap 是保险。
+
+**内存水位与自动化无关**:这台上常驻的是 `singbox-relay`(1.6 MiB)与三个一次性容器;把可用内存吃掉的
+是 VS Code 远端与 pi 会话(约 2.7GB)。今早 08:00 微软积分开跑时实测 `free 2806MB`、`clusters=2`。
+
+**`suite-check resources`** 会在宿主上打一份水位(镜像/构建缓存/内存/swap/根分区),只在真该清时提示。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,
