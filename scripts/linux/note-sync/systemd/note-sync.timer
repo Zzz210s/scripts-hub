@@ -1,0 +1,12 @@
+[Unit]
+Description=每 5 分钟同步一次 0-Note(远端仓库为主)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=note-sync.service
+
+[Install]
+WantedBy=timers.target

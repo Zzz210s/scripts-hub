@@ -307,6 +307,53 @@ BBR 生效的验证:`ss -tin state established` 里能看到用 `bbr` 的连接;
 不用时禁用 containers 扩展(它在轮询 docker socket)、收窄工作区根(现在是 `/`,排除项只是缓解)、
 试 `NODE_OPTIONS=--max-old-space-size=1024`(需实测远端服务是否尊重它)。
 
+## 7.8 三端同步:本机 ↔ GitHub ↔ 服务器(2026-10-05)
+
+真源是 GitHub `Zzz210s/note`(分支 `master`),两端都按"远端为主"同步。
+
+| 端 | 触发 | 脚本 | 动作 |
+| --- | --- | --- | --- |
+| 本机 `F: -Note` | Windows 计划任务 `NoteSync`,每 5 分钟 | `scripts/note-sync/note-sync.sh` | pull --rebase --autostash → **只提交 2 分钟没被改过的文件** → 脱敏闸门 → 提交 → push(重试 3 次) |
+| 服务器 `/srv/apps/note/repo` | systemd `note-sync.timer`,每 5 分钟 | `/srv/apps/automation/note-sync.sh` | 同上;拉取成功后博客重建按 sha 变化自动重建 |
+
+配置:本机 `~/.note-sync/config.env`;服务器复用 `suite.env`。冲突一律**停下 + 企业微信通知**,绝不 force。
+
+四个坑(都实测踩过):
+
+1. **`git commit` 默认提交整个索引** —— 脚本判定"刚被改过"而跳过的文件,仍被别的会话暂存着,于是被一起提交。
+   必须 `git commit -m ... -- "${READY[@]}"`,失败回滚也只用 `git reset -- "${READY[@]}"`。
+2. **未跟踪同名文件挡住 merge** —— 另一个会话在服务器上新建了 `app_static.py`,远端也有同名文件,
+   git 直接 `Aborting`。脚本现在拉取前把这些文件**移到备份目录**(不是删除)再拉。
+3. **github 在这台机器上时通时断** —— 只用 `timeout` 不够(它杀的是直接子进程,`git fetch` 子进程会活下来),
+   必须同时用 git 自己的低速超时:`git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30`。
+4. **HTTPS + gh 凭据会把 token 放进 URL** —— `ps` 与 journald 里能看到
+   `https://x-access-token:gho_***@github.com/...`。服务器侧已改为 **deploy key + SSH**
+   (`~/.ssh/id_ed25519_note`,仓库 deploy key `server-note-sync`,写权限;`core.sshCommand` 指定密钥)。
+
+## 7.9 一次真实事故:VS Code 扩展宿主吃满 swap(22:40–23:02)
+
+**现象**:ping 通(8ms)、22/443 端口开、relay 正常返回 200,但 SSH **认证**卡死登不上;load 39(2 核),
+swap 4095/4095 全满。
+
+**根因**:VS Code 远端**扩展宿主**一个进程占 **3.45 GB swap**(另有 1.1 GB RSS)—— 编辑器把交换空间吃干净了。
+
+**earlyoom 为什么没救**:它的判据是"内存**与** swap 同时低于阈值"(AND)。当时 swap 剩 0%,但内存还有 40%,
+所以不触发。
+
+**处理**:
+
+| 动作 | 说明 |
+| --- | --- |
+| 撤掉 `user-1000.slice` 的 `MemoryHigh=2G` | 它只是加剧了压力(不是唯一原因),撤掉后恢复 `infinity` |
+| 新增 `mem-guard`(每 5 分钟) | swap 剩余 <10% **且** load > 2×核数 → 杀掉 `vscode-server` 里 RSS 最大的进程并通知;**绝不碰 pi/tmux** |
+| 装 `zram-tools`(lz4,25%,pri=100) | 换页走压缩内存,thrash 不再致命 |
+
+**结果**:swap 4095 → 500 MB,可用内存 1131 → 2438 MB,load 39 → 8。
+
+**教训**:小内存机器上"编辑器 + 跑批"共存,必须有基于 **swap/负载** 的守卫;earlyoom 的 AND 判据覆盖不了
+"swap 满了但内存还没到底"。另外:VS Code 扩展宿主会**累积**(实测两小时 1.34 → 1.78 GB),
+长期开着远端窗口就会走到这一步 —— 不用时关窗口,或定期重启远端服务。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,

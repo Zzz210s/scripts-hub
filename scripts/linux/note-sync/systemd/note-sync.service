@@ -1,0 +1,15 @@
+[Unit]
+Description=0-Note 同步(服务器侧:拉取远端仓库,有本地提交就推送)
+Documentation=https://github.com/Zzz210s/scripts-hub/blob/main/docs/docker-deployment.md
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Environment=NOTE_DIR=/srv/apps/note/repo
+ExecStart=/srv/apps/automation/note-sync.sh
+# 同步是轻活,但别和跑批抢资源(与 blog-rebuild 同级)
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=50
+IOWeight=50

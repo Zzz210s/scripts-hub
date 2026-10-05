@@ -1,0 +1,8 @@
+[Unit]
+Description=内存守卫:swap 紧张且负载高时杀掉 VS Code 远端扩展宿主
+Documentation=https://github.com/Zzz210s/scripts-hub/blob/main/docs/docker-deployment.md
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/srv/apps/automation/mem-guard.sh
