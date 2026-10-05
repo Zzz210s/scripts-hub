@@ -12,7 +12,7 @@
 # 配置:~/.note-sync/config.env(机器私有,不入库)
 #   NOTE_DIR=/f/0-Note
 #   HAC_DIR=/c/Users/23652/home-automation-configs
-#   WECOM_WEBHOOK_FILE=/e/.../wecom-webhook.txt   # 可选,失败时通知用
+#   WECOM_WEBHOOK_FILE=~/.note-sync/wecom-server.txt   # 可选,失败时通知用(走"服务器"通道)
 set -uo pipefail
 
 CONFIG="${NOTE_SYNC_CONFIG:-$HOME/.note-sync/config.env}"

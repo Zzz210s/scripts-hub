@@ -12,10 +12,13 @@
 import fs from 'node:fs'
 
 const [program = '自动化程序', reason = '未知', logFile] = process.argv.slice(2)
+// 每个程序一条独立通道(2026-10-05 用户建了 epic 与 服务器 两个新群机器人)。
+// 通道文件都在仓库之外、权限 600;文档只记路径不记 key。
 const webhookFiles = {
     微软积分: '/srv/apps/automation/rewards/wechat-bridge/data/wecom-webhook.txt',
     微信读书签到: '/srv/apps/automation/weread/secrets/wecom-webhook.txt',
-    'Epic 限免': '/srv/apps/automation/epic/secrets/wecom-webhook.txt'
+    'Epic 限免': '/srv/apps/automation/epic/secrets/wecom-webhook.txt',
+    服务器: '/srv/apps/automation/secrets/wecom-server.txt'
 }
 const webhookFile = webhookFiles[program]
 

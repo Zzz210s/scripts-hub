@@ -16,7 +16,7 @@
 set -uo pipefail
 
 NOTE_DIR="${NOTE_DIR:-/srv/apps/note/repo}"
-WEBHOOK_FILE="${NOTE_WECOM_WEBHOOK:-/srv/apps/automation/weread/secrets/wecom-webhook.txt}"
+WEBHOOK_FILE="${NOTE_WECOM_WEBHOOK:-/srv/apps/automation/secrets/wecom-server.txt}"   # 同步冲突走"服务器"通道
 LOG="${NOTE_SYNC_LOG:-/srv/apps/automation/logs/note-sync.log}"
 mkdir -p "$(dirname "$LOG")"
 

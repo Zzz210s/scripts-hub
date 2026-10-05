@@ -354,6 +354,25 @@ swap 4095/4095 全满。
 "swap 满了但内存还没到底"。另外:VS Code 扩展宿主会**累积**(实测两小时 1.34 → 1.78 GB),
 长期开着远端窗口就会走到这一步 —— 不用时关窗口,或定期重启远端服务。
 
+## 7.10 企业微信消息通道(2026-10-05 拆分)
+
+每个程序/用途一条独立通道,key 只落在服务器上的文件里(仓库外,600),文档只记路径。
+
+| 通道 | 用途 | 文件 |
+| --- | --- | --- |
+| **Epic 限免** | 领取开始 / 结果 / 需要你处理 | `/srv/apps/automation/epic/secrets/wecom-webhook.txt` |
+| **服务器** | 基础设施告警:内存守卫、note 同步冲突、部署与体检异常 | `/srv/apps/automation/secrets/wecom-server.txt` |
+| 微软积分 | 不变 | `/srv/apps/automation/rewards/wechat-bridge/data/wecom-webhook.txt` |
+| 微信读书签到 | 不变 | `/srv/apps/automation/weread/secrets/wecom-webhook.txt` |
+
+本机侧的 0-Note 同步失败通知也走"服务器"通道(本机文件 `~/.note-sync/wecom-server.txt`)。
+
+改通道只需换文件内容,不用动代码:`mem-guard.sh` 用 `MEM_GUARD_WEBHOOK`、`note-sync.sh` 用
+`NOTE_WECOM_WEBHOOK`、`alert-fail.mjs` 用内置的"程序 → 文件"表(含 `服务器` 这一项,可被别的脚本复用)。
+
+> 提醒:webhook key 属于凭据。仓库是公开的,任何把 key 写进笔记/文档的动作都会被 push 前的脱敏闸门拦下
+> (规则名「企业微信 webhook 真 key」)。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,

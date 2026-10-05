@@ -12,7 +12,7 @@ set -uo pipefail
 DRY=0
 [ "${1:-}" = "--dry" ] && DRY=1
 LOG="${MEM_GUARD_LOG:-/srv/apps/automation/logs/mem-guard.log}"
-WEBHOOK_FILE="${MEM_GUARD_WEBHOOK:-/srv/apps/automation/weread/secrets/wecom-webhook.txt}"
+WEBHOOK_FILE="${MEM_GUARD_WEBHOOK:-/srv/apps/automation/secrets/wecom-server.txt}"   # 基础设施告警走"服务器"通道
 SWAP_FREE_MIN="${SWAP_FREE_MIN:-10}"   # swap 剩余百分比低于这个值
 LOAD_FACTOR="${LOAD_FACTOR:-2}"        # load 高于 核数 x 这个倍数
 
