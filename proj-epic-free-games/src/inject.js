@@ -34,7 +34,12 @@ export async function injectSession({ browserDir, accessToken, expiresAt, launch
     let launchContext = launch
     if (!launchContext) {
         try {
-            launchContext = (await import('patchright')).chromium.launchPersistentContext
+            const chromium = (await import('patchright')).chromium
+            // 必须 bind:launchPersistentContext 是 BrowserType 的方法,拆下来单独调用时
+            // 拿不到 this,patchright 内部读 this._playwright 就炸 —— 报错原文
+            // 「Cannot read properties of undefined (reading '_playwright')」
+            // (2026-10-05 服务器上第一次真跑踩到;本机从未跑过这条路,所以一直没暴露)
+            launchContext = chromium.launchPersistentContext.bind(chromium)
         } catch (error) {
             return { ok: false, error: `patchright 不可用:${error?.message ?? error}` }
         }

@@ -8,6 +8,7 @@
 //   node src/cli.js login --browser   退路:开浏览器人工登录一次(落 profile)
 //   node src/cli.js auth              看 token 状态与到期时间
 //   node src/cli.js pause / resume    暂停 / 恢复无人值守运行
+import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { loadConfig } from './config.js'
@@ -105,6 +106,21 @@ async function printLink(query) {
     return 0
 }
 
+/**
+ * 可用内存(MB)。
+ *
+ * 不能用 os.freemem():Linux 上它返回 MemFree,把可回收的页缓存也算作已用 ——
+ * 实测同一时刻 MemFree 不到 800MB 而 MemAvailable 是 2.3GB,于是内存闸门会把可跑的情形
+ * 判成「内存不足」跳过(Windows 上没这个问题)。优先读 /proc/meminfo 的 MemAvailable。
+ */
+function freeMemoryMb() {
+    try {
+        const m = /^MemAvailable:\s+(\d+) kB/m.exec(fs.readFileSync('/proc/meminfo', 'utf8'))
+        if (m) return Math.round(Number(m[1]) / 1024)
+    } catch { /* 非 Linux 或读不到,走兜底 */ }
+    return Math.round(os.freemem() / 1048576)
+}
+
 async function main() {
     if (flag('-h') || flag('--help')) {
         log(USAGE)
@@ -171,7 +187,7 @@ async function main() {
                     probe,
                     runEngine: runEpicEngine,
                     readDb: readVendorDb,
-                    freeMb: () => Math.round(os.freemem() / 1048576),
+                    freeMb: () => freeMemoryMb(),
                     peerRunning: () => peerRunning(config.busyPeers),
                     ensureSession,
                     send: async (text) => {

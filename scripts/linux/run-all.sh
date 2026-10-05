@@ -19,7 +19,7 @@ if ! flock -n 7; then
     exit 0
 fi
 
-note "=== 编排开始(先微软积分,后微信读书)==="
+note "=== 编排开始(先微软积分,再微信读书,最后 Epic 限免)==="
 
 "$SUITE_DIR/rewards/run.sh" 7>&-
 RC_REWARDS=$?
@@ -29,8 +29,12 @@ note "微软积分退出码 $RC_REWARDS"
 RC_WEREAD=$?
 note "微信读书退出码 $RC_WEREAD"
 
+"$SUITE_DIR/epic/run.sh" 7>&-
+RC_EPIC=$?
+note "Epic 限免退出码 $RC_EPIC"
+
 note "=== 编排结束 ==="
-if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ]; then
+if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ]; then
     exit 0
 fi
 exit 1

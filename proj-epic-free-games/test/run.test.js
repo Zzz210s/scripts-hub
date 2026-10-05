@@ -100,30 +100,29 @@ test('尝试次数用尽:静音跳过,不启动引擎', async () => {
     assert.deepEqual(calls.sent, [])
 })
 
-test('暂停与低内存:前者照旧推一条,后者也推;安静时段静音', async () => {
+test('跳过一律不推送(暂停 / 低内存 / 安静时段),原因只写运行日志', async () => {
     const paused = setup()
     const pausedState = emptyState(NOW)
     pausedState.paused = true
     writeState(paused.config.stateFile, pausedState)
     await runOnce({ config: paused.config, deps: paused.deps, now: NOW })
-    assert.match(paused.calls.sent[0], /正常跳过/)
-    assert.match(paused.calls.sent[0], /已手动暂停/)
+    assert.deepEqual(paused.calls.sent, [])
 
     const lowMem = setup({ freeMb: () => 100 })
     await runOnce({ config: lowMem.config, deps: lowMem.deps, now: NOW })
-    assert.match(lowMem.calls.sent[0], /可用内存不足/)
+    assert.deepEqual(lowMem.calls.sent, [])
 
     const quiet = setup()
     await runOnce({ config: quiet.config, deps: quiet.deps, now: new Date(2026, 9, 6, 21, 0, 0) })
     assert.deepEqual(quiet.calls.sent, [])
 })
 
-test('读免费清单失败:推一条跳过,不启动引擎,退出码非 0', async () => {
+test('读免费清单失败:不推送(只写日志)、不启动引擎、退出码非 0', async () => {
     const { config, deps, calls } = setup({ probe: async () => { calls.probe++; return { ok: false, error: 'HTTP 503' } } })
     const result = await runOnce({ config, deps, now: NOW })
     assert.equal(result.code, 1)
     assert.equal(calls.engine, 0)
-    assert.match(calls.sent[0], /读免费游戏清单失败/)
+    assert.deepEqual(calls.sent, [])
 })
 
 test('dry-run:探测与引擎都不跑,只报告会发什么', async () => {

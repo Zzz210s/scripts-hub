@@ -164,6 +164,38 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 | **当天第一次真跑,退出码 1,企业微信里一条消息都没有** | `config.yaml` 以**文件**形式 bind mount 到容器里,而程序改配置的写法是「写 .tmp 再 rename 覆盖」—— rename 覆盖一个挂载点必然 EBUSY(2026-10-05 实测:1 秒内退出,`执行失败:EBUSY: resource busy or locked, rename '/opt/weread/config.yaml.tmp' -> '/opt/weread/config.yaml'`) | 挂成模板:`./weread/config.yaml:/opt/weread/config.template.yaml:ro`,由 `run-once.sh` 复制到容器可写层再用(补丁只影响本次运行,不需要落回宿主) |
 | 崩溃时完全静默(只能靠"今天没消息"发现) | 程序死在发消息之前,result 消息根本没机会生成 | 两个运行器都加兜底:`alert-fail.mjs` —— 退出码非 0 **且**日志里从未出现「企业微信」时,补一条「需要你处理」提醒(出现过说明程序至少试过发送,不重复打扰) |
 
+## 7.2 Epic 限免领取(2026-10-05 接入)
+
+第三个程序,容器化时比前两个多两件事:**引擎刻意用可见窗口**(上游 `epic-games.js` 里写死
+`headless: false`,注释说明 headless 更容易触发 hCaptcha)→ 容器里用 **Xvfb** 提供虚拟显示;
+以及**结账环节的人机验证**只能人工完成(程序会把预置结账链接推给企业微信)。
+
+| 项 | 值 |
+| --- | --- |
+| 镜像 | `automation-epic:local`(1.55 GB) |
+| 容器 | `epic-run`,一次性;入口 `deploy/run-once.sh` 先起 Xvfb 再跑 `node src/cli.js run` |
+| 编排位置 | 第三步(微软积分 → 微信读书 → Epic),宿主看门狗 `EPIC_RUN_TIMEOUT_MIN=40` |
+| 浏览器 | 两个都预置:`chromium`(可见窗口用)+ `chromium-headless-shell`(注入 cookie 用 headless) |
+| 凭据 | `epic/secrets/epic-tokens.json`(设备授权登录生成,自动续期)+ `wecom-webhook.txt` |
+| 状态 | `epic/data/state.json`(已领记录、当天尝试次数);`epic/vendor-data/` 存上游引擎结果 |
+| 守卫 | 程序自己判(src/guards.js):已暂停 / 次数用尽 / 同伴在跑 / 安静时段 / 内存不足 |
+
+**接入时踩到的六个坑**(全在部署层,项目代码只改了两处):
+
+| 症状 | 根因 | 修法 |
+| --- | --- | --- |
+| 构建直接失败 `"/vendor": not found` | 暂存布局与 Dockerfile 的 COPY 路径不一致 | 把项目摊平到构建上下文根(与 `COPY package.json/src/vendor` 对齐) |
+| 构建日志里只有一行空的 `exit code: 1` | `read -r A B < <(node -e '...')`:node 输出不带换行 → `read` 返回 1 → `set -e` 静默退出 | 改用 herestring `read -r A B <<< "$(...)"`,并补参数校验 |
+| `curl: command not found` | `node:24-slim` 里没有 curl,apt 清单漏了 | 加进 apt 清单 |
+| `Executable doesn't exist at /root/.cache/ms-playwright/...` | 浏览器铺到了 `node_modules/patchright-core/.local-browsers`,但 patchright 默认去用户缓存找 | `ENV PLAYWRIGHT_BROWSERS_PATH=0` |
+| 会话注入报 `Cannot read properties of undefined (reading '_playwright')` | 项目代码把 `chromium.launchPersistentContext` 拆下来单独调用,丢了 `this` | 项目侧修:`.bind(chromium)` |
+| 引擎跑不起来、一直等到超时 | 上一次崩溃在 profile 里留下 `SingletonLock`,而容器每次都是新 hostname → Chromium 判成「被另一台电脑占用」 | `run-once.sh` 每次先 `rm -f /opt/epic/data/browser/Singleton*` |
+| 引擎崩溃 `ENOENT .../vendor/free-games-claimer/data/.epic-games.json.tmp` | 镜像里没有那个 data 目录 | Dockerfile `mkdir -p` + compose 挂 `epic/vendor-data` 留档 |
+
+**已知会走到人工的环节**:结账时的 hCaptcha。程序识别到就把「需要你处理」+ 每款一条结账链接推出来,
+点开在浏览器里完成即可。2026-10-05 首次真跑就撞上了它(引擎日志:`Got hcaptcha challenge! Lost trust due to
+too many login attempts?`),属于设计内的退化路径,不是故障。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,

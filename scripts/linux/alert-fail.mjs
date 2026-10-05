@@ -14,7 +14,8 @@ import fs from 'node:fs'
 const [program = '自动化程序', reason = '未知', logFile] = process.argv.slice(2)
 const webhookFiles = {
     微软积分: '/srv/apps/automation/rewards/wechat-bridge/data/wecom-webhook.txt',
-    微信读书签到: '/srv/apps/automation/weread/secrets/wecom-webhook.txt'
+    微信读书签到: '/srv/apps/automation/weread/secrets/wecom-webhook.txt',
+    'Epic 限免': '/srv/apps/automation/epic/secrets/wecom-webhook.txt'
 }
 const webhookFile = webhookFiles[program]
 

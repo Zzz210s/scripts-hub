@@ -54,3 +54,27 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 800m
+
+  epic-run:
+    image: automation-epic:local
+    container_name: epic-run
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/deploy/run-once.sh"]
+    environment:
+      TZ: Asia/Shanghai
+      # 同伴(另两个程序)的单实例锁:错峰判定要用(.env 侧的 EPIC_BUSY_PEERS)
+      EPIC_BUSY_PEERS: /peers/rewards/run.lock
+    volumes:
+      - ./epic/data:/opt/epic/data
+      - ./epic/logs:/opt/epic/logs
+      - ./epic/secrets:/opt/epic/secrets
+      # 上游引擎的结果文件(lowdb);挂出来便于回查每次领取的细节
+      - ./epic/vendor-data:/opt/epic/vendor/free-games-claimer/data
+      - ./rewards/logs:/peers/rewards:ro
+      - ./epic/deploy:/opt/deploy:ro
+    security_opt:
+      - no-new-privileges:true
+    # 浏览器 + Xvfb 要额外共享内存与 init(回收 Xvfb/Chromium 的僵尸进程)
+    shm_size: 1g
+    init: true
+    mem_limit: 1800m

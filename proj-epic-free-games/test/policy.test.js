@@ -4,17 +4,16 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { REASONS, isSilentSkip, reasonText, followUpText, ACTION_KINDS, actionText } from '../src/policy.js'
 
-test('静音表:不需要人管的跳过只写日志', () => {
-    for (const reason of ['nothing-new', 'already-attempted', 'peer-running', 'quiet-hours']) {
+test('静音表:所有正常跳过都只写日志(2026-10-05 用户要求)', () => {
+    // 企业微信只收「需要你处理」;跳过不论原因都不推送,文案留在运行日志里
+    for (const reason of Object.keys(REASONS)) {
         assert.equal(isSilentSkip(reason), true, `${reason} 应静音`)
-    }
-    for (const reason of ['low-memory', 'probe-failed', 'paused']) {
-        assert.equal(isSilentSkip(reason), false, `${reason} 应推送`)
+        assert.equal(REASONS[reason].silent, true, `${reason} 的 silent 字段应为 true`)
     }
 })
 
-test('未知原因不静音也不抛', () => {
-    assert.equal(isSilentSkip('未定义的原因'), false)
+test('未知原因也静音、不抛,且有人话文案', () => {
+    assert.equal(isSilentSkip('未定义的原因'), true)
     assert.equal(reasonText('未定义的原因'), '未定义的原因')
     assert.equal(followUpText('未定义的原因'), '下一次触发会再看')
 })

@@ -71,3 +71,24 @@ systemctl list-timers automation-suite.timer
 ③ 看门狗 `docker rm -f <服务名>` 删不掉 compose run 的一次性容器(名字是自动生成的),要按
 `label=com.docker.compose.service=<服务名>` 删;④ venv 用符号链暴露 `python` 会让 Python 解析不到
 `pyvenv.cfg`,报"依赖装了却 ModuleNotFoundError",要 `ENV PATH=/opt/venv/bin:$PATH`。
+
+## Epic 限免领取(第三个程序,2026-10-05 接入)
+
+```bash
+# 跑一次(宿主运行器,带看门狗)
+/srv/apps/automation/epic/run.sh
+
+# 看清单(不登录)/ 看状态 / 看 token
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js probe
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js status
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js auth
+
+# 重新登录(token 被吊销时;会打印链接与验证码,浏览器确认一次)
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js login
+
+# 某款游戏的预置结账链接(hCaptcha 退化路径手动用)
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js link 1
+```
+
+容器里跑的是 Xvfb + 可见窗口的 Chromium(上游引擎刻意不用 headless,为了少触发 hCaptcha)。
+`data/state.json` 里 `days.<日期>.attempts` 是当天尝试次数,上限 2;要当天强制重跑就把它改成 0。
