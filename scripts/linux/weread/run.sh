@@ -13,7 +13,7 @@ cd "$ROOT" || exit 1
 
 LOG="$ROOT/logs/last-run.log"
 RLOG="$ROOT/logs/runner.log"
-WATCHDOG_MIN="${WEREAD_RUN_TIMEOUT_MIN:-100}"
+WATCHDOG_MIN="${WEREAD_RUN_TIMEOUT_MIN:-330}"   # 会话循环:要覆盖最多 3 个会话的累计时长
 mkdir -p "$ROOT/logs" "$ROOT/data" "$SUITE_DIR/state"
 
 REALDAY="$(date +%F)"; CLOCK="$(date +%H:%M:%S)"

@@ -90,5 +90,9 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint node epic-run src/cli.js link 1
 ```
 
+微信读书的宿主看门狗是 **330 分钟**:程序在一次运行内会循环补读(最多 3 个会话,
+每个会话上限 100 分钟),不达标就在同一次运行里再来一个,直到官方口径达标或用完配额。
+配额由程序侧 `MAX_SESSIONS_PER_RUN` 控制(默认 3),总预算 `RUN_BUDGET_MINUTES`(默认 330)。
+
 容器里跑的是 Xvfb + 可见窗口的 Chromium(上游引擎刻意不用 headless,为了少触发 hCaptcha)。
 `data/state.json` 里 `days.<日期>.attempts` 是当天尝试次数,上限 2;要当天强制重跑就把它改成 0。

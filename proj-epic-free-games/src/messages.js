@@ -46,14 +46,19 @@ export function buildSkipMessage({ date, account, reason }) {
     return `${headline(account, date, '正常跳过')}\n\n原因:${reasonText(reason)}\n后续:${followUpText(reason)}\n你需要做什么:不需要`
 }
 
-/** action:标题 / 空行 / 请你 / 原因 / 不处理的后果 / 逐条结账链接。登录态失效时给链接没用,只让人去登录。 */
+/** action:标题 / 空行 / 请你 / 原因 / 不处理的后果 / 逐条商店页链接。登录态失效时给链接没用,只让人去登录。
+ *
+ * 2026-10-05 改:以前给的是预置结账链接 `.../store/purchase?offers=1-...`,用户实测打开报
+ * 「发生意外错误。Account id is missing」—— 那个页面要求网页端已登录该账号。商店页链接
+ * 任何情况下都能打开,点「Get」即可,失败率最低。预置结账链接仍可用 `node src/cli.js link` 取。 */
 export function buildActionMessage({ date, account, kind = 'captcha', items = [] }) {
     const { please, reason, consequence } = actionText(kind)
     const lines = [please, `原因:${reason}`, `不处理的后果:${consequence}`]
     if (kind !== 'login') {
         for (const item of items) {
-            if (!item?.checkout) continue
-            lines.push(`结账链接:${item.checkout}${item.title ? `${SEP}${item.title}` : ''}`)
+            const url = item?.store ?? item?.checkout
+            if (!url) continue
+            lines.push(`商店页:${url}${item.title ? `${SEP}${item.title}` : ''}`)
         }
     }
     return `${headline(account, date, '需要你处理')}\n\n${lines.join('\n')}`

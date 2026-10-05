@@ -23,7 +23,7 @@ export const followUpText = (reason) => REASONS[reason]?.followUp ?? '下一次�
 
 export const ACTION_KINDS = {
     captcha: {
-        please: '请你:在浏览器里打开下面的链接完成结账',
+        please: '请你:在浏览器里打开下面的商店页,点 Get 完成领取',
         reason: '结账时遇到 hCaptcha 人机验证',
         consequence: '验证通过前领不到,这个周期结束后不能补领'
     },

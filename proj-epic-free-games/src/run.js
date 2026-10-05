@@ -5,7 +5,7 @@ import { cycleEnd, dayKey, formatLocal } from './clock.js'
 import { shouldSkipLocally } from './guards.js'
 import { buildActionMessage, buildResultMessage, buildSkipMessage, buildStartMessage } from './messages.js'
 import { isSilentSkip } from './policy.js'
-import { checkoutUrl } from './promo.js'
+import { checkoutUrl, storeUrl } from './promo.js'
 import { attemptsToday, loadState, markGame, markNotified, notifiedOnce, pendingGames, pruneState, recordAttempt, saveState } from './state.js'
 
 const MESSAGE_DATE = (now) => dayKey(now)
@@ -99,7 +99,7 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         const kind = summary.loginRequired ? 'login' : summary.captcha ? 'captcha' : 'blocked'
         const items = failed.map((game) => {
             const source = pending.find((item) => item.slug === game.slug) ?? {}
-            return { title: game.title, checkout: checkoutUrl(source), endAt: source.endAt ?? deadline }
+            return { title: game.title, store: storeUrl(source.slug), checkout: checkoutUrl(source), endAt: source.endAt ?? deadline }
         })
         await deps.send(buildActionMessage({ date, account: finalAccount, kind, items }))
     } else {

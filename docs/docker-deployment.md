@@ -196,6 +196,18 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 点开在浏览器里完成即可。2026-10-05 首次真跑就撞上了它(引擎日志:`Got hcaptcha challenge! Lost trust due to
 too many login attempts?`),属于设计内的退化路径,不是故障。
 
+## 7.3 2026-10-05 的两处行为调整
+
+| 症状 / 诉求 | 原来 | 现在 |
+| --- | --- | --- |
+| 微信读书官方进度差一点就停了,只能等下一次触发 | 一次运行 = 一个底座会话,不达标只记一次尝试 | **会话循环**:不达标就在同一次运行内再跑一个会话(最多 3 个),每轮按最新官方进度重算目标并写回底座配置;宿主看门狗 100 → **330 分钟**;程序侧 `MAX_SESSIONS_PER_RUN=3`、`RUN_BUDGET_MINUTES=330` |
+| Epic 消息里的预置结账链接打开报 `Account id is missing` | 消息只给 `.../store/purchase?offers=1-...` | 消息改推**商店页链接**(点 Get);预置结账链接仍可用 `node src/cli.js link` 取 |
+| Epic 人机验证频繁出现 | 每天 2 次尝试 | 每天 **1 次**、失败不重试 —— 验证码多由"登录尝试过多"触发,保持上游"不刷"的定调 |
+| 无可领取游戏时不想收到消息 | `nothing-new` 本来就不推送 | 加回归测试固化,防止以后改坏 |
+
+微信读书的 `attempts` 现在按**会话**累加(一次触发内可能 2-3 个),每日上限 3 → 6;
+循环结束后用 `recordMinutes()` 补记最终进度,**不**重复累加 attempts。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,

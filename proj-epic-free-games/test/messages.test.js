@@ -63,7 +63,7 @@ test('skip 三段固定,末行是 你需要做什么:不需要', () => {
     assert.ok(text.trimEnd().endsWith('你需要做什么:不需要'))
 })
 
-test('action 正文首句是 请你:,并逐条给结账链接', () => {
+test('action 正文首句是 请你:,并逐条给商店页链接', () => {
     const text = buildActionMessage({
         date: DATE,
         kind: 'captcha',
@@ -75,15 +75,15 @@ test('action 正文首句是 请你:,并逐条给结账链接', () => {
     assert.match(text, /需要你处理/)
     const body = text.split('\n\n')[1]
     assert.ok(body.startsWith('请你:'), '正文第一句必须是 请你:')
-    assert.match(text, /结账链接:https:\/\/www\.epicgames\.com\/store\/purchase\?offers=1-ns-oid · TerraScape/)
-    assert.match(text, /结账链接:https:\/\/www\.epicgames\.com\/store\/purchase\?offers=1-ns-oid2 · 深埋之星/)
+    assert.match(text, /商店页:https:\/\/www\.epicgames\.com\/store\/purchase\?offers=1-ns-oid · TerraScape/)
+    assert.match(text, /商店页:https:\/\/www\.epicgames\.com\/store\/purchase\?offers=1-ns-oid2 · 深埋之星/)
     assert.match(text, /不处理的后果:/)
 })
 
-test('login 型 action 不给结账链接', () => {
+test('login 型 action 不给链接', () => {
     const text = buildActionMessage({ date: DATE, kind: 'login', items: [{ title: 'TerraScape' }] })
     assert.match(text, /登录令牌已失效/)
-    assert.doesNotMatch(text, /结账链接/)
+    assert.doesNotMatch(text, /商店页|结账链接/)
 })
 
 test('多条游戏的结果消息经发送层截断后仍不超上限', () => {

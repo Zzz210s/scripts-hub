@@ -25,7 +25,7 @@ export function loadConfig(env = process.env) {
         webhookFile: env.WECOM_WEBHOOK_FILE || path.join(root, 'secrets', 'wecom-webhook.txt'),
         locale: env.EPIC_LOCALE || 'zh-CN',
         country: env.EPIC_COUNTRY || 'CN',
-        maxAttemptsPerDay: int(env.EPIC_MAX_ATTEMPTS, 2),
+        maxAttemptsPerDay: int(env.EPIC_MAX_ATTEMPTS, 1),   // 2026-10-05:人机验证多由"登录尝试过多"触发,降为每天 1 次
         engineTimeoutMinutes: int(env.EPIC_ENGINE_TIMEOUT_MINUTES, 30),
         busyPeers: String(env.EPIC_BUSY_PEERS || '').split(',').map((s) => s.trim()).filter(Boolean),
         dryRun: env.EPIC_DRY_RUN === '1'

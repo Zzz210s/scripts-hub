@@ -64,3 +64,16 @@ export function recordRun(state, { minutes, targetMinutes, outcome, at = new Dat
     next.done = next.todayMinutes >= targetMinutes
     return next
 }
+
+/**
+ * 只刷新分钟数与达标标记,**不**累加 attempts。
+ * 用于会话循环结束后用最终官方进度补记一次 —— 每个会话已经各自计过一次 attempts,
+ * 这里再加就多算了(2026-10-05 加循环时补的)。
+ */
+export function recordMinutes(state, { minutes, targetMinutes }) {
+    const next = { ...state }
+    next.todayMinutes = Math.max(state.todayMinutes, minutes)
+    next.targetMinutes = targetMinutes ?? state.targetMinutes
+    next.done = next.todayMinutes >= next.targetMinutes
+    return next
+}

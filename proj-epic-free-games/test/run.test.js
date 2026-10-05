@@ -65,7 +65,7 @@ test('跑过之后同一款不再重复领取', async () => {
     assert.equal(calls.engine, 1)
 })
 
-test('hCaptcha:发需要你处理并带结账链接,状态保持失败,退出码非 0', async () => {
+test('hCaptcha:发需要你处理并带商店页链接,状态保持失败,退出码非 0', async () => {
     const { config, deps, calls } = setup({
         runEngine: async () => { calls.engine++; return { code: 1, stdout: '  Got hcaptcha challenge! Lost trust' } },
         readDb: () => ({})
@@ -74,7 +74,8 @@ test('hCaptcha:发需要你处理并带结账链接,状态保持失败,退出码
     assert.equal(result.code, 1)
     assert.equal(calls.sent.length, 2)
     assert.match(calls.sent[1], /需要你处理/)
-    assert.match(calls.sent[1], /结账链接:https:\/\/www\.epicgames\.com\/store\/purchase\?offers=1-ns-oid/)
+    assert.match(calls.sent[1], /商店页:https:\/\/store\.epicgames\.com\/en-US\/p\/tomb-star/)
+    assert.doesNotMatch(calls.sent[1], /store\/purchase/)
     assert.equal(gameStatus(loadState(config.stateFile).state, 'tomb-star'), 'failed')
 })
 

@@ -77,13 +77,14 @@ test('跳过提醒同一天同一种原因只发一次,需人工处理的不限'
 
 // 2026-10-04 用户反馈:「本来一切正常、不需要人做任何事」的跳过不必再推企业微信,
 // 只写运行日志。可能让今天白丢或需要留意的原因仍然照旧推送。
-test('静音表:只有不需要人管的跳过不推送,paused 与有风险的原因照旧推', () => {
-    for (const reason of ['done', 'peer-running', 'quiet-hours']) {
+test('静音表:只有「需要你处理」才推,其余跳过一律只写日志', () => {
+    // 2026-10-04 用户要求:正常跳过不推送 —— 内存不足 / 次数用尽 / 临近关机 / 已暂停都不再打扰
+    for (const reason of ['done', 'peer-running', 'quiet-hours', 'low-memory', 'attempts-exhausted', 'before-shutdown', 'paused']) {
         assert.equal(isSilentSkip(reason), true, `${reason} 应该静音`)
     }
-    for (const reason of ['low-memory', 'attempts-exhausted', 'before-shutdown', 'credential-invalid', 'stats-unavailable', 'paused']) {
-        assert.equal(isSilentSkip(reason), false, `${reason} 应该照旧推送`)
+    // 这两类不处理就一直不跑,必须让人知道
+    for (const reason of ['credential-invalid', 'stats-unavailable']) {
+        assert.equal(isSilentSkip(reason), false, `${reason} 应该推送`)
     }
-    // paused 是有意留着的状态:没人清就一直在跳,消息里还带一个 resume 动作,所以不静音
-    assert.equal(isSilentSkip('paused'), false)
+    assert.equal(isSilentSkip('没见过的原因'), true)
 })

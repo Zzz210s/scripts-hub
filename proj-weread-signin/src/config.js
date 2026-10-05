@@ -22,8 +22,10 @@ export const DEFAULTS = {
     quietEnd: '23:00',
     shutdownTime: '02:00',
     shutdownGuardMinutes: 30,
-    maxAttemptsPerDay: 3,        // 每天最多尝试几次(守卫与“今天还能跑多久”共用)
-    runTimeoutMinutes: 100,
+    maxAttemptsPerDay: 6,        // 每天最多跑几个**会话**(2026-10-05 起一次运行内会循环,见 maxSessionsPerRun)
+    maxSessionsPerRun: 3,        // 一次运行内最多跑几个底座会话(不达标就再来一个,直到达标或用完)
+    runBudgetMinutes: 330,       // 一次运行的总时长预算(与宿主看门狗一致;超出就不再开新会话)
+    runTimeoutMinutes: 100,      // 单个会话的上限(底座自己的目标时长也受它夹逼)
     accountName: '微信读书',
     busyPeers: ''
 }
@@ -73,6 +75,8 @@ export function loadConfig(envPath = '.env') {
         shutdownTime: pick('SHUTDOWN_TIME', DEFAULTS.shutdownTime),
         shutdownGuardMinutes: toInt(env.SHUTDOWN_GUARD_MINUTES, DEFAULTS.shutdownGuardMinutes),
         maxAttemptsPerDay: toInt(env.MAX_ATTEMPTS_PER_DAY, DEFAULTS.maxAttemptsPerDay),
+        maxSessionsPerRun: toInt(env.MAX_SESSIONS_PER_RUN, DEFAULTS.maxSessionsPerRun),
+        runBudgetMinutes: toInt(env.RUN_BUDGET_MINUTES, DEFAULTS.runBudgetMinutes),
         runTimeoutMinutes: toInt(env.RUN_TIMEOUT_MINUTES, DEFAULTS.runTimeoutMinutes),
         accountName: pick('ACCOUNT_NAME', DEFAULTS.accountName),
         // 同伴程序(错峰用):逗号分隔的 run-state.js 路径,任一在跑就跳过本次

@@ -38,14 +38,14 @@ test('sendStartNotice:不再联网预览挑战与余额,取数抛错也照样发
 test('sendSkipNotice:当天已发过就不再发;dry-run 每次都发', async () => {
     const seen = []
     const res = await sendSkipNotice({
-        cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', reason: 'before-shutdown', dryRun: false,
+        cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', reason: 'credential-invalid', dryRun: false,
         notifyOnce: (dir, key, date) => { seen.push([key, date]); return false }
     })
     assert.deepEqual(res, { ok: true, skipped: true })
-    assert.deepEqual(seen, [['before-shutdown', '2026-10-02']])
+    assert.deepEqual(seen, [['credential-invalid', '2026-10-02']])
 
     const dry = await sendSkipNotice({
-        cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', reason: 'before-shutdown', dryRun: true,
+        cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', reason: 'credential-invalid', dryRun: true,
         notifyOnce: () => { throw new Error('dry-run 不该消耗额度') }
     })
     assert.equal(dry.ok, true)
@@ -70,8 +70,8 @@ test('sendSkipNotice:正常跳过只记运行日志,不推送也不消耗额度'
     }
 })
 
-test('sendSkipNotice:有风险的跳过照旧推送', async () => {
-    for (const reason of ['low-memory', 'attempts-exhausted', 'before-shutdown', 'paused']) {
+test('sendSkipNotice:需要你处理的两类照旧推送', async () => {
+    for (const reason of ['credential-invalid', 'stats-unavailable']) {
         const sent = []
         const res = await sendSkipNotice({
             cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', reason, dryRun: false,
@@ -89,10 +89,10 @@ test('sendSkipNotice:当天首次时发一条不带圆括号的说明', async ()
     const sent = []
     const res = await sendSkipNotice({
         cwd: CWD, config: CONFIG, plan: null, date: '2026-10-02', accountName: 'TestReader',
-        reason: 'low-memory', detail: '812MB', dryRun: false, notifyOnce: () => true,
+        reason: 'stats-unavailable', detail: 'HTTP 503', dryRun: false, notifyOnce: () => true,
         send: async text => { sent.push(text); return { ok: true } }
     })
     assert.equal(res.ok, true)
-    assert.match(sent[0], /原因:可用内存不足 · 812MB/)
+    assert.match(sent[0], /原因:读不到官方阅读统计 · HTTP 503/)
     assert.doesNotMatch(sent[0], /[()]/)
 })
