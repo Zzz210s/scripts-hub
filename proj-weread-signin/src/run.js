@@ -221,6 +221,9 @@ export async function runOnce(options = {}) {
         failures: parsed.failures,
         outcome,
         credited: after > before,
+        // 这次运行内跑了几个会话、为什么停(达标 / 配额用尽 / 底座失败 / 统计读不到)
+        sessions,
+        stopReason,
         credential: { ok: credential.ok, renewed: credential.renewed, changed: credential.changed },
         welfare: welfareRecord(welfare),
         weekly: weeklyRecord(weekly),
