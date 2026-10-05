@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# 宿主侧入口:一条命令跑服务器体检(工具在容器里,宿主什么都不用装)。
+#
+#   suite-check            # 四项全跑
+#   suite-check drift|privacy|units|backup
+#
+# 需要 ~/scripts-hub 是 scripts-hub 的克隆(体检工具本体),克隆命令:
+#   gh repo clone Zzz210s/scripts-hub ~/scripts-hub
+set -uo pipefail
+SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
+if [ ! -d "$HOME/scripts-hub/scripts" ]; then
+    echo "[失败] 缺少 $HOME/scripts-hub —— 先跑:gh repo clone Zzz210s/scripts-hub ~/scripts-hub" >&2
+    exit 2
+fi
+exec docker compose -f "$SUITE_DIR/compose.yaml" run --rm -T suite-check "$@"

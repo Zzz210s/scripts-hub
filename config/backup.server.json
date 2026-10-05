@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "why": "服务器侧清单:这台云主机上的自动化数据现在才是权威副本(本机只剩代码与凭据)。config/backup.json 的 sets 是给 Windows 本机用的,路径都是 ~/AppData、%REWARDS_DIR% 之类;在服务器上跑要用这份。用法:node scripts/backup.mjs --config=config/backup.server.json --dry-run",
+  "placeholders": {
+    "known": ["SUITE_DIR", "HOME_DIR"],
+    "note": "服务器上路径固定,占位符只是为了让清单与 config/backup.json 同形;展开值由 ~/.config/automation-suite/local-paths.env 提供"
+  },
+  "restic": {
+    "tag": "tencent-vm",
+    "repository": "",
+    "passwordFile": "",
+    "note": "留空是有意的:没配仓库与密码时 --apply 会拒绝执行(见 docs/infrastructure.md)。要真推,先定备份目标再填,或走 --pull 由本机拉。"
+  },
+  "excludeDirs": ["node_modules", ".git", "logs", "previous-run.log"],
+  "prepare": [],
+  "sets": [
+    {
+      "id": "suite-credentials",
+      "priority": "critical",
+      "why": "容器跑起来需要的真实凭据:账号密码、登录态数据库、企业微信 webhook、Epic/微信读书 token。丢了要重新登录或重新抓 cURL。",
+      "paths": [
+        "%SUITE_DIR%/rewards/.env",
+        "%SUITE_DIR%/rewards/sessions",
+        "%SUITE_DIR%/rewards/config",
+        "%SUITE_DIR%/rewards/wechat-bridge/data",
+        "%SUITE_DIR%/weread/.env",
+        "%SUITE_DIR%/weread/secrets",
+        "%SUITE_DIR%/weread/data",
+        "%SUITE_DIR%/epic/secrets",
+        "%SUITE_DIR%/epic/data"
+      ]
+    },
+    {
+      "id": "suite-config",
+      "priority": "normal",
+      "why": "编排与容器定义(compose、suite.env、run-all、三个 run.sh、systemd unit)。内容都在 scripts-hub 里,这里是运行副本,恢复时按 docs/docker-deployment.md 重铺即可。",
+      "paths": ["%SUITE_DIR%/compose.yaml", "%SUITE_DIR%/suite.env", "%SUITE_DIR%/run-all.sh", "%SUITE_DIR%/alert-fail.mjs"]
+    },
+    {
+      "id": "pi-on-server",
+      "priority": "normal",
+      "why": "服务器上也跑 pi,凭据与配置在 ~/.pi/agent(模型密钥、mcp、settings)。丢了要重新填密钥。",
+      "paths": ["%HOME_DIR%/.pi/agent/auth.json", "%HOME_DIR%/.pi/agent/settings.json", "%HOME_DIR%/.pi/agent/mcp.json", "%HOME_DIR%/.config/gh/hosts.yml"]
+    },
+    {
+      "id": "suite-check-config",
+      "priority": "normal",
+      "why": "体检工具自己的私有配置(个人标识清单、路径展开表),不在仓库里。",
+      "paths": ["%HOME_DIR%/.config/automation-suite"]
+    },
+    {
+      "id": "scripts-hub-clone",
+      "priority": "optional",
+      "why": "体检用的仓库克隆。有 GitHub 远端,可重新克隆,所以默认跳过(--include-optional 才收)。",
+      "optional": true,
+      "paths": ["%HOME_DIR%/scripts-hub"]
+    }
+  ]
+}

@@ -55,6 +55,29 @@ services:
       - no-new-privileges:true
     mem_limit: 800m
 
+  # 服务器侧体检工具(按需跑,非常驻):scripts-hub 的四个纯 Node 模块
+  # 镜像里只有 node + git + restic;仓库本体留在宿主挂进来,更新工具只要 git pull
+  suite-check:
+    image: automation-suite-check:local
+    container_name: suite-check
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/suite-check/entrypoint.sh"]
+    environment:
+      TZ: Asia/Shanghai
+      REPO_DIR: /repo
+      PRIVATE_DIR: /private
+      SUITE_DIR: /data
+      SENSITIVE_PATTERNS_FILE: /private/sensitive-patterns.txt
+      AUTOMATION_LOCAL_PATHS: /private/local-paths.env
+    volumes:
+      - ${HOME}/scripts-hub:/repo:ro
+      - ${HOME}/.config/automation-suite:/private:ro
+      - /srv/apps/automation:/data:ro
+      - /etc/systemd/system:/etc/systemd/system:ro
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+
   epic-run:
     image: automation-epic:local
     container_name: epic-run
