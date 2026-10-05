@@ -42,7 +42,9 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ./weread/.env:/opt/weread/.env:ro
-      - ./weread/config.yaml:/opt/weread/config.yaml
+      # config.yaml 以"模板"形式只读挂进来,由 run-once.sh 复制到容器可写层再用 ——
+      # 直接挂成 /opt/weread/config.yaml 的话,程序改配置时的 tmp+rename 会 EBUSY(2026-10-05 踩到)
+      - ./weread/config.yaml:/opt/weread/config.template.yaml:ro
       - ./weread/secrets:/opt/weread/secrets
       - ./weread/data:/opt/weread/data
       - ./weread/logs:/opt/weread/logs

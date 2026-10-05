@@ -161,6 +161,8 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 | 看门狗超时后容器还在跑 | `docker rm -f rewards-run` 删不掉 `compose run` 的一次性容器(真名是 `automation-rewards-run-run-<hash>`) | 按标签删:`docker ps -aq --filter "label=com.docker.compose.service=rewards-run" \| xargs -r docker rm -f` |
 | 底座报「缺少依赖: PyYAML, requests, httpx」 | venv 用 `ln -s /opt/venv/bin/python /usr/local/bin/python` 暴露:符号链让 Python 把 `sys.executable` 解析成 `/usr/bin/python3`,找不到 `pyvenv.cfg` → 看不到 venv 的 site-packages | 改用 `ENV PATH="/opt/venv/bin:$PATH"`(并加 `/etc/profile.d/venv.sh` 兜住登录 shell) |
 | 子命令(status/plan/auth)跑了却像在跑 `run` | 服务的 entrypoint 是 `run-once.sh`,后面跟的命令被忽略 | 显式 `--entrypoint node` |
+| **当天第一次真跑,退出码 1,企业微信里一条消息都没有** | `config.yaml` 以**文件**形式 bind mount 到容器里,而程序改配置的写法是「写 .tmp 再 rename 覆盖」—— rename 覆盖一个挂载点必然 EBUSY(2026-10-05 实测:1 秒内退出,`执行失败:EBUSY: resource busy or locked, rename '/opt/weread/config.yaml.tmp' -> '/opt/weread/config.yaml'`) | 挂成模板:`./weread/config.yaml:/opt/weread/config.template.yaml:ro`,由 `run-once.sh` 复制到容器可写层再用(补丁只影响本次运行,不需要落回宿主) |
+| 崩溃时完全静默(只能靠"今天没消息"发现) | 程序死在发消息之前,result 消息根本没机会生成 | 两个运行器都加兜底:`alert-fail.mjs` —— 退出码非 0 **且**日志里从未出现「企业微信」时,补一条「需要你处理」提醒(出现过说明程序至少试过发送,不重复打扰) |
 
 ## 8. 本机怎么办
 

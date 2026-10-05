@@ -125,4 +125,9 @@ fi
 
 # ---- 结束通知(解析本次日志;通知失败不影响退出码) ----
 node "$ROOT/wechat-bridge/notify-run.js" "$LOG" >> "$LOG" 2>&1
+
+# 崩在发消息之前 = 企业微信里什么都没有,人只能靠"今天没消息"猜。补一条兜底提醒。
+if [ "$FAIL" -ne 0 ] && ! grep -q "企业微信" "$LOG"; then
+    node "$SUITE_DIR/alert-fail.mjs" "微软积分" "退出码 $CODE" "$LOG" >> "$RLOG" 2>&1
+fi
 exit "$CODE"

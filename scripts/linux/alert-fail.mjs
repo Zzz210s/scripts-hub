@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+/**
+ * 宿主侧"运行崩了、一条消息都没发出去"的兜底提醒。
+ *
+ * 为什么需要:程序崩溃时会死在发消息之前(2026-10-05 实测:微信读书因为 config.yaml
+ * 的挂载方式报 EBUSY,1 秒内退出,企业微信里什么也没有 —— 人只能靠"今天没消息"猜)。
+ * 运行器检测到「退出码非 0 且日志里根本没出现过企业微信」时调这个脚本,补一条提醒。
+ *
+ * 用法:node alert-fail.mjs <程序名> <原因> [日志文件]
+ *   例:node alert-fail.mjs 微信读书签到 "退出码 1" /srv/apps/automation/weread/logs/last-run.log
+ */
+import fs from 'node:fs'
+
+const [program = '自动化程序', reason = '未知', logFile] = process.argv.slice(2)
+const webhookFiles = {
+    微软积分: '/srv/apps/automation/rewards/wechat-bridge/data/wecom-webhook.txt',
+    微信读书签到: '/srv/apps/automation/weread/secrets/wecom-webhook.txt'
+}
+const webhookFile = webhookFiles[program]
+
+const tail = logFile && fs.existsSync(logFile)
+    ? fs.readFileSync(logFile, 'utf8').trim().split(/\r?\n/).slice(-6).join('\n').slice(-600)
+    : '(没有日志)'
+
+const text = [
+    `${program} · ${new Date().toLocaleDateString('sv-SE')} · 需要你处理`,
+    '',
+    `请你:看服务器上 ${logFile ?? '对应日志'} 的尾部,再跑一次确认`,
+    `原因:运行在发出任何消息之前就退出了 · ${reason}`,
+    '不处理的后果:今天这一次等于没跑,而且不会有任何推送 —— 这正是这条兜底提醒要补上的',
+    '',
+    '日志尾部:',
+    tail
+].join('\n')
+
+if (!webhookFile || !fs.existsSync(webhookFile)) {
+    console.error(`未找到 webhook 文件:${webhookFile ?? '(未知程序)'}`)
+    process.exit(1)
+}
+
+const response = await fetch(webhookFile.startsWith('http') ? webhookFile : fs.readFileSync(webhookFile, 'utf8').trim(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ msgtype: 'text', text: { content: text } })
+})
+console.log(response.ok ? `${program}:兜底提醒已发送` : `${program}:兜底提醒发送失败(HTTP ${response.status})`)
+process.exit(response.ok ? 0 : 1)

@@ -49,4 +49,10 @@ kill "$WDPID" 2>/dev/null
 wait "$WDPID" 2>/dev/null
 
 note "=== weread run finished, exit code $CODE ==="
+
+# 崩在发消息之前 = 企业微信里什么都没有,人只能靠"今天没消息"猜。补一条兜底提醒。
+# 判据:退出码非 0,且日志里连"企业微信"都没出现过(出现过说明程序至少试过发送)。
+if [ "$CODE" -ne 0 ] && ! grep -q "企业微信" "$LOG"; then
+    node "$SUITE_DIR/alert-fail.mjs" "微信读书签到" "退出码 $CODE" "$LOG" >> "$RLOG" 2>&1
+fi
 exit "$CODE"
