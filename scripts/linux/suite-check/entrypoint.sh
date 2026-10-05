@@ -63,19 +63,38 @@ run_units() {
         bad "生成 unit 失败"
         return
     fi
-    # 生成物落在 <dest>/systemd/ 下(见 apply-schedule.mjs 的 --help)
+    # 生成物落在 <dest>/systemd/ 下(见 apply-schedule.mjs 的 --help)。
+    # 比两件事:
+    #   1) 仓库里的权威 unit(scripts/linux/systemd/)对比 /etc/systemd/system/ 里现装的 —— 这才是真漂移
+    #   2) 仓库权威 unit 与 config/schedule.json 渲染出来的 —— 保证"约定"与"权威实现"没分叉
     for f in automation-suite.timer automation-suite.service; do
-        if [ ! -f "$dest/systemd/$f" ]; then
-            bad "生成物里没有 systemd/$f"
+        authority="$REPO/scripts/linux/systemd/$f"
+        generated="$dest/systemd/$f"
+        installed="/etc/systemd/system/$f"
+
+        if [ ! -f "$authority" ]; then
+            bad "仓库里没有权威 unit:scripts/linux/systemd/$f"
             continue
         fi
-        if [ ! -f "/etc/systemd/system/$f" ]; then
-            bad "/etc/systemd/system/$f 不存在(还没安装?)"
-        elif diff -q "$dest/systemd/$f" "/etc/systemd/system/$f" >/dev/null; then
-            ok "$f 与仓库生成的一致"
+        if [ ! -f "$installed" ]; then
+            bad "$installed 不存在(还没安装?见 scripts/linux/README.md 第 5 步)"
+        elif diff -q "$authority" "$installed" >/dev/null; then
+            ok "$f:已安装的与仓库权威一致"
         else
-            bad "$f 与仓库生成的不一致"
-            diff -u "$dest/systemd/$f" "/etc/systemd/system/$f" | sed 's/^/    /' | head -20
+            bad "$f:已安装的与仓库权威不一致(重装:sudo cp 仓库里的 scripts/linux/systemd/$f /etc/systemd/system/ 后 daemon-reload)"
+            diff -u "$authority" "$installed" | sed 's/^/    /' | head -20
+        fi
+
+        # 只比功能性行:注释、Description、Documentation 是文档,不是行为 ——
+        # 权威版手写了更具体的描述与文档链接,渲染器给的是通用文案,两者本就不该相等。
+        if [ -f "$generated" ]; then
+            strip() { grep -vE '^#|^Description=|^Documentation=' "$1"; }
+            if ! diff -q <(strip "$authority") <(strip "$generated") >/dev/null; then
+                bad "$f:仓库权威与 config/schedule.json 渲染出来的**行为**不一致(约定与实现分叉)"
+                diff -u <(strip "$authority") <(strip "$generated") | sed 's/^/    /' | head -12
+            else
+                ok "$f:仓库权威与 config/schedule.json 渲染出来的行为一致"
+            fi
         fi
     done
 }
