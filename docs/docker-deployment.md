@@ -278,6 +278,35 @@ docker builder prune -f                # 清(不影响镜像,只让下次重建�
 BBR 生效的验证:`ss -tin state established` 里能看到用 `bbr` 的连接;注意**入向**连接显示的是对端的算法,
 要看本机作发送方的那条。
 
+## 7.7 VS Code 远端服务的内存(2026-10-05 实测)
+
+这台上真正吃内存的是**编辑器的扩展宿主**,不是自动化:
+
+| 进程 | 实测 |
+| --- | --- |
+| 扩展宿主(`VSCODE_EXTHOST_WILL_SEND_SOCKET=1`) | **1.78 GB RSS + 2.59 GB swap**,14 线程;两小时内从 1.34 GB 长到 1.78 GB |
+| VS Code 全部 13 个进程 | 合计 1765 MB RSS |
+| 用户 slice(`user-1000.slice`) | ~2.15 GB(编辑器 + pi + shell) |
+| 自动化 | 常驻 0(一次性容器);跑批峰值 1.6-2.6 GB |
+
+远端只装了 2 个扩展(containers + 中文包),没有 TS 语言服务 —— 所以 1.78 GB 属于**累积**而不是某个扩展本身。
+
+**内存账算不平**:跑批峰值 2.6 GB + 编辑器 2.1 GB + 系统 0.5 GB = 5.2 GB,而机器只有 3.7 GB。所以
+微软积分运行器自带的内存闸门(`REWARDS_MIN_FREE_MB=1200`)才是实际的保护 —— 编辑器占着内存时,那次跑批会
+**跳过**(当天还有 12:00 兜底与 `Persistent=true` 补跑)。今早 08:00 实测 `free 2806MB`,闸门没拦。
+
+已做的两件事:
+
+1. `user-1000.slice` 加 `MemoryHigh=2G`(`/etc/systemd/system/user-1000.slice.d/10-memory.conf`):
+   超了就压它(回收/放慢),不杀进程。自动化是 **system** 服务,不在这个 slice 里,不受影响。
+   写入时该 slice 已到 2.15 GB —— 正好卡在上限。
+2. 远端 settings 关掉后台churn:`telemetry.telemetryLevel=off`、`extensions.autoUpdate/autoCheckUpdates=false`、
+   `remote.autoForwardPorts=false`、`update.mode=none`;搜索/监听排除 19 条(见 7.6)。
+
+其余可选项:重启远端服务(`Remote-SSH: Kill VS Code Server on Host`,立即回收 ~1.8 GB,窗口会重连)、
+不用时禁用 containers 扩展(它在轮询 docker socket)、收窄工作区根(现在是 `/`,排除项只是缓解)、
+试 `NODE_OPTIONS=--max-old-space-size=1024`(需实测远端服务是否尊重它)。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,
