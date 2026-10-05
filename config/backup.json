@@ -1,19 +1,28 @@
 {
-  "version": 1,
-  "why": "本机异地备份清单。为什么不能靠 GitHub 与现有 bare 镜像兜底,见 docs/infrastructure.md。",
+  "version": 2,
+  "why": "多机异地备份清单:一台上位本机(Windows),一台腾讯云主机(跑微软积分与微信读书签到)。为什么不能靠 GitHub 与现有 bare 镜像兜底,见 docs/infrastructure.md。",
   "placeholders": {
-    "note": "路径里的 %NAME% 从环境变量或机器私有的 ~/.config/automation-suite/local-paths.env 展开(与 scripts/lib/schedule-targets.mjs 同一套);~ 展开为家目录。这一步故意不写死盘符:仓库是公开的。",
-    "known": ["USERPROFILE", "NOTES_DIR", "WEREAD_SIGNIN_DIR", "REWARDS_DIR", "HOME_AUTOMATION_CONFIGS_DIR", "EPIC_DIR"]
+    "note": "路径里的 %NAME% 从环境变量或机器私有的 ~/.config/automation-suite/local-paths.env 展开(与 scripts/lib/schedule-targets.mjs 同一套);~ 展开为家目录。这一步故意不写死盘符与主机地址:仓库是公开的。",
+    "known": ["USERPROFILE", "NOTES_DIR", "WEREAD_SIGNIN_DIR", "REWARDS_DIR", "HOME_AUTOMATION_CONFIGS_DIR", "EPIC_DIR", "BACKUP_REMOTE_SSH"]
   },
   "restic": {
     "tag": "elevens-machine",
     "repository": "",
     "passwordFile": "",
-    "note": "两项留空时用环境变量 RESTIC_REPOSITORY / RESTIC_PASSWORD_FILE;都为空则 --apply 拒绝执行(见 docs/infrastructure.md 待决策项)。"
+    "note": "两项留空时用环境变量 RESTIC_REPOSITORY / RESTIC_PASSWORD_FILE;都为空则 --apply 拒绝执行(见 docs/infrastructure.md 待决策项)。每台机器一个仓库或一个 tag,不要共用同一个快照命名空间。"
   },
   "excludeDirs": [
     ".capture",
     ".sessions-trash-20260903"
+  ],
+  "prepare": [
+    {
+      "id": "context-db",
+      "kind": "sqlite-vacuum",
+      "source": "~/.local/share/cortexkit/magic-context/context.db",
+      "target": "~/.local/share/automation-suite/backup-staging/context.db",
+      "why": "magic-context 的活库带 WAL,热拷贝可能不一致;先 VACUUM INTO 一份一致快照再交给 restic(见 docs/infrastructure.md 决策项 6)。快照路径在下面 agent-memory 集合里。"
+    }
   ],
   "sets": [
     {
@@ -37,37 +46,43 @@
         "%WEREAD_SIGNIN_DIR%/secrets",
         "%REWARDS_DIR%/.env",
         "%HOME_AUTOMATION_CONFIGS_DIR%/proj-epic-free-games/secrets"
-      ]
+      ],
+      "excludePaths": ["~/.config/automation-suite/restic-password", "~/.config/automation-suite/backup-staging"]
     },
     {
       "id": "agent-memory",
       "priority": "critical",
-      "why": "AI 会话与项目记忆:只在本机,没有任何远端副本(magic-context 的 context.db 也在内)",
+      "why": "AI 会话与项目记忆:只在本机,没有任何远端副本。context.db 用 VACUUM INTO 快照(见 prepare),活库与 WAL 不直接进备份",
       "paths": [
         "~/.pi/agent/sessions",
         "~/.pi/agent/sessions-trash",
         "~/.local/share/cortexkit",
-        "~/.ai-brief-hub",
-        "~/.ai-sessions"
+        "~/.local/share/automation-suite/backup-staging",
+        "~/.ai-brief-hub"
+      ],
+      "excludePaths": [
+        "~/.local/share/cortexkit/magic-context/context.db",
+        "~/.local/share/cortexkit/magic-context/context.db-wal",
+        "~/.local/share/cortexkit/magic-context/context.db-shm"
       ]
     },
     {
       "id": "notes",
       "priority": "critical",
-      "why": "笔记库:远端 Zzz210s/note 是 public 且落后本地若干提交,不能当备份",
+      "why": "笔记库:远端 Zzz210s/note 是 public 且与本地分叉(26 未推 / 23 未拉),不能当备份",
       "paths": ["%NOTES_DIR%"]
     },
     {
       "id": "workspaces",
       "priority": "critical",
-      "why": "两个权威工作区:没有 origin,本地是唯一一份完整历史与运行数据",
+      "why": "两个权威工作区:没有 origin,本地是唯一一份完整历史与运行数据;云上那台的数据是从这里部署出去的",
       "paths": ["%WEREAD_SIGNIN_DIR%", "%REWARDS_DIR%"],
       "excludePaths": ["%WEREAD_SIGNIN_DIR%/.capture"]
     },
     {
       "id": "repos",
       "priority": "normal",
-      "why": "本机仓库克隆:GitHub 上有远端,但 ai-session-hub 存在未推提交",
+      "why": "本机仓库克隆:GitHub 上有远端,但 ai-session-hub 等存在未推提交",
       "paths": [
         "~/config-ai",
         "~/ai-route",
@@ -76,13 +91,78 @@
         "~/pi-codegraph",
         "%HOME_AUTOMATION_CONFIGS_DIR%"
       ]
-    },
-    {
-      "id": "weread-capture",
-      "priority": "low",
-      "optional": true,
-      "why": "微信读书接口逆向的抓取产物(约 600MB,gitignore 内)。想留就加 --include-optional",
-      "paths": ["%WEREAD_SIGNIN_DIR%/.capture"]
     }
-  ]
+  ],
+  "remote": {
+    "id": "tencent-vm",
+    "label": "腾讯云主机(自动化套件生产机)",
+    "ssh": "%BACKUP_REMOTE_SSH%",
+    "root": "/srv/apps/automation",
+    "modes": {
+      "run-on-remote": {
+        "summary": "在云主机上装 restic,把 /srv/apps/automation 推到云外的仓库(COS / R2 / B2 / 另一台机器)",
+        "pro": "不依赖本机在线;云主机 7x24,可交给 systemd timer;数据不经本机中转",
+        "con": "要在云主机上多装一个二进制并放仓库凭据;云主机被攻破时凭据也在同一台机器上"
+      },
+      "pull-over-ssh": {
+        "summary": "从本机 SSH 把云上目录拉到本地暂存,再由本机 restic 推走(本脚本默认就是这条)",
+        "pro": "云主机保持最小,不装 restic、不放仓库凭据;备份任务集中在本机,一处可审计",
+        "con": "要求本机在线且 SSH 可达;每次拉 sessions.db 等约 25MB"
+      }
+    },
+    "note": "路径相对 root 展开;以 / 开头的是绝对路径。默认 --dry-run 只列出计划,加 --remote 才通过 SSH 只读枚举体积,加 --pull 才打印(或配合 --apply 执行)rsync 拉取命令。",
+    "excludeDirs": ["node_modules", "__pycache__", ".venv", "venv", "ms-playwright", ".cache", "logs", "src/vendor"],
+    "sets": [
+      {
+        "id": "cloud-credentials",
+        "priority": "critical",
+        "why": "云上凭据:微信读书 .env 与 secrets、微软积分 .env、企业微信 webhook。仓库里都没有",
+        "paths": [
+          "rewards/.env",
+          "weread/.env",
+          "weread/secrets",
+          "rewards/wechat-bridge/data/wecom-webhook.txt",
+          "/etc/systemd/system/automation-suite.service",
+          "/etc/systemd/system/automation-suite.timer"
+        ]
+      },
+      {
+        "id": "cloud-state",
+        "priority": "critical",
+        "why": "云上运行状态与登录态:补登录比重跑贵得多,points-history 是唯一的历史记录",
+        "paths": [
+          "rewards/sessions",
+          "rewards/config",
+          "rewards/wechat-bridge/data",
+          "weread/data",
+          "weread/config.yaml"
+        ]
+      },
+      {
+        "id": "cloud-code",
+        "priority": "normal",
+        "why": "云上部署的代码/编排/镜像定义:多数可从本机工作区与 scripts-hub 重建,留一份省得重配(镜像本身不备,vendor/Chromium 不备)",
+        "paths": [
+          "compose.yaml",
+          "run-all.sh",
+          "suite.env",
+          "systemd",
+          "rewards/run.sh",
+          "rewards/deploy",
+          "rewards/src/src",
+          "rewards/src/scripts",
+          "rewards/src/Dockerfile",
+          "rewards/src/package.json",
+          "rewards/src/package-lock.json",
+          "rewards/src/config.example.json",
+          "weread/run.sh",
+          "weread/deploy",
+          "weread/src",
+          "weread/vendor",
+          "weread/Dockerfile",
+          "weread/package.json"
+        ]
+      }
+    ]
+  }
 }

@@ -10,7 +10,7 @@
 
 | 方向 | 结论 | 状态 |
 | --- | --- | --- |
-| 备份 | 用 **restic**,目标先落**腾讯云主机**(SFTP),清单与脚本已就绪 | 脚本已做并实测,目标待定 |
+| 备份 | 用 **restic**,清单已升级为**多来源**(本机 + 腾讯云主机),目标建议**跨 provider 对象存储** | 脚本已做并实测,目标待定 |
 | 通知中间层 | **不动**现有三份企业微信实现;apprise 只用于新基础设施的告警 | 已评估,不改代码 |
 | 更新 | **topgrade 已装**,但要配收窄配置,不能裸跑 | 已装 + 配置模板已实测 |
 | 监控 | 建议放**云主机的 docker compose**,不在本机起容器 | 只出方案,不实施 |
@@ -63,52 +63,94 @@
 
 **组合**:restic 做快照与加密,rclone 只作为可能的云后端(rclone 已装,目前没有任何 remote)。
 
-### 1.4 目标位置选项
+### 1.4 拓扑:现在到底跑在哪(2026-10-05 只读核实)
 
-| 选项 | 成本 | 风险 | 备注 |
+备份目标必须先看拓扑,否则很容易把「源」和「备份」放进同一个故障域。实测:
+
+| 程序/资产 | 跑在哪 | 数据(状态/凭据/日志)在哪 | 谁是权威 | 本机(Windows)是否还参与 |
+| --- | --- | --- | --- | --- |
+| 微软积分 | 腾讯云主机 `62.234.211.51`(Ubuntu 26.04 / 2C4G / 59G 盘)的一次性容器,由 `automation-suite.timer` 08:00 与 12:00 触发 | `/srv/apps/automation/rewards/{.env,config,sessions,wechat-bridge/data,logs}` | **云主机**(`sessions.db` 是登录态,`points-history.json` 是唯一历史) | **否**:本机计划任务 `MicrosoftRewardsScript` 已不存在 |
+| 微信读书签到 | 同上,同一个 timer,整轮由 `run-all.sh` 顺序触发 | `/srv/apps/automation/weread/{.env,secrets,data,logs}` | **云主机**(`data/state.json`、`history.json`) | **否**:`WeReadSignIn` 任务已不存在 |
+| 本机工作区 `E:/weread-signin`、`E:/Microsoft-Rewards-Script-4.3.2` | 本机(代码与部署源,目前不再被计划任务调用) | 各自 `.git` 与 logs(最后一次本地运行 2026-10-04) | 本机(唯一完整历史,无 origin) | 是,但只作为代码来源与备份源 |
+| Epic 限免 | 本机按需(`EpicFreeGames` 任务当前未注册) | `proj-epic-free-games/secrets` | 本机 | 是 |
+| 凭据/会话/记忆/笔记 | 本机 | 见 1.1 表 | 本机 | 是 |
+
+要点:**签到类程序的权威数据已整体搬到云主机**,本机 Windows 只剩代码、凭据与 AI 资产。
+所以「备份本机」和「备份云主机」是两件事,不能混成一份清单。
+
+### 1.4a 目标位置选项
+
+核心原则:**跨机器,最好跨 provider**。把云主机备份回它自己(或同账号同区域的另一台)不构成
+异地副本 —— 账号欠费/被盗、区域故障、误删会同时带走源与备份。
+
+| 选项 | 成本 | 跨故障域? | 备注 |
 | --- | --- | --- | --- |
-| **腾讯云主机 SFTP**(已有,地址见 `~/.ssh/config`) | 0(已付费) | 单点云主机,但已在异地;盘剩 50GB,放 2GB 上下的快照够用 | **推荐先落这里**。restic 支持 `sftp:` 后端,只要放一个 `restic serve`/SFTP 目录 |
-| rclone 云盘(OneDrive / 对象存储) | 免费额度或几元/月 | 需要 OAuth 配置;免费额度有 API 限流 | 次选,适合当第二份 |
-| 移动硬盘 / U 盘 | 一次性买盘(¥100-300) | 需要人记得插;不插就没有 | 适合做「离线第三份」 |
-| 第二个 git 远端(私有仓) | 0 | 只覆盖 git 仓库;会话与凭据进不去 | 只解决 `ai-session-hub` 那 11 个未推提交,不是备份方案 |
-| NAS | 需要买设备 | 一次性投入最高 | 不必要 |
+| **跨 provider 对象存储**(Cloudflare R2 免费 10GB / Backblaze B2 免费 10GB,均支持 S3 协议) | 0(额度内)或几元/月 | 是(与腾讯云不同账号) | **首选**。restic 原生 `s3:` 后端;两台机器各推一个仓库或各用一个 tag |
+| 腾讯云 COS(对象存储,S3 兼容) | 约 ¥0.1/GB·月 | 否(同账号) | 次选。比放云主机本机强(不在同一块盘、不在同一台机器),但账号级故障仍会一起带走 |
+| 本机 Windows 硬盘 + 移动硬盘/U 盘 | 一次性(¥100-300) | 对云主机是跨机;对本机不是 | 适合当**离线第三份**;`restic` 可对本地目录做仓库,移动盘记得插 |
+| 自建 SFTP(另一台 VPS / NAS) | 已有或一次性 | 是 | 可行,但要自己维护那台机器 |
 
-**注意:不要选 D:、E:、F: 上的任何位置** —— 它们与 C: 同盘。
+**不要选**:云主机自己的盘(源与备份同机);同账号同区域的另一台云主机(帮助有限);D:/E:/F:(与 C: 同一块 NVMe 的虚拟盘);`Zzz210s/note`(public 且与本地分叉,见 1.1)。
+
+**按机器分开备份**(两份清单,不要合并):
+
+- **腾讯云主机 `62.234.211.51`**:`rewards/{.env,sessions,config,wechat-bridge/data}`、`weread/{.env,secrets,data,config.yaml}`、systemd 单元;代码可从本机重建,`src/vendor` 与镜像不备。合计约 **25MB**。
+- **本机 Windows**:`credentials` / `agent-memory`(pi 会话 + `VACUUM INTO` 后的 magic-context)/ `notes`(`F:/0-Note`)/ `workspaces`(`E:` 两个工作区,去掉 `.capture`)/ `repos`。合计约 **1.1GB**。
+- **不备**:`.capture`(621MB 逆向产物)、`~/.ai-sessions`(71MB 心跳,可重建)、`rewards/src/vendor`(115MB Chromium,可重下)、两边的 `logs`(ephemeral)。
+
+### 1.4b 云主机那组:两种模式
+
+| 模式 | 怎么做 | 好处 | 代价 |
+| --- | --- | --- | --- |
+| **run-on-remote** | 在云主机装 restic,把 `/srv/apps/automation` 推到云外仓库(COS/R2/B2),交给 systemd timer | 不依赖本机在线;云主机 7x24;数据不经本机中转 | 云主机上多一个二进制与一份仓库凭据;云主机被攻破时凭据同机 |
+| **pull-over-ssh**(脚本默认支持这条) | 从本机 `rsync` 把云上目录拉到本机暂存,再由本机 restic 推走 | 云主机保持最小,不装 restic、不放仓库凭据;备份任务集中在一处可审计 | 要求本机在线且 SSH 可达;每次拉约 25MB(含 20MB `sessions.db`) |
+
+两者不互斥:可以先用 pull-over-ssh 起步,稳定后再把 run-on-remote 当第二份。
 
 ### 1.5 已经做掉的
 
-- `config/backup.json` —— 清单:6 个集合(`credentials` / `agent-memory` / `notes` /
-  `workspaces` / `repos` / `weread-capture`),每项写清「为什么它需要被备份」。
+- `config/backup.json`(version 2)—— **多来源清单**:本机 `sets`(5 个集合:`credentials` /
+  `agent-memory` / `notes` / `workspaces` / `repos`)+ `remote` 段(云主机 3 个集合:
+  `cloud-credentials` / `cloud-state` / `cloud-code`)。每项写清「为什么它需要被备份」。
   排除项按目录名走:`.capture`、`node_modules`、`.venv`、`__pycache__`、`.codegraph`、
   `ms-playwright`、`logs`、`tmp`、`.cache` 等。
-- `scripts/backup.mjs` + `scripts/lib/backup.mjs` —— 枚举与执行。**默认 `--dry-run`**,
-  不需要 restic 也不需要 `npm install`;`--apply` 在没有仓库参数时**故意拒绝执行**。
+- `prepare` 段:`context.db` 先 `VACUUM INTO` 到 `~/.local/share/automation-suite/backup-staging/`
+  再进 `agent-memory`;活库与 `-wal`/`-shm` 不直接进备份。
+- `scripts/backup.mjs` + `scripts/lib/backup.mjs` + `scripts/lib/backup-remote.mjs` +
+  `scripts/lib/backup-prepare.mjs` —— 枚举与执行。**默认 `--dry-run`**:不装 restic 也能跑,
+  不加 `--remote` 就**不连任何远端**;`--apply` 在没有仓库参数时**故意拒绝执行**(且在写盘之前就拦下)。
 
 ```bash
-node scripts/backup.mjs                 # 枚举会备份什么(已实测)
-node scripts/backup.mjs --list          # 看有哪些集合
+node scripts/backup.mjs                 # 枚举本机会备份什么(已实测)
+node scripts/backup.mjs --list          # 看本机 + 云上的集合
 node scripts/backup.mjs --json          # 机器可读
-node scripts/backup.mjs --set=notes     # 只看一个集合
-node scripts/backup.mjs --strict        # 有缺失就退出 1
+node scripts/backup.mjs --set=notes     # 只看一个本机集合
+node scripts/backup.mjs --strict        # 本机有路径缺失就退出 1
+node scripts/backup.mjs --remote        # 只读 SSH 枚举云上体积(实测可用)
+node scripts/backup.mjs --prepare       # 只跑 VACUUM INTO 快照(实测:198MB)
+node scripts/backup.mjs --pull          # 只打印从云上拉取的 rsync 命令
+node scripts/backup.mjs --pull --apply  # 真拉 + 真推(需 restic 仓库参数)
 ```
 
-实测输出:`29/30 个来源存在,约 2.04 万个文件,1.7GB,1 个缺失`。缺失的是
-`proj-epic-free-games/secrets/`(还没建)。
-清单里的路径不写死盘符:`%NAME%` 从环境变量或机器私有的 `~/.config/automation-suite/local-paths.env`
-展开(`NOTES_DIR` 是本轮新增的键),所以仓库里不会出现本机绝对路径。
+实测(2026-10-05):本机 `29/30 个来源存在,约 2 万个文件,1.1GB,1 个缺失`(缺
+`proj-epic-free-games/secrets/`);云上 `29/29 个来源存在,约 5MB 快照量级 + 20MB sessions.db`。
+路径与主机地址都不写死:本机盘符走 `%NAME%` 占位符(如 `NOTES_DIR`),云主机走
+`%BACKUP_REMOTE_SSH%`(填在机器私有的 `~/.config/automation-suite/local-paths.env`),
+所以公开仓库里不会出现本机路径或真实 IP。
 
 ### 1.6 备份待决策项
 
-1. **快照落哪**(推荐:腾讯云主机 SFTP 目录 `~/backups/restic`)。定了之后填
-   `config/backup.json` 的 `restic.repository` / `restic.passwordFile`,或设
-   `RESTIC_REPOSITORY` / `RESTIC_PASSWORD_FILE`。
-2. **密码文件放哪**(推荐:`~/.config/automation-suite/restic-password`,600,且**它本身不进备份** ——
-   丢了密码等于丢了所有快照)。
-3. **`.capture/`(621MB 逆向抓取产物)要不要留**(推荐:默认不留,`--include-optional` 可加回)。
-4. **跑多勤**(推荐:每天一次,接在 22:00 之后、AutoShutdown0200 之前)。
-5. **magic-context 的活库怎么备**(`context.db` 735MB + WAL;热拷贝可能不一致。
-   推荐:备份前先 `VACUUM INTO` 一份快照文件,或接受 restic 读取时的轻微不一致 —— 待定)。
-6. **`~/.ai-sessions`(71MB 心跳注册表)值不值得备**(推荐:不值得,可重建;现在在清单里,可以删)。
+1. **快照落哪**(推荐:**跨 provider 对象存储** R2/B2,两台机器各一个 restic 仓库;
+   退而求其次腾讯云 COS)。定了之后填 `config/backup.json` 的 `restic.repository` /
+   `restic.passwordFile`,或设 `RESTIC_REPOSITORY` / `RESTIC_PASSWORD_FILE`。
+2. **密码文件放哪**(推荐:**不放被备份的那台机器**。密码管理器存一份 + 离线纸质/硬件密钥存一份;
+   本机 `~/.config/automation-suite/restic-password`(600)只能算其中一份,且已从 `credentials` 集合
+   排除,不进任何快照。**丢了密码 = 所有快照永久不可读**,restic 没有后门)。
+3. **跑多勤**(已定:**每天一次,22:00 之后** —— 接在 AutoShutdown0200 之前)。
+4. **`.capture/`(621MB 逆向抓取产物)要不要留**(已定:**不备**,已从清单移除)。
+5. **`~/.ai-sessions`(71MB 心跳注册表)值不值得备**(已定:**不备**,已从清单移除)。
+6. **magic-context 的活库怎么备**(已定:**`VACUUM INTO` 快照**,实现见 `prepare` 段与
+   `scripts/lib/backup-prepare.mjs`)。
 
 ---
 
@@ -211,30 +253,36 @@ TOML 反序列化失败(而且只在启动时报一行 ERROR,容易被当成没�
 
 ## 5. 待决策清单(汇总,逐条附推荐)
 
-| # | 决策 | 推荐 |
+| # | 决策 | 推荐 / 现状 |
 | --- | --- | --- |
-| 1 | restic 快照落哪 | 腾讯云主机 SFTP 目录,`~/backups/restic` |
-| 2 | restic 密码文件放哪 | `~/.config/automation-suite/restic-password`(600,本身不入备份) |
-| 3 | 备份频率 | 每天一次,22:00 之后、AutoShutdown0200 之前 |
-| 4 | 621MB `.capture/` 备不备 | 默认不备,需要时 `--include-optional` |
-| 5 | 备份里要不要含 `~/.ai-sessions`(71MB 心跳) | 不要,可重建(现在在清单里,可删) |
-| 6 | magic-context 活库怎么备 | 备份前 `VACUUM INTO` 快照,避免 WAL 不一致 |
-| 7 | 要不要给 `Zzz210s/note` 推那 26 个提交 | 要(公开仓,推前先确认里面没有敏感内容;或改为私有仓) |
+| 1 | restic 快照落哪 | **跨 provider 对象存储**(R2 / B2),两台机器各一仓库;次选腾讯云 COS。**不要**放云主机自己或同账号同区域 |
+| 2 | restic 密码文件放哪 | 密码管理器 + 离线纸质/硬件各一份;本机 `~/.config/automation-suite/restic-password`(600,已从 `credentials` 集合排除)。丢了密码 = 快照全废 |
+| 3 | 备份频率 | **已定:每天一次,22:00 之后**、AutoShutdown0200 之前 |
+| 4 | 621MB `.capture/` 备不备 | **已定:不备**(已从清单移除) |
+| 5 | 备份里要不要含 `~/.ai-sessions`(71MB 心跳) | **已定:不要**(已从清单移除) |
+| 6 | magic-context 活库怎么备 | **已定:`VACUUM INTO` 快照**(`prepare` 段已实现,实测 198MB) |
+| 7 | 要不要给 `Zzz210s/note` 推那 26 个提交 | **暂缓**:只读检查发现未推提交里含生产机 IP `62.234.211.51`(56 处)与本机用户目录路径(`%USERPROFILE%` 形式)等,而远端是 public;先脱敏(IP→`<服务器IP>`、用户名→占位)再推,或转私有(会断公开 Pages) |
 | 8 | 通知层换不换 apprise | 不换;apprise 只给新基础设施用 |
 | 9 | topgrade 进不进计划任务 | 先进手动阶段;要进就配 `config/topgrade.example.toml` |
-| 10 | 监控放哪 | 云主机 docker compose,不在本机 |
-| 11 | 先上 RSSHub 还是 changedetection | RSSHub(链路更短,风险更低) |
+| 10 | 监控放哪 | **云主机 docker compose**,不在本机 |
+| 11 | 先上 RSSHub 还是 changedetection | **RSSHub**(链路更短,风险更低) |
 
 ---
 
 ## 6. 复核命令
 
 ```bash
-# 备份清单:枚举会备份什么(不需要 restic、不需要 npm install)
+# 备份清单:枚举本机会备份什么(不需要 restic、不需要 npm install;不连远端)
 node scripts/backup.mjs
 
-# 只核查「清单里写的路径都还在」
+# 只核查「本机清单里写的路径都还在」
 node scripts/backup.mjs --strict
+
+# 通过 SSH 只读枚举云上要备份什么(需要 BACKUP_REMOTE_SSH;只跑 du/find/stat,不传文件)
+node scripts/backup.mjs --remote
+
+# 打印从云上拉取的 rsync 命令(不执行)
+node scripts/backup.mjs --pull
 
 # 更新工具:看会升什么,不真升
 topgrade --dry-run --config config/topgrade.example.toml

@@ -76,7 +76,7 @@
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `backup.mjs` | 按 `config/backup.json` 枚举「没有异地副本」的资产,`--apply` 时交给 restic 推走 | 盘点、接异地备份、换机前的盘点 | **默认 `--dry-run`**,不需要 restic、不需要 `npm install`;`--list` / `--json` / `--set=<id>` / `--include-optional` / `--strict`;仓库与密码未配置时 `--apply` **故意拒绝执行**。选型与目标位置选项见 `../docs/infrastructure.md` |
+| `backup.mjs` | 按 `config/backup.json` 枚举「没有异地副本」的资产(本机 + 云主机两个来源),`--apply` 时交给 restic 推走 | 盘点、接异地备份、换机前的盘点 | **默认 `--dry-run`**,不需要 restic、不需要 `npm install`,不加 `--remote` 就不连远端;`--list` / `--json` / `--set=<id>` / `--include-optional` / `--strict` / `--remote`(只读 SSH 枚举云上)/ `--prepare`(`VACUUM INTO` 快照)/ `--pull`(打印 rsync 拉取命令,`--pull --apply` 才真拉);仓库与密码未配置时 `--apply` **故意拒绝执行**。选型、拓扑与两种云上模式见 `../docs/infrastructure.md` |
 | `lib/backup.mjs` | 清单读取(展开 `~`、合并默认排除项)+ 递归枚举(文件数/字节数) | 被 `backup.mjs` 调用 | 纯本地纯函数,不联网;排除按目录名做 |
 
 ## 检查

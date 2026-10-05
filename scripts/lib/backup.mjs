@@ -55,7 +55,8 @@ export function loadManifest(file) {
         paths: (set.paths ?? []).map((p) => expandPath(p, values)),
         excludePaths: (set.excludePaths ?? []).map((p) => expandPath(p, values))
     }))
-    return { ...raw, sets, excludeDirs: [...DEFAULT_EXCLUDE_DIRS, ...(raw.excludeDirs ?? [])] }
+    const prepare = (raw.prepare ?? []).map((step) => ({ ...step, source: expandPath(step.source, values), target: expandPath(step.target, values) }))
+    return { ...raw, _values: values, sets, prepare, excludeDirs: [...DEFAULT_EXCLUDE_DIRS, ...(raw.excludeDirs ?? [])] }
 }
 
 /** 递归统计一个目录:文件数、总字节、目录数。权限错误只标记 deep=false,不抛。 */
@@ -80,6 +81,7 @@ export function walk(root, { excludeDirs, excludePaths = [] }) {
                 out.dirs += 1
                 stack.push(full)
             } else if (entry.isFile()) {
+                if (skipAbs.has(full)) continue
                 out.files += 1
                 try {
                     out.bytes += fs.statSync(full).size
