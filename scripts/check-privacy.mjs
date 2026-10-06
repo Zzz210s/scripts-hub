@@ -61,6 +61,9 @@ let findings = 0
 const fileNameHits = []
 
 outer: for (const rel of files) {
+    // 自测夹具整份跳过:里面全是**假**样例(hunter2 / EXAMPLE / mongodb://admin:hunter2@),
+    // 规则表与它的测试天然要含"看起来像凭据"的字符串。
+    if (SELF_FILES.has(rel)) continue
     for (const [re, why] of FORBIDDEN_PATH_RULES) {
         if (re.test(rel)) {
             findings++
