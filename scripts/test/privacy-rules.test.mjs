@@ -65,8 +65,8 @@ test('文件路径规则:secrets/ 与真 .env 命中,示例文件放行', () => 
 })
 
 test('私有清单里的标识会变成规则', () => {
-    const { rules } = rulesWithPrivate(['示例标识'])
-    const literal = rules.find(([name]) => name.includes('示例标识'))
+    const { rules } = rulesWithPrivate(['示例昵称'])
+    const literal = rules.find(([name]) => name.includes('示例昵称'))
     assert.ok(literal, '私有标识应生成一条字面量规则')
-    assert.equal(literal[3], '示例标识')
+    assert.equal(literal[3], '示例昵称')
 })

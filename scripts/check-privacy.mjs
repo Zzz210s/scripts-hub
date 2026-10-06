@@ -19,7 +19,13 @@ import { FORBIDDEN_PATH_RULES, rulesWithPrivate } from './lib/privacy-rules.mjs'
 
 const repo = path.resolve(import.meta.dirname, '..')
 // 本文件与规则表自身含允许清单里的字面量,只对它们跳过「私有标识」规则(通用规则照跑)
-const SELF_FILES = new Set(['scripts/check-privacy.mjs', 'scripts/lib/privacy-rules.mjs'])
+// 规则表自身、以及它的回归测试(测试里全是**假**样例:hunter2 / EXAMPLE / xxxxxxxx),
+// 这些文件必须含“看起来像凭据”的字符串,否则测不出规则是否有效。
+const SELF_FILES = new Set([
+    'scripts/check-privacy.mjs',
+    'scripts/lib/privacy-rules.mjs',
+    'scripts/test/privacy-rules.test.mjs'
+])
 const args = process.argv.slice(2)
 const verbose = args.includes('--verbose')
 const staged = args.includes('--staged')
