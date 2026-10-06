@@ -57,7 +57,7 @@ git rev-parse --git-dir >/dev/null 2>&1 || { log "$NOTE_DIR 不是 git 仓库"; 
 # 脚本真源:scripts/note-sync/notify-blog.sh。任何失败只记日志,绝不影响同步本身。
 blog_guard() {
     local s="$HAC_DIR/scripts/note-sync/notify-blog.sh"
-    [ -x "$s" ] || return 0
+    [ -f "$s" ] || return 0   # 用 -f 不用 -x:git 里可能没记可执行位(服务器实测踩过)
     "$s" "$@" >>"$LOG" 2>&1 || log "博客通知脚本返回非零(忽略)"
 }
 
