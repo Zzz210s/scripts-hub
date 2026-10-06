@@ -78,6 +78,11 @@
 | --- | --- | --- | --- |
 | `backup.mjs` | 按 `config/backup.json` 枚举「没有异地副本」的资产(本机 + 云主机两个来源),`--apply` 时交给 restic 推走 | 盘点、接异地备份、换机前的盘点 | **默认 `--dry-run`**,不需要 restic、不需要 `npm install`,不加 `--remote` 就不连远端;`--list` / `--json` / `--set=<id>` / `--include-optional` / `--strict` / `--remote`(只读 SSH 枚举云上)/ `--prepare`(`VACUUM INTO` 快照)/ `--pull`(打印 rsync 拉取命令,`--pull --apply` 才真拉);仓库与密码未配置时 `--apply` **故意拒绝执行**。选型、拓扑与两种云上模式见 `../docs/infrastructure.md` |
 | `lib/backup.mjs` | 清单读取(展开 `~`、合并默认排除项)+ 递归枚举(文件数/字节数) | 被 `backup.mjs` 调用 | 纯本地纯函数,不联网;排除按目录名做 |
+| `note-snapshot.mjs` | 笔记库快照:一个日期一个目录(`repo.bundle` 全历史 + `worktree.tar.zst` 全工作区 + `manifest.json` 逐件 sha256),按保留策略清理旧日期目录;`--drill` 做恢复演练、`--restore` 真恢复 | 想给笔记库留一份不依赖 restic 的恢复件时 | **默认 `--dry-run`**;`--apply` / `--list` / `--drill[=<日期>]` / `--drill=<日期> --source=<原工作区>` / `--restore <快照目录> --to <目标>` / `--keep=<n>`(默认 3)/ `--no-prune`;迁移旧件用 `--bundle-from` / `--worktree-from` / `--legacy-meta`。根目录取 `%NOTE_BACKUP_ROOT%` |
+| `lib/note-snapshot.mjs` | 造快照:`git bundle --all`、工作区 `tar` + zstd、写 manifest、按日期清理 | 被 `note-snapshot.mjs` 与 `backup.mjs` 的 prepare 步骤调用 | 制品先落 `.tmp` 再改名,manifest 最后写:中断不会留下半个快照 |
+| `lib/note-git.mjs` | git 命令包装、文件 sha256、本机日期、仓库元信息(HEAD/refs/提交数/`git status -uall`) | 被上面两个与 `note-drill.mjs` 调用 | `localDate` 用本地时区(不用 UTC,避免跨日) |
+| `lib/note-store.mjs` | 快照目录命名、列出、保留策略、恢复(`--no-checkout` 克隆 + 解包 + `git reset`) | 同上 | `planPrune` 是纯函数(单测锁住:只动日期目录、永远留最新那份);tar 路径转正斜杠 |
+| `lib/note-drill.mjs` | 恢复演练:bundle refs/fsck/提交数、解包逐文件 sha256、以 HEAD 为基准的差异分类与 `git status` 对齐 | `note-snapshot.mjs --drill` 调用 | 全程在临时目录里做,结束即删(`--keep-tmp` 保留现场) |
 
 ## 检查
 
@@ -126,4 +131,5 @@
 - 提交前 `bash -n scripts/*.sh scripts/lib/*.sh` 与 `shellcheck scripts/*.sh scripts/lib/*.sh` 都应无输出;
   `node --check scripts/*.mjs scripts/lib/*.mjs` 与 `node scripts/check-wecom-drift.mjs`、`node scripts/check-privacy.mjs` 应通过;
   `node scripts/apply-schedule.mjs --dry-run` 应能把默认配置渲染成触发器(不改本机任务);
-  `node scripts/backup.mjs` 应能枚举出全部集合(只读,不写盘)。
+  `node scripts/backup.mjs` 应能枚举出全部集合(只读,不写盘);
+  `node --test "scripts/test/*.test.mjs"` 应全绿(脱敏规则 + 快照的保留策略/差异分类/tar 路径)。

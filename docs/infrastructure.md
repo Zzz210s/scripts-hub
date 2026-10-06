@@ -31,7 +31,7 @@
 | 简报/心跳 `~/.ai-brief-hub`、`~/.ai-sessions` | 5.3MB + 71MB | 无 | 没有异地副本(可重建,低价值) |
 | 真实凭据:`~/.pi/agent/auth.json`、`models-store.json`、`~/.opencommit`、`~/.npmrc`、`~/.ssh`、`~/AppData/Roaming/GitHub CLI`、`~/.config/automation-suite`、`~/.config/cortexkit` | 合计 <2MB | 无(仓库里只有 `*.template`) | **没有异地副本**,丢了要逐个重配 |
 | 工作区凭据:`%WEREAD_SIGNIN_DIR%/{.env,secrets}`、`%REWARDS_DIR%/.env` | <15KB | 无 | **没有异地副本** |
-| 笔记库 `%NOTES_DIR%` | 98MB / 6562 文件 | GitHub `Zzz210s/note`(**public**) | 半个:144 个未提交改动 + 26 个未推提交不在远端 |
+| 笔记库 `%NOTES_DIR%` | 98MB / 6562 文件 | GitHub `Zzz210s/note`(**public**);本地 `%NOTE_BACKUP_ROOT%` 下的日期快照(见 1.5) | 半个:144 个未提交改动 + 26 个未推提交不在远端;本地快照已改成「一个日期一个目录」并**过了恢复演练**(见 1.5a) |
 | 微信读书工作区 `%WEREAD_SIGNIN_DIR%` | 626MB(其中 `.capture/` 621MB 是逆向抓取产物) | 仓库里只有**脱敏快照** | **没有异地副本**(无 origin) |
 | 微软积分工作区 `%REWARDS_DIR%` | 172MB | 同上 | **没有异地副本**(无 origin) |
 | 本机仓库克隆:`config-ai`、`ai-route`、`ai-session-hub`、`brief-hub`、`pi-codegraph`、`home-automation-configs` | ~19MB | 各有 GitHub origin | 基本算有;`ai-session-hub` 有 11 个未推提交 |
@@ -115,7 +115,26 @@
   排除项按目录名走:`.capture`、`node_modules`、`.venv`、`__pycache__`、`.codegraph`、
   `ms-playwright`、`logs`、`tmp`、`.cache` 等。
 - `prepare` 段:`context.db` 先 `VACUUM INTO` 到 `~/.local/share/automation-suite/backup-staging/`
-  再进 `agent-memory`;活库与 `-wal`/`-shm` 不直接进备份。
+  再进 `agent-memory`;活库与 `-wal`/`-shm` 不直接进备份。第二个 prepare 步骤 `note-snapshot`
+  生成笔记库快照(见下),`--apply` 时先跑 prepare 再调 restic。
+- **笔记库快照(2026-10-06 起)**:`scripts/note-snapshot.mjs` 把笔记库收成**一个日期一个目录**:
+
+```
+%NOTE_BACKUP_ROOT%/<YYYY-MM-DD>/
+  repo.bundle        git bundle --all:全部 refs 与完整历史(单文件,可直接 git clone)
+  worktree.tar.zst   工作区全量,只排除 .git;含未跟踪与被 .gitignore 的文件(如 .obsidian/)
+  manifest.json      日期 / HEAD / refs / 提交数 / 文件数与字节 / 每件 sha256 / 保留策略
+  legacy-meta/       仅迁移那一份有:旧的 diff/status/log 原件
+%NOTE_BACKUP_ROOT%/legacy/
+  2026-09-23-pre-rewrite-full.bundle   历史重写前的完整历史(head 在当前仓库里已不存在)
+  2026-09-23-pre-rename.bundle         重写前另一时间点
+  SHA256SUMS.txt
+```
+
+  保留策略:只保留最近 **3** 个日期目录(可配),更旧的整目录删;`legacy/` 不动。
+  新快照写成功后才清理,且 `manifest.json` 最后写(中断不留半个快照)。
+  `notes` 集合(活库,含 `.git` 原样)与新的 `notes-snapshot` 集合**同时存在**:
+  前者是活库原样,后者是自包含、不依赖 restic 就能恢复的制品;新增不删旧,上传面只增不减。
 - `scripts/backup.mjs` + `scripts/lib/backup.mjs` + `scripts/lib/backup-remote.mjs` +
   `scripts/lib/backup-prepare.mjs` —— 枚举与执行。**默认 `--dry-run`**:不装 restic 也能跑,
   不加 `--remote` 就**不连任何远端**;`--apply` 在没有仓库参数时**故意拒绝执行**(且在写盘之前就拦下)。
@@ -137,6 +156,32 @@ node scripts/backup.mjs --pull --apply  # 真拉 + 真推(需 restic 仓库参�
 路径与主机地址都不写死:本机盘符走 `%NAME%` 占位符(如 `NOTES_DIR`),云主机走
 `%BACKUP_REMOTE_SSH%`(填在机器私有的 `~/.config/automation-suite/local-paths.env`),
 所以公开仓库里不会出现本机路径或真实 IP。
+
+### 1.5a 笔记库快照的恢复演练(2026-10-06 实测通过)
+
+快照不是「拷了就完」,`scripts/note-snapshot.mjs --drill` 每次都把三件事验一遍:
+
+| 检查 | 2026-10-05 那份(迁自旧三件) | 2026-10-06 那份(当天生成) |
+| --- | --- | --- |
+| `git bundle verify` | `is okay`,`records a complete history` | 同左 |
+| 全量取回后 `git fsck --full` | 无输出(干净) | 同左 |
+| 提交数 / HEAD / 3 个 refs vs 清单 | 495 / `52e062b` / 全部一致 | 609 / `2e92fee` / 全部一致 |
+| 工作区解包:文件数 / 字节 / 摘要 vs 清单 | 750 / 22381529 / `e06c1fd6d62c` 一致 | 876 / 26492567 / `3fda9a3a69ac` 一致 |
+| 逐文件 sha256 比对源工作区 | 750 个全一致 | 876 个全一致 |
+| 克隆 + 解包后的工作区 | 可用;以 HEAD 为基准独立算出的 D/M/多出 =136/6/157,与 `git status -uall` 逐条对齐 | 可用;0/0/0 逐条对齐 |
+
+(右侧一列是当时那次的数字;这份快照每天重生成,HEAD 与文件数会变。)
+
+旧三件的去向(体积:meta 3.5MB / mirror 88MB / worktree 109MB,共约 200MB):
+meta 的 7 个文件原样收进 `2026-10-05/legacy-meta/`;mirror 与 worktree 被重新打包成
+`2026-10-05/{repo.bundle, worktree.tar.zst}`(17MB)并通过上表演练;确认后旧目录已删除。
+mirror 比可达历史大出来的部分是仓库里**已不可达的对象**(`git fsck --unreachable`:7883 个
+被丢掉的 stash 提交及其 trees/blobs),`git bundle` 不收这类对象。复核:同一批对象在活库
+`F:/0-Note/.git` 里仍在(同口径统计 8695 个不可达 commit),而活库在 `notes` 集合里 —— 所以没丢东西。
+
+`F:` 根上的两个散落文件(2026-09-23 的 bundle ×2)已移入 `%NOTE_BACKUP_ROOT%/legacy/`
+并记 sha256;根上那份 `0-Note-backup-2026-10-05-diff-HEAD.patch` 与 `legacy-meta/diff-HEAD.patch`
+逐字节相同,删掉了重复的那份。
 
 ### 1.6 备份待决策项
 
@@ -283,6 +328,15 @@ node scripts/backup.mjs --remote
 
 # 打印从云上拉取的 rsync 命令(不执行)
 node scripts/backup.mjs --pull
+
+# 笔记库快照:看计划 / 生成 / 列出 / 恢复演练(演练不通过就不要删任何旧件)
+node scripts/note-snapshot.mjs
+node scripts/note-snapshot.mjs --apply
+node scripts/note-snapshot.mjs --list
+node scripts/note-snapshot.mjs --drill=<日期> --source=<原始工作区目录>
+
+# 纯函数回归(脱敏规则 + 快照保留策略/差异分类/tar 路径)
+node --test "scripts/test/*.test.mjs"
 
 # 更新工具:看会升什么,不真升
 topgrade --dry-run --config config/topgrade.example.toml

@@ -3,7 +3,7 @@
   "why": "多机异地备份清单:一台上位本机(Windows),一台腾讯云主机(跑微软积分与微信读书签到)。为什么不能靠 GitHub 与现有 bare 镜像兜底,见 docs/infrastructure.md。",
   "placeholders": {
     "note": "路径里的 %NAME% 从环境变量或机器私有的 ~/.config/automation-suite/local-paths.env 展开(与 scripts/lib/schedule-targets.mjs 同一套);~ 展开为家目录。这一步故意不写死盘符与主机地址:仓库是公开的。",
-    "known": ["USERPROFILE", "NOTES_DIR", "WEREAD_SIGNIN_DIR", "REWARDS_DIR", "HOME_AUTOMATION_CONFIGS_DIR", "EPIC_DIR", "BACKUP_REMOTE_SSH"]
+    "known": ["USERPROFILE", "NOTES_DIR", "NOTE_BACKUP_ROOT", "WEREAD_SIGNIN_DIR", "REWARDS_DIR", "HOME_AUTOMATION_CONFIGS_DIR", "EPIC_DIR", "BACKUP_REMOTE_SSH"]
   },
   "restic": {
     "tag": "elevens-machine",
@@ -22,6 +22,14 @@
       "source": "~/.local/share/cortexkit/magic-context/context.db",
       "target": "~/.local/share/automation-suite/backup-staging/context.db",
       "why": "magic-context 的活库带 WAL,热拷贝可能不一致;先 VACUUM INTO 一份一致快照再交给 restic(见 docs/infrastructure.md 决策项 6)。快照路径在下面 agent-memory 集合里。"
+    },
+    {
+      "id": "note-snapshot",
+      "kind": "note-snapshot",
+      "source": "%NOTES_DIR%",
+      "target": "%NOTE_BACKUP_ROOT%",
+      "keep": 3,
+      "why": "笔记库快照:一个日期一个目录(repo.bundle 全历史 + worktree.tar.zst 全工作区 + manifest.json 逐件 sha256),本地只留最近 keep 份,长期载体是 restic 快照。与 notes 集合同时存在是有意的:notes 是活库原样,这里是自包含、不依赖 restic 的恢复件。实现与恢复演练见 scripts/note-snapshot.mjs、docs/infrastructure.md。"
     }
   ],
   "sets": [
@@ -69,8 +77,14 @@
     {
       "id": "notes",
       "priority": "critical",
-      "why": "笔记库:远端 Zzz210s/note 是 public 且与本地分叉(26 未推 / 23 未拉),不能当备份",
+      "why": "笔记库活库原样(含 .git 当前状态):远端 Zzz210s/note 是 public 且与本地分叉(26 未推 / 23 未拉),不能当备份",
       "paths": ["%NOTES_DIR%"]
+    },
+    {
+      "id": "notes-snapshot",
+      "priority": "critical",
+      "why": "笔记库的日期快照目录(每份:repo.bundle 全历史 + worktree.tar.zst 全工作区含未跟踪与 .gitignore 的文件 + manifest.json)。由 prepare 的 note-snapshot 步骤生成,只保留最近 N 份,所以这里是一个有界的目录",
+      "paths": ["%NOTE_BACKUP_ROOT%"]
     },
     {
       "id": "workspaces",
