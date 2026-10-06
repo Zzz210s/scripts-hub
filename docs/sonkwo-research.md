@@ -205,6 +205,38 @@ dex 原生侧另有 `api.sonkwo.cn/auth/session/login/refresh?locale=js&sonkwo_v
 2. 或用**有效杉果登录态**逐个试路径(有 token 时 401/400 与 404 可区分);
 3. 抓包需先解决 pinning(Frida/改包),不建议先走。
 
+## 4.6 领取请求已完整挖出(2026-10-06 反编译 Hermes 字节码)
+
+用 `hermes-dec` 的 `hbc-disassembler` 反汇编 `assets/index.android.bundle`(HBC v96,输出 98MB)后,
+从字符串表与调用点定位到**真正的领取接口**。之前猜的 `takeBenefit` 是**方法名**(`memberApi.takeBenefitCoupon`),
+真正的 URL 是 `take`:
+
+```
+POST https://api.sonkwo.cn/epic/game/user-game/take
+Authorization: Bearer <杉果登录 token>
+Content-Type: application/json
+
+{"epicUserId": "<Epic 账号 id>"}
+```
+
+**无鉴权实测(参数名靠错误信息迭代确认)**:
+
+| 请求 | 响应 |
+| --- | --- |
+| `GET .../take` | 405(Method Not Allowed → 端点存在) |
+| `POST .../take` `{}` | 400 `{"errorCode":1000,"errorMsg":"epic用户id 不能为空"}` |
+| `POST .../take` `{"epicUserId":"abc"}` | 401 `{"errorCode":1000,"errorMsg":"未登录"}` |
+| `POST .../take` `{"epic_user_id":"abc"}` / `{"userId":…}` / `{"epicId":…}` / `{"epicAccountId":…}` | 400 仍是「epic用户id 不能为空」 |
+
+**注意:请求体里没有游戏 id** —— 它是「一键领取当期全部周免」,与 App 里的「Epic 一键领取」一致。
+
+**登录接口(从 dex 取证,未实测)**:`POST /auth/session/login/password`(另有 `phone`、`authCode`、
+`openid`、`refresh?locale=js&sonkwo_version=`)。鉴权头是标准的 `Authorization: Bearer`。
+**Epic 绑定/解绑**:`/auth/api/platform/front/bind`、`/auth/api/platform/front/unbind/`(App 内一次性操作)。
+
+**还差的一步**:有效的杉果登录态(账号密码或 token)。拿到后即可端到端验证:
+登录 → 用**我们已有的 Epic account id**(OAuth token 里就有)→ 调 `take` → 看是否真的领到。
+
 ## 6. 未解问题(需抓包/实测)
 
 1. 杉果 App「Epic 喜加一」点击领取后,实际请求的**域名/路径/鉴权**是什么?是杉果后端代领,还是 App 内 Epic webview?
