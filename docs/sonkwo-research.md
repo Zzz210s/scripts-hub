@@ -259,6 +259,31 @@ Content-Type: application/json
 - App 也失败 → 杉果侧 Epic 集成已坏,这条路作废;
 - App 成功 → 说明接口需要 App 特有上下文,要复刻就得先绕过证书固定(抓包),成本明显上升。
 
+## 4.8 反编译 App 的 HTTP 层:为什么第三方调用必然 500(2026-10-06)
+
+用户确认「App 里手动领取成功」后,把 APK 的 dex 用 `jadx` 全量反编译(10,939 个类),直接读它的 HTTP 层:
+
+`AppOkHelper` 的拦截器链:`HeaderInterceptor` → `ChangeUrlIntercepter` → `RefreshTokenInterceptor`。
+
+| 类 | 作用 | 结论 |
+| --- | --- | --- |
+| `HeaderInterceptor` | 只加两个头:`Authorization: Bearer <token>` 与 `Rcode` | **`Rcode` 为空时根本不会加**(源码里 `if (!getRCode().isEmpty())`)→ 不是我们缺头 |
+| `ChangeUrlIntercepter` | 按 `url_name` 请求头重写目标 host(该头在发出前被移除) | host 由 JS 层指定,与我们直接请求 `api.sonkwo.cn` 一致 |
+| `RefreshTokenInterceptor` | 401 时用 refresh token 换新 token 并重放 | 与我们的 500 无关(我们不是 401) |
+
+**`Rcode` 的来源**(顺带查清):`SonkwoRouter.Callback.onUrlRCodeFound(url)` —— 它是 App 从**某个 URL 里解析出来**的会话风险码,
+变化时会触发 `LogOutModule.sendEvent("3")`(强制重登)。JS 侧通过 `getRcode` / `saveRcode` 读写。
+
+**实测**:带上 `url_name`、`mark_uuid`、`TDC_itoken`,再加 9 种 body 形状(`epicUserId` / `offerId`+`namespace` /
+`activityId` / `couponId` / `freeGameId` …)—— **全部 500**;缺 `epicUserId` 时才是 400。
+
+**结论**:第三方 HTTP 调用该接口**稳定 500**,而 App 能成功。差异不在请求头(已逐行核对),最可能是:
+服务端对该接口有额外的**客户端/设备态风控**(或 `TDC` 会话),也可能是后端自身缺陷。
+复刻需要先绕过证书固定抓真实请求(Frida/改包),投入产出比明显变差。
+
+**至此建议**:① 手动在 App 里点(零成本,已验证可用);② 自动化改走**本机住宅 IP + 可见浏览器**;
+③ 若仍要杉果路线,再考虑改包抓包。
+
 ## 6. 未解问题(需抓包/实测)
 
 1. 杉果 App「Epic 喜加一」点击领取后,实际请求的**域名/路径/鉴权**是什么?是杉果后端代领,还是 App 内 Epic webview?
