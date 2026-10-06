@@ -391,6 +391,34 @@ swap 4095/4095 全满。
 **持久化 profile**。实测该 profile 里确实有会话(`_epicSID`、`EPIC_EG1`、`REFRESH_EPIC_EG1`),所以引擎能继续跑;
 至于 10-06 这次为什么仍然「有未领取」,日志里没有任何线索 —— 这也是上面第 3 条要补引擎输出的原因。
 
+## 7.12 Epic 真因:子进程丢了浏览器路径 + 公开历史脱敏(2026-10-06)
+
+**真因(修完第 3 条留证功能后立刻抓到的)**:
+
+```
+browserType.launchPersistentContext: Executable doesn't exist at
+  /root/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome
+```
+
+`engineEnv()` 返回的是一个**全新对象**,而 `spawn(..., { env })` 是**整体替换**而不是合并 ——
+于是引擎子进程丢掉了 `PLAYWRIGHT_BROWSERS_PATH=0`(浏览器装在包目录里,不在 `~/.cache/ms-playwright`),
+patchright 找不到浏览器,每天都「有未领取」。修法:`engineEnv` 先 `...process.env`,显式覆盖项排在后面
+(这样外部的 `EG_PASSWORD` 之类仍会被清空)。
+
+**修完实跑**:浏览器正常启动,走到了结账页,然后上游自己报
+`Failed to claim! To avoid captchas try to get a new IP address.` —— 等 `It's all yours` /
+`Download the Epic Games Launcher...` / `Is Epic Games Launcher installed?` 三个成功标记超时。
+这是机房 IP 被 Epic 反欺诈拦下,不是代码问题(上游在源码里也明说了)。
+
+**顺带做的两件**:
+
+1. **公开历史脱敏**:scripts-hub 历史里的真实昵称(`855972f`/`216779c`/`dbb36a2` 三个提交)用
+   `git filter-repo --replace-text` 清掉 → 全新克隆验证 0 残留,111 个提交保留;服务器上的克隆已重克隆
+   (本地克隆 `git fetch && git reset --hard origin/main` 对齐)。
+2. **提交前脱敏闸门**:全局 pre-commit hook(`config-ai` 的 `host/git/hooks/pre-commit` → `~/.githooks/pre-commit`),
+   只在仓库自带 `scripts/check-privacy.mjs` 时生效 —— 手动提交以前不经过闸门,这次就是这么漏的。
+   实测:暂存一个假密码 → 提交被拦下;逃生舱 `PRIVACY_GATE=0 git commit ...`。
+
 ## 8. 本机怎么办
 
 迁到云主机后,**停掉本机的 Windows 计划任务**(否则两边同一天都跑:微软账号会互相顶掉登录态,
