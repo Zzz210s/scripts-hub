@@ -53,6 +53,14 @@ notify() {
 cd "$NOTE_DIR" 2>/dev/null || { log "找不到 $NOTE_DIR"; exit 2; }
 git rev-parse --git-dir >/dev/null 2>&1 || { log "$NOTE_DIR 不是 git 仓库"; exit 2; }
 
+# 通知博客重建(note 仓是纯内容仓,不再有 workflow —— 这件事改由仓外做)。
+# 脚本真源:scripts/note-sync/notify-blog.sh。任何失败只记日志,绝不影响同步本身。
+blog_guard() {
+    local s="$HAC_DIR/scripts/note-sync/notify-blog.sh"
+    [ -x "$s" ] || return 0
+    "$s" "$@" >>"$LOG" 2>&1 || log "博客通知脚本返回非零(忽略)"
+}
+
 # ── 1. 拉取(远端为主)────────────────────────────────────────────
 
 # ── 拉取前:把"远端已有、本地未跟踪且同名"的文件移开 ──────────────────────────
@@ -110,6 +118,7 @@ if [ "${#READY[@]}" -eq 0 ]; then
     # 没有新改动;若本地有未推送提交(别的会话提交过)也要推
     if [ "$(git log --oneline '@{u}..HEAD' 2>/dev/null | wc -l)" -eq 0 ]; then
         log "无改动、无待推送"
+        blog_guard          # 兜底:每 30 分钟比一次(note HEAD vs 博客最近成功部署)+ 失败自愈
         exit 0
     fi
 else
@@ -158,6 +167,7 @@ fi
 for attempt in 1 2 3; do
     if out=$(timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push 2>&1); then
         log "push 成功(第 $attempt 次)"
+        blog_guard --force --reason "note-sync 推送成功(第 $attempt 次)"   # 内容刚变:立即通知博客重建
         exit 0
     fi
     log "push 第 $attempt 次失败:$out"
