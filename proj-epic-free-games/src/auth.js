@@ -62,5 +62,7 @@ export async function ensureSession({ config, now = new Date(), fetchImpl, sleep
 
     const injected = await inject({ browserDir: config.browserDir, accessToken: active.accessToken, expiresAt: active.accessExpiresAt, log })
     if (injected.ok) return { ok: true, mode, injected: true, tokens: active }
+    // 被主动跳过(值太大)不是故障:引擎本来就靠 profile 里的会话,别报成"失败"吓人
+    if (injected.skipped) return { ok: true, mode, injected: false, warn: injected.error, tokens: active }
     return { ok: true, mode, injected: false, warn: `会话注入失败,退回 profile:${injected.error}`, tokens: active }
 }

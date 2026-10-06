@@ -65,13 +65,19 @@ test('跑过之后同一款不再重复领取', async () => {
     assert.equal(calls.engine, 1)
 })
 
-test('hCaptcha:发需要你处理并带商店页链接,状态保持失败,退出码非 0', async () => {
+test('hCaptcha:发需要你处理并带商店页链接,状态保持失败,退出码 0(跑完并已推送)', async () => {
+    const logs = []
     const { config, deps, calls } = setup({
         runEngine: async () => { calls.engine++; return { code: 1, stdout: '  Got hcaptcha challenge! Lost trust' } },
-        readDb: () => ({})
+        readDb: () => ({}),
+        log: (line) => logs.push(line)
     })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.equal(result.code, 1)
+    // 退出码语义:跑完并已把结果推给人 = 0;"有未领取"是业务结果不是崩溃。
+    // 原来给 1 会让宿主兜底逻辑误判成"运行在发消息前就退出了",同一天连推两条(2026-10-06 实测)。
+    assert.equal(result.code, 0)
+    assert.ok(logs.some((line) => line.includes('[引擎输出]')), '失败时要把引擎输出写进日志')
+    assert.ok(logs.some((line) => line.includes('hcaptcha challenge')), '引擎原始报错要出现在日志里')
     assert.equal(calls.sent.length, 2)
     assert.match(calls.sent[1], /需要你处理/)
     assert.match(calls.sent[1], /商店页:https:\/\/store\.epicgames\.com\/en-US\/p\/tomb-star/)

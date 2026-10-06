@@ -51,7 +51,10 @@ wait "$WDPID" 2>/dev/null
 note "=== epic run finished, exit code $CODE ==="
 
 # 崩在发消息之前 = 企业微信里什么都没有。补一条兜底提醒(出现过"企业微信"说明程序至少试过发送)
-if [ "$CODE" -ne 0 ] && ! grep -q "企业微信" "$LOG"; then
+# 判据:退出码非 0,且日志里既没有"企业微信"(程序试过发送)也没有 "[完成]"
+# (程序跑完并自己报过结果)。2026-10-06:Epic 的日志里没有"企业微信"字样,
+# 只按那一条判会误报成"运行在发消息前就退出了",同一天连推两条。
+if [ "$CODE" -ne 0 ] && ! grep -q "企业微信" "$LOG" && ! grep -q "\[完成\]" "$LOG"; then
     node "$SUITE_DIR/alert-fail.mjs" "Epic 限免" "退出码 $CODE" "$LOG" >> "$RLOG" 2>&1
 fi
 exit "$CODE"

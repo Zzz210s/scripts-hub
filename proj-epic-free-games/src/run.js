@@ -105,6 +105,16 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
     } else {
         await deps.send(buildResultMessage({ date, account: finalAccount, games: summary.games, cycleEnd: deadline }))
     }
+    // 领取失败时把引擎输出的尾部写进日志 —— 否则第二天只有一句"有未领取",无从判断原因
+    // (2026-10-06 实测:引擎自己的报错没进 last-run.log,只能靠翻容器日志)
+    if (!summary.ok && run.stdout) {
+        const tailLines = String(run.stdout).trim().split(/\r?\n/).slice(-15)
+        log(`[引擎输出] 末 ${tailLines.length} 行:`)
+        for (const line of tailLines) log(`  ${line}`)
+    }
     log(`[完成] ${formatLocal(now)} · ${summary.ok ? '全部拿到' : '有未领取'}`)
-    return { code: summary.ok ? 0 : 1, summary }
+    // 退出码语义:这一次**跑完并已把结果推给人**就算成功(0)。"有未领取"是业务结果,
+    // 不是崩溃 —— 原来的 code=1 会让宿主兜底逻辑误判成"运行在发消息前就退出了",
+    // 于是同一天连推两条(2026-10-06 实测)。真崩溃仍由 main() 的 catch 给 1。
+    return { code: 0, summary }
 }

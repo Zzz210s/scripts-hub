@@ -127,7 +127,10 @@ fi
 node "$ROOT/wechat-bridge/notify-run.js" "$LOG" >> "$LOG" 2>&1
 
 # 崩在发消息之前 = 企业微信里什么都没有,人只能靠"今天没消息"猜。补一条兜底提醒。
-if [ "$FAIL" -ne 0 ] && ! grep -q "企业微信" "$LOG"; then
+# 判据:退出码非 0,且日志里既没有"企业微信"(程序试过发送)也没有 "[完成]"
+# (程序跑完并自己报过结果)。2026-10-06:Epic 的日志里没有"企业微信"字样,
+# 只按那一条判会误报成"运行在发消息前就退出了",同一天连推两条。
+if [ "$FAIL" -ne 0 ] && ! grep -q "企业微信" "$LOG" && ! grep -q "\[完成\]" "$LOG"; then
     node "$SUITE_DIR/alert-fail.mjs" "微软积分" "退出码 $CODE" "$LOG" >> "$RLOG" 2>&1
 fi
 exit "$CODE"

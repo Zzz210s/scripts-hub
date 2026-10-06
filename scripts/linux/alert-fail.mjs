@@ -22,9 +22,17 @@ const webhookFiles = {
 }
 const webhookFile = webhookFiles[program]
 
-const tail = logFile && fs.existsSync(logFile)
-    ? fs.readFileSync(logFile, 'utf8').trim().split(/\r?\n/).slice(-6).join('\n').slice(-600)
-    : '(没有日志)'
+// logFile 可能被调用方传成非字符串(会触发 Node 的 DEP0187 警告),先收口
+const logPath = typeof logFile === 'string' ? logFile : undefined
+const logText = logPath && fs.existsSync(logPath) ? fs.readFileSync(logPath, 'utf8') : ''
+const tail = logText ? logText.trim().split(/\r?\n/).slice(-6).join('\n').slice(-600) : '(没有日志)'
+
+// 程序已经跑完并自己报过结果时不要补发 —— 2026-10-06 实测:Epic 的 last-run.log 里没有
+// "企业微信"字样(推送走子进程),调用方据此误判成"没发过消息",于是同一天连推两条。
+if (logText.includes('[完成]')) {
+    console.log(`${program}:日志里已有 [完成] 标记,程序自己报过结果,跳过兜底提醒`)
+    process.exit(0)
+}
 
 const text = [
     `${program} · ${new Date().toLocaleDateString('sv-SE')} · 需要你处理`,

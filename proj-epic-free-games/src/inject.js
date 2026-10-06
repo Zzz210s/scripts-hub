@@ -7,6 +7,19 @@
 export const BEARER_COOKIE = 'EPIC_BEARER_TOKEN'
 export const INJECT_DOMAINS = ['.epicgames.com', '.fortnite.com', '.unrealengine.com', '.twinmotion.com']
 
+// 浏览器对单个 cookie 的上限是 4096 字节(name + value + 属性),超过就整条拒收。
+// 2026-10-06 实测(容器内 patchright + Chromium):value=4096 字节就报
+// `Protocol error (Storage.setCookies): Invalid cookie fields`,4000 字节才成功。
+// Epic 的 access token 实测 **4529 字节**,所以这条路对它根本不成立 —— 不是偶发失败。
+export const MAX_COOKIE_VALUE_BYTES = 4000
+
+/** cookie 值放不下时返回原因,放得下返回 null */
+export function oversizedReason(accessToken) {
+    const bytes = Buffer.byteLength(String(accessToken ?? ''), 'utf8')
+    if (bytes <= MAX_COOKIE_VALUE_BYTES) return null
+    return `access token ${bytes} 字节,超过浏览器 cookie 上限(约 ${MAX_COOKIE_VALUE_BYTES} 字节)—— 这条注入路对 Epic 不成立,引擎改用 profile 里的会话`
+}
+
 /** 写成引擎站点能识别的 cookie;取值就是 access_token 原样,含 eg1~ 前缀。 */
 export function buildBearerCookies(accessToken, expiresAt) {
     const value = String(accessToken ?? '')
@@ -31,6 +44,12 @@ export function buildBearerCookies(accessToken, expiresAt) {
  */
 export async function injectSession({ browserDir, accessToken, expiresAt, launch, headless = true, log } = {}) {
     if (!browserDir || !accessToken) return { ok: false, error: '缺少 browserDir 或 accessToken' }
+    // 先量尺寸再开浏览器:放不下就根本别开(开着也只会拿到一条看不懂的 CDP 报错)
+    const oversized = oversizedReason(accessToken)
+    if (oversized) {
+        log?.(`[登录] 跳过 token 注入:${oversized}`)
+        return { ok: false, skipped: true, error: oversized }
+    }
     let launchContext = launch
     if (!launchContext) {
         try {
