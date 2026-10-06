@@ -342,6 +342,27 @@ Content-Type: application/json
 (B) 家里机器跑同一引擎(住宅 IP + 桌面浏览器,形态最接近,成功率最高);
 (C) 模型解 hCaptcha(不换 IP 的对抗路线)。
 
+## 4.11 抓包管道打通(不需要 root / 不需要装 CA / 不受 VPN 干扰)
+
+前面判定"抓不到"的三条障碍,实际有一条**绕法**:
+
+| 障碍 | 绕法 |
+| --- | --- |
+| 手机上的 Throne VPN(`tun0`)会吞掉全局代理 | 代理地址改用 **`127.0.0.1`** —— loopback 不进 tun0 |
+| 手机上的 127.0.0.1 端口不是本机的 | **`adb reverse tcp:8899 tcp:8899`** 把手机本地端口映射到 PC |
+| 需要 CA 才能看 HTTPS 内容 | 这一步**只看 CONNECT 目标域名**,不需要 CA |
+
+一条命令开关:抓包脚本(内部:`node sni-proxy.mjs` + `adb reverse` + `settings put global http_proxy 127.0.0.1:8899`)。
+实测在 VPN 开启状态下成功抓到手机流量(浏览器与系统请求)。
+
+**抓到的事实**:
+- 杉果 App 使用 **多个域名** —— 除已知的 `api.sonkwo.cn` 外,还有 **`data.sonkwo.com`**(访问我的页/喜加一页时出现);
+  实测 `data.sonkwo.com/epic/game/user-game/take` → **404**(该路径不在这个 host 上)。
+- **claim 流程本身没抓到**:当天三款游戏已全部「已在库中」,App 不再走领取流程 → 需要**有未领取的游戏**时才能抓。
+
+**局限**:这套只看到**域名**(CONNECT 目标)。要看**请求内容**(URL/参数/body)必须 MITM,而 MITM 需要把 CA 装进
+**系统**信任区 —— 非 root 设备做不到。可行的下一步只有**改包**(加 `networkSecurityConfig` 信任用户 CA + 去 pinning + 重签名重装)。
+
 ## 6. 未解问题(需抓包/实测)
 
 1. 杉果 App「Epic 喜加一」点击领取后,实际请求的**域名/路径/鉴权**是什么?是杉果后端代领,还是 App 内 Epic webview?
