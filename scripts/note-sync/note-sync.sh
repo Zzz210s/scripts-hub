@@ -139,7 +139,7 @@ fi
 
 # ── 3b. 巡检闸门(0-Note 自己的规则:课件规范 / 断链 / 索引登记)────
 # 只拦「必须为 0」的阶段;A3/A5/A6/A8 是历史欠账,留在报告里但不拦。整轮检查约 2 秒。
-VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A4,A7,A9,A10,A11,A12,A13,A14,A15,A16}"
+VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A4,A7,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18}"
 if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
     PY="$(command -v python3 || command -v python || true)"
     if [ -z "$PY" ]; then
