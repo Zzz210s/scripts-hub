@@ -8,6 +8,13 @@ import { readJsonSafe } from './atomic.js'
 
 export function engineEnv(config, env = {}) {
     return {
+        // 必须继承父进程环境:`spawn(..., { env })` 是**整体替换**而不是合并,
+        // 不给它 process.env 就会丢掉 PATH、HOME、PLAYWRIGHT_BROWSERS_PATH 等 ——
+        // 2026-10-06 实测后果:patchright 找不到浏览器,引擎直接报
+        // `Executable doesn't exist at /root/.cache/ms-playwright/chromium-1243/...`,
+        // 而浏览器其实装在包目录里(`PLAYWRIGHT_BROWSERS_PATH=0`)。
+        // 下面这些显式覆盖必须排在后面,才能盖掉外面可能存在的同名变量。
+        ...process.env,
         NOWAIT: '1',
         NOTIFY: '',
         NOTIFY_TITLE: '',
