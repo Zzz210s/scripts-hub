@@ -7,6 +7,8 @@
 #   2. 只提交"2 分钟没被改过"的文件 —— 这个库有多个 AI 会话同时写,
 #      立刻 add 会把别人写了一半的文件提交进去
 #   3. push 前跑脱敏闸门(check-privacy --staged):仓库是 public,命中即撤回暂存并通知
+#   3b. push 前跑 0-Note 巡检(check_vault --fail-on):课件规范 / 断链 / 索引登记这类硬规则必须为 0,
+#      历史欠账(A3 孤篇 / A5A6 元数据 / A8 标签)留在报告里但不拦(2026-10-06 加)
 #   4. push 失败重试 3 次(每次先 rebase);冲突/被拒 → 停下 + 企业微信通知,绝不 force
 #
 # 配置:~/.note-sync/config.env(机器私有,不入库)
@@ -124,6 +126,25 @@ if ! gate=$(node "$HAC_DIR/scripts/check-privacy.mjs" --staged 2>&1); then
 原因:push 前脱敏检查命中(个人标识或明文账号密码形状)
 不处理的后果:这次不会推送 —— 仓库是公开的,推上去等于永久公开"
     exit 1
+fi
+
+# ── 3b. 巡检闸门(0-Note 自己的规则:课件规范 / 断链 / 索引登记)────
+# 只拦「必须为 0」的阶段;A3/A5/A6/A8 是历史欠账,留在报告里但不拦。整轮检查约 2 秒。
+VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A4,A7,A9,A10,A11,A12,A13,A14,A15,A16}"
+if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
+    PY="$(command -v python3 || command -v python || true)"
+    if [ -z "$PY" ]; then
+        log "跳过巡检闸门(没找到 python)"
+    elif ! vault=$(cd "$NOTE_DIR" && PYTHONIOENCODING=utf-8 "$PY" -B \
+             "50-资源/工具/vault-check/check_vault.py" --quiet --fail-on "$VAULT_GATE_STAGES" 2>&1); then
+        log "巡检闸门拦下:$(printf '%s' "$vault" | tail -n 3 | tr '\n' ' ')"
+        git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
+        notify "0-Note 同步 · 需要你处理
+请你:在本机跑 cd F:\\0-Note && python -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
+原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
+不处理的后果:这次不会推送 —— 先按报告改掉,或临时把该阶段从 VAULT_GATE_STAGES 里去掉"
+        exit 1
+    fi
 fi
 
 # ── 4. 提交并推送(失败重试 3 次)──────────────────────────────────
