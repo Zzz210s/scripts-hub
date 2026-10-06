@@ -24,6 +24,8 @@ NOTE_DIR="${NOTE_DIR:-/f/0-Note}"
 HAC_DIR="${HAC_DIR:-/c/Users/23652/home-automation-configs}"
 QUIET_MIN="${NOTE_SYNC_QUIET_MIN:-2}"
 LOG="${NOTE_SYNC_LOG:-$HOME/.note-sync/sync.log}"
+# 冲突提示里指路用:服务器侧由入口脚本覆盖成自己的路径
+NOTE_LABEL="${NOTE_LABEL:-本机 F:\0-Note}"
 mkdir -p "$(dirname "$LOG")"
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
