@@ -164,6 +164,47 @@
 
 ---
 
+## 4.5 APK 静态分析(2026-10-06 补,adb 实机取证)
+
+用 adb 从已连接的真机(Huawei REA-AN00 / Android 15,包名 `com.sonkwoapp`)拉下 `base.apk`(64MB)后解包分析:
+
+**技术栈**:React Native + Hermes 字节码(`assets/index.android.bundle` 7.6MB,魔数 `c61fbc03`)
++ Flutter 库 + CodePush(`assets/CodePushHash`);原生侧有 okhttp3。
+
+**JS bundle 里的 epic 接口(字符串表取证,证明领取由杉果后端执行)**:
+
+| 路径 | 含义 | 实测(无鉴权) |
+| --- | --- | --- |
+| `epic/game/user-game/takeBenefit` | **领取福利** | 404(见下) |
+| `epic/game/user-game/queryTakeRecordPage` | 领取记录 | 401 未登录(存在) |
+| `epic/game/queryFreeGameSummary` | 免费游戏摘要 | 200(公开) |
+| `epic/game/addFreeFeedback` | 反馈 | 405(POST-only) |
+| `epic/game/user-game/game-list` / `get-user-info` | 用户游戏/信息 | 401 |
+| `auth/api/platform/front/bind` / `unbind` | Epic 账号绑定/解绑 | — |
+| `epic_freeCallback` | WebView 回调 | — |
+
+dex 原生侧另有 `api.sonkwo.cn/auth/session/login/refresh?locale=js&sonkwo_version=`。
+
+**关键结论**:`takeBenefit` 的存在证明**领取动作由杉果自己的后端对 Epic 发起** —— 这与
+「我们的机房 IP 被 Epic 拦」完全无关,是本路线最大的价值。
+
+**证书固定(重要阻碍)**:APK 内含 `assets/com.sonkwoapp.cert.pem`(1992 字节,自签证书)+ okhttp3
+→ 应用做了 **HTTPS pinning**。因此 HTTP Toolkit / mitmproxy 注入 CA **看不到它的流量**,
+抓包必须先绕过 pinning(Frida 或改包),成本显著上升。真机未 root(`id -u` = 2000)。
+
+**端点探测失败**:`takeBenefit` 及其 8 种变体(`/325`、`?id=325`、`take-benefit`、`benefit`、
+带 productId 等)在 `api.sonkwo.cn` 上**全部 404**;`api.sonkwo.com` 不解析;
+`www.sonkwo.cn/api/*` 返回 410(旧前缀已下线)。→ 真实路径需要反编译 Hermes 字节码,或用有效
+登录态逐个试。
+
+**登录链路**:旧文档里的 `auth.sonkwo.com/api/access_token.json` **已不存在**(域名不解析);
+现役是 `api.sonkwo.cn/auth/session/login/...`(仅从 APK 的 dex 取证,请求形状未确认)。
+
+**下一步(按性价比)**:
+1. 反编译 Hermes 字节码(`hermes-dec` 已下载)拿到 `takeBenefit` 的调用点与参数;
+2. 或用**有效杉果登录态**逐个试路径(有 token 时 401/400 与 404 可区分);
+3. 抓包需先解决 pinning(Frida/改包),不建议先走。
+
 ## 6. 未解问题(需抓包/实测)
 
 1. 杉果 App「Epic 喜加一」点击领取后,实际请求的**域名/路径/鉴权**是什么?是杉果后端代领,还是 App 内 Epic webview?
