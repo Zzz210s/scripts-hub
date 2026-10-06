@@ -28,7 +28,7 @@ test('显式传入的 env 优先级最高', () => {
 })
 
 test('外部环境里的 EG_PASSWORD 会被清空(不继承凭据)', () => {
-    process.env.EG_PASSWORD = 'should-not-leak'
+    process.env.EG_PASSWORD = '${EG_PASSWORD_PLACEHOLDER}'
     const env = engineEnv(CONFIG)
     assert.equal(env.EG_PASSWORD, '')
     delete process.env.EG_PASSWORD

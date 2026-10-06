@@ -48,5 +48,5 @@ test('同伴互查:新写的锁算在跑;过期的与不存在的都不算', () 
 })
 
 test('lockFile 落在 logs/ 下', () => {
-    assert.match(lockFile('C:/x'), /logs[\\/]run\.lock$/)
+    assert.match(lockFile('/tmp/x'), /logs[\\/]run\.lock$/)
 })

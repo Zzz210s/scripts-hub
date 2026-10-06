@@ -71,7 +71,7 @@
 | --- | --- | --- | --- | --- |
 | 微软积分 | 腾讯云主机 `62.234.211.51`(Ubuntu 26.04 / 2C4G / 59G 盘)的一次性容器,由 `automation-suite.timer` 08:00 与 12:00 触发 | `/srv/apps/automation/rewards/{.env,config,sessions,wechat-bridge/data,logs}` | **云主机**(`sessions.db` 是登录态,`points-history.json` 是唯一历史) | **否**:本机计划任务 `MicrosoftRewardsScript` 已不存在 |
 | 微信读书签到 | 同上,同一个 timer,整轮由 `run-all.sh` 顺序触发 | `/srv/apps/automation/weread/{.env,secrets,data,logs}` | **云主机**(`data/state.json`、`history.json`) | **否**:`WeReadSignIn` 任务已不存在 |
-| 本机工作区 `E:/weread-signin`、`E:/Microsoft-Rewards-Script-4.3.2` | 本机(代码与部署源,目前不再被计划任务调用) | 各自 `.git` 与 logs(最后一次本地运行 2026-10-04) | 本机(唯一完整历史,无 origin) | 是,但只作为代码来源与备份源 |
+| 本机工作区 `<软件盘>:/weread-signin`、`<软件盘>:/Microsoft-Rewards-Script-4.3.2` | 本机(代码与部署源,目前不再被计划任务调用) | 各自 `.git` 与 logs(最后一次本地运行 2026-10-04) | 本机(唯一完整历史,无 origin) | 是,但只作为代码来源与备份源 |
 | Epic 限免 | 本机按需(`EpicFreeGames` 任务当前未注册) | `proj-epic-free-games/secrets` | 本机 | 是 |
 | 凭据/会话/记忆/笔记 | 本机 | 见 1.1 表 | 本机 | 是 |
 
@@ -90,12 +90,12 @@
 | 本机 Windows 硬盘 + 移动硬盘/U 盘 | 一次性(¥100-300) | 对云主机是跨机;对本机不是 | 适合当**离线第三份**;`restic` 可对本地目录做仓库,移动盘记得插 |
 | 自建 SFTP(另一台 VPS / NAS) | 已有或一次性 | 是 | 可行,但要自己维护那台机器 |
 
-**不要选**:云主机自己的盘(源与备份同机);同账号同区域的另一台云主机(帮助有限);D:/E:/F:(与 C: 同一块 NVMe 的虚拟盘);`Zzz210s/note`(public 且与本地分叉,见 1.1)。
+**不要选**:云主机自己的盘(源与备份同机);同账号同区域的另一台云主机(帮助有限);D、E、F 三个盘符(与 C: 同一块 NVMe 的虚拟盘);`Zzz210s/note`(public 且与本地分叉,见 1.1)。
 
 **按机器分开备份**(两份清单,不要合并):
 
 - **腾讯云主机 `62.234.211.51`**:`rewards/{.env,sessions,config,wechat-bridge/data}`、`weread/{.env,secrets,data,config.yaml}`、systemd 单元;代码可从本机重建,`src/vendor` 与镜像不备。合计约 **25MB**。
-- **本机 Windows**:`credentials` / `agent-memory`(pi 会话 + `VACUUM INTO` 后的 magic-context)/ `notes`(`F:/0-Note`)/ `workspaces`(`E:` 两个工作区,去掉 `.capture`)/ `repos`。合计约 **1.1GB**。
+- **本机 Windows**:`credentials` / `agent-memory`(pi 会话 + `VACUUM INTO` 后的 magic-context)/ `notes`(`F:/0-Note`)/ `workspaces`(`<软件盘>` 两个工作区,去掉 `.capture`)/ `repos`。合计约 **1.1GB**。
 - **不备**:`.capture`(621MB 逆向产物)、`~/.ai-sessions`(71MB 心跳,可重建)、`rewards/src/vendor`(115MB Chromium,可重下)、两边的 `logs`(ephemeral)。
 
 ### 1.4b 云主机那组:两种模式

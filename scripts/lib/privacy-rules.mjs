@@ -42,7 +42,9 @@ export const BASE_RULES = [
     ['本机用户目录路径', new RegExp(`[A-Za-z]:[${BS}${BS}${BS}/]{1,2}Users`, 'i'), null],
     // 笔记库自身的路径不算隐私:它已写在 0-Note(公开仓库)的项目说明里,
     // 而同步失败的提醒必须指名道姓告诉用户去哪修。命中片段只有 "F:\0" 这么长。
-    ['盘符绝对路径', new RegExp(`(^|[^A-Za-z0-9])(C|D|E|F|G):[${BS}${BS}${BS}]{1,2}[A-Za-z0-9_]`), (v) => /^[Ff]:/.test(v)],
+    // 2026-10-06 修:原来用 `[${BS}${BS}${BS}]{1,2}` 拼字符类,正则实际把分隔符当成了可选的,
+    // 于是 `链路 C:Web checkout` 这种标题被误报成 `C:W`。改成显式的 [\\/] 并把"必须有分隔符"写死。
+    ['盘符绝对路径', /(^|[^A-Za-z0-9])[A-Ga-g]:[\\/]{1,2}[A-Za-z0-9_]/, (v) => /^[^A-Za-z0-9]*[Ff]:/.test(v)],
     ['Unix 家目录路径', /\/home\/[a-z][a-z0-9_-]{2,}/, null],
     ['微软凭据形状', /wrk-(?!EXAMPLE|xxxxxxxx|x{4,})[A-Za-z0-9_-]{10,}/, null],
     ['企业微信 webhook 真 key', /webhook\/send\?key=(?!0{8}|YOUR_WEBHOOK_KEY)[A-Za-z0-9-]{20,}/, null],
