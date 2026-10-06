@@ -237,6 +237,28 @@ Content-Type: application/json
 **还差的一步**:有效的杉果登录态(账号密码或 token)。拿到后即可端到端验证:
 登录 → 用**我们已有的 Epic account id**(OAuth token 里就有)→ 调 `take` → 看是否真的领到。
 
+## 4.7 端到端验证:登录态拿到了,但 take 接口返回 500(2026-10-06)
+
+用真实浏览器(用户勾选 Allow remote debugging 后,CDP 直连其 Edge,读取 cookie,不复制 profile)拿到
+杉果登录态后,做了完整验证:
+
+| 检查 | 结果 |
+| --- | --- |
+| `GET /epic/game/user-game/get-user-info`(带 Bearer) | **200** —— 返回 id / name / `thirdId`(Epic 账号 id)/ `gameNum` 64 / `freeNum` **63** |
+| 杉果侧绑定的 Epic 账号 vs 我们 OAuth 的 `accountId` | **相同**(绑的就是同一个账号) |
+| `GET /epic/game/user-game/queryTakeRecordPage` | **200** —— 53 条领取记录(令牌与接口都正常) |
+| `POST /epic/game/user-game/take` `{"epicUserId": …}` | **500 Internal Server Error** |
+| 加上 `mark_uuid`(query 与 header 各试)、`TDC_itoken`、`clientType`、`gameId`、`productId`、`gameIds`、`id`、`type` 共 8 种 body 形状 | **全部 500** |
+| 在真实浏览器页面里 `fetch()` 调该接口 | `TypeError: Failed to fetch`(跨域被拒,无法从网页复现) |
+
+**判断**:`take` 的 500 与「参数名/缺字段」无关(否则应是 400 —— 缺 `epicUserId` 时确实是 400)。
+更可能是:① 该接口要求 App 侧特有的上下文(客户端签名/设备态),第三方 HTTP 调用直接 500;
+② 或杉果侧后端当前故障;③ 或杉果保存的 Epic 授权已失效(绑定时间为 2025-04,`freeNum` 停在 63)。
+
+**决定性的下一步(成本最低)**:让用户在**杉果 App 里手动点一次「Epic 喜加一」领取**。
+- App 也失败 → 杉果侧 Epic 集成已坏,这条路作废;
+- App 成功 → 说明接口需要 App 特有上下文,要复刻就得先绕过证书固定(抓包),成本明显上升。
+
 ## 6. 未解问题(需抓包/实测)
 
 1. 杉果 App「Epic 喜加一」点击领取后,实际请求的**域名/路径/鉴权**是什么?是杉果后端代领,还是 App 内 Epic webview?
