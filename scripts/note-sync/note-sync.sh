@@ -97,7 +97,7 @@ if ! out=$(timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c 
     git rebase --abort >/dev/null 2>&1 || true
     log "pull 失败:$out"
     notify "0-Note 同步 · 需要你处理
-请你:在本机 F:\\0-Note 里手动解决冲突后提交
+请你:在 ${NOTE_LABEL} 里手动解决冲突后提交
 原因:git pull --rebase 失败,自动同步已停下
 不处理的后果:本机与远端会继续分叉,后面每次同步都会停"
     exit 1
@@ -151,7 +151,7 @@ if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
         log "巡检闸门拦下:$(printf '%s' "$vault" | tail -n 3 | tr '\n' ' ')"
         git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
         notify "0-Note 同步 · 需要你处理
-请你:在本机跑 cd F:\\0-Note && python -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
+请你:在 ${NOTE_LABEL} 里跑 python3 -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
 原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
 不处理的后果:这次不会推送 —— 先按报告改掉,或临时把该阶段从 VAULT_GATE_STAGES 里去掉"
         exit 1
@@ -178,7 +178,7 @@ for attempt in 1 2 3; do
 done
 
 notify "0-Note 同步 · 需要你处理
-请你:在本机 F:\\0-Note 跑一次 git push 看报错
+请你:在 ${NOTE_LABEL} 跑一次 git push 看报错
 原因:自动推送连续 3 次失败(多半是远端有新提交或网络问题)
 不处理的后果:本机改动还没上云,服务器也就拉不到"
 exit 1
