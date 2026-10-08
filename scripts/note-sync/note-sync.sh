@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本机 0-Note 同步(三端同步的本机侧):本机 → GitHub → 服务器,以远程仓库为主。
+# 本机内容仓同步(三端同步的本机侧):本机 → GitHub → 服务器,以远程仓库为主。
 # 由 Windows 计划任务每 5 分钟调用一次;幂等,随时可以手动跑。
 #
 # 规则(2026-10-05 与用户确认):
@@ -7,7 +7,7 @@
 #   2. 只提交"2 分钟没被改过"的文件 —— 这个库有多个 AI 会话同时写,
 #      立刻 add 会把别人写了一半的文件提交进去
 #   3. push 前跑脱敏闸门(check-privacy --staged):仓库是 public,命中即撤回暂存并通知
-#   3b. push 前跑 0-Note 巡检(check_vault --fail-on):课件规范 / 断链 / 索引登记这类硬规则必须为 0,
+#   3b. push 前跑内容仓巡检(check_vault --fail-on):课件规范 / 断链 / 索引登记这类硬规则必须为 0,
 #      历史欠账(A3 孤篇 / A5A6 元数据 / A8 标签)留在报告里但不拦(2026-10-06 加)
 #   4. push 失败重试 3 次(每次先 rebase);冲突/被拒 → 停下 + 企业微信通知,绝不 force
 #
@@ -25,7 +25,7 @@ HAC_DIR="${HAC_DIR:-/c/Users/23652/home-automation-configs}"
 QUIET_MIN="${NOTE_SYNC_QUIET_MIN:-2}"
 LOG="${NOTE_SYNC_LOG:-$HOME/.note-sync/sync.log}"
 # 冲突提示里指路用:服务器侧由入口脚本覆盖成自己的路径
-NOTE_LABEL="${NOTE_LABEL:-本机 F:\0-Note}"
+NOTE_LABEL="${NOTE_LABEL:-本机内容仓}"
 mkdir -p "$(dirname "$LOG")"
 
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
@@ -94,12 +94,24 @@ move_conflicting_untracked() {
 move_conflicting_untracked
 
 if ! out=$(timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 pull --rebase --autostash 2>&1); then
-    git rebase --abort >/dev/null 2>&1 || true
-    log "pull 失败:$out"
-    notify "0-Note 同步 · 需要你处理
+    # **区分「真冲突」与「链路不通」** —— 两者处置完全不同,混报会把人叫去解一个不存在的冲突。
+    # 2026-10-09 实测:服务器到 github 的连接时断时续(15s 超时),而这里一律报
+    # 「请你手动解决冲突后提交」;实际工作树干净、没有 rebase 在进行,根本无冲突可解。
+    if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ] \
+       || [ -n "$(git diff --name-only --diff-filter=U 2>/dev/null)" ]; then
+        git rebase --abort >/dev/null 2>&1 || true
+        log "pull 冲突:$out"
+        notify "内容仓 同步 · 有真冲突要处理
 请你:在 ${NOTE_LABEL} 里手动解决冲突后提交
-原因:git pull --rebase 失败,自动同步已停下
+原因:git pull --rebase 因冲突停下(有未合并的路径)
 不处理的后果:本机与远端会继续分叉,后面每次同步都会停"
+    else
+        log "pull 失败(非冲突):$out"
+        notify "内容仓 同步 · 拉取失败(网络,不是冲突)
+请你:不用动仓库 —— 这是到 GitHub 的链路问题,下一轮会自动重试
+原因:$(printf '%s' "$out" | tail -n 1 | cut -c1-160)
+不处理的后果:这一轮同步跳过;连续多轮不通时,服务器内容会停在旧版本"
+    fi
     exit 1
 fi
 [ "$out" != "Already up to date." ] && log "pull:$out"
@@ -132,14 +144,14 @@ fi
 if ! gate=$(node "$HAC_DIR/scripts/check-privacy.mjs" --staged 2>&1); then
     log "脱敏闸门拦下:$gate"
     git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径,别动别的会话已暂存的内容
-    notify "0-Note 同步 · 需要你处理
+    notify "内容仓 同步 · 需要你处理
 请你:看本机 $LOG 的最近几行,删掉凭据或把文件加进 .gitignore
 原因:push 前脱敏检查命中(个人标识或明文账号密码形状)
 不处理的后果:这次不会推送 —— 仓库是公开的,推上去等于永久公开"
     exit 1
 fi
 
-# ── 3b. 巡检闸门(0-Note 自己的规则:课件规范 / 断链 / 索引登记)────
+# ── 3b. 巡检闸门(内容仓自己的规则:课件规范 / 断链 / 索引登记)────
 # 只拦「必须为 0」的阶段;A3/A5/A6/A8 是历史欠账,留在报告里但不拦。整轮检查约 2 秒。
 VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A4,A7,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20}"
 if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
@@ -150,7 +162,7 @@ if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
              "50-资源/工具/vault-check/check_vault.py" --quiet --fail-on "$VAULT_GATE_STAGES" 2>&1); then
         log "巡检闸门拦下:$(printf '%s' "$vault" | tail -n 3 | tr '\n' ' ')"
         git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
-        notify "0-Note 同步 · 需要你处理
+        notify "内容仓 同步 · 需要你处理
 请你:在 ${NOTE_LABEL} 里跑 python3 -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
 原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
 不处理的后果:这次不会推送 —— 先按报告改掉,或临时把该阶段从 VAULT_GATE_STAGES 里去掉"
@@ -177,7 +189,7 @@ for attempt in 1 2 3; do
     sleep 3
 done
 
-notify "0-Note 同步 · 需要你处理
+notify "内容仓 同步 · 需要你处理
 请你:在 ${NOTE_LABEL} 跑一次 git push 看报错
 原因:自动推送连续 3 次失败(多半是远端有新提交或网络问题)
 不处理的后果:本机改动还没上云,服务器也就拉不到"
