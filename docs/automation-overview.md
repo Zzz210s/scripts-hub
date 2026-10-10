@@ -22,7 +22,7 @@
 | 智慧树刷课配置 | `proj-autovisor/configs.ini` |
 | 上游补丁与贡献状态 | `patches/` |
 
-## 1. 四个程序各一行
+## 1. 五个程序各一行
 
 | 程序 | 干什么 | 代码来源 / 仓库 | 本地路径 | 跑在哪台机器 | 什么时候跑 | 运行时 | 凭据从哪来 | 通知怎么发 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -30,6 +30,7 @@
 | **微信读书签到** | 每天完成阅读挑战打卡(读满当日目标,单日上限 120 分钟),再用官方只读 API 回读校验时长真被计入 | 本仓库 `proj-weread-signin/`(MIT;开发在本地克隆 `%WEREAD_DIR%`,无远端);底座 `funnyzak/weread-bot` 固定在 `vendor/`,commit 记在 `VENDOR_COMMIT.txt` | `%WEREAD_DIR%` | 本机 Windows | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 每天 08:30 起每 60 分钟一次,14 小时窗口 | Node.js >= 20.11(实测 v24.14.0)+ Python 3(vendor 依赖 `requests` / `httpx` / `PyYAML` / `urllib3` / `croniter` / `apprise`) | `%WEREAD_DIR%\secrets\`:网页 cookie、官方只读 Key、App 渠道凭据 | 企业微信群机器人;`secrets\wecom-webhook.txt`,发送层 `src/notify.js` |
 | **智慧树刷课** | Autovisor 自动播放智慧树/知到的共享课视频 | 上游 `CXRunfree/Autovisor` v3.17.3(MIT),代码未改,只改配置 | `%AUTOVISOR_DIR%\app`(原始 zip 备份在 `%AUTOVISOR_DIR%`) | **只在本机 Windows**(需要本机 Chrome 与图形会话) | **手动**跑 `Autovisor.exe`;没有计划任务 | 打包好的 exe(PyInstaller;内嵌 Python 3.10 + Playwright)+ 本机标准路径的 Chrome | 运行时手动登录一次,登录态落 `app\data\cookies.json`;`configs.ini` 的账号密码留空 | 程序自带界面与日志,不接企业微信 |
 | **Epic 限免领取** | 每周四探测 Epic 免费清单,只有存在没领过的项才用 Playwright 引擎自动领取;被 hCaptcha 挡住时推预置结账链接 | 上游 `vogler/free-games-claimer` 的 `epic-games.js` + `src/`(AGPL-3.0)逐字节收编在 `proj-epic-free-games/vendor/`,commit 记在 `VENDOR_COMMIT.txt`;探测/状态/登录/通知薄壳自研,同在本仓库 | `proj-epic-free-games/`(就在仓库里,无需另建工作区) | 本机 Windows | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 每天 09:00 起每 240 分钟一次,14 小时窗口,一天最多真跑 2 次;**默认不注册,跑一次 `node src/cli.js login` 后在配置里打开** | Node.js >= 20.11 + patchright 驱动的持久化浏览器 | 不存密码:设备授权 token 在 `secrets/epic-tokens.json`(每次运行自动续期),登录态注入 `data/browser/`;`secrets/wecom-webhook.txt` 只是通知地址;调研见 `proj-epic-free-games/docs/auth.md` | 企业微信群机器人;`secrets/wecom-webhook.txt`,发送层 `src/notify.js` |
+| **B站任务** | 跑 B站每日经验任务(登录 / 观看 / 分享 / 投币 5 枚),由薄壳判断会员状态并领年度大会员的 B币券,再做纯获取型的漫画签到与大积分 | 自研薄壳(零依赖 Node)+ 上游 `RayWangQvQ/BiliBiliToolPro`(GPL-3.0)的 Console,固定 commit `2db0fc613f`,只在构建镜像时取用、不进仓库,来源与复核记在 `proj-bilibili-tasks/NOTICE` | `proj-bilibili-tasks/`(就在仓库里,无需另建工作区) | 云主机容器(或本机 Windows,备用入口) | 登录后 24 分钟 + 每天套件 08:00 / 12:00 两次触发,一天最多真跑 2 次;**默认不注册,扫码登录后在配置里打开**;Linux 侧由 `run-all.sh` 顺序调到,程序自己用守卫与 `no-credentials` 早退 | .NET 10 runtime(上游 Console)+ Node.js >= 20.11(薄壳) | 不存密码:扫码登录产物 `secrets/cookies.json`,失效时推一条「需要你处理」 | 企业微信群机器人;`secrets/wecom-webhook.txt`,发送层 `src/notify.js`;上游 13 个通知 sink 全关 |
 
 表里的「什么时候跑」是默认值,真实时刻由 [`../config/schedule.json`](../config/schedule.json) 决定
 (见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节):改完跑 `node scripts/apply-schedule.mjs --apply --yes`。
@@ -42,7 +43,7 @@
 
 | 仓库 | 可见性 | 作用 | 现状备注 |
 | --- | --- | --- | --- |
-| `Zzz210s/scripts-hub` | PUBLIC | 多个完整项目的合集,每个项目一个隔离子目录(`proj-microsoft-rewards/`、`proj-weread-signin/`、`proj-autovisor/`、`proj-epic-free-games/`),外加合集层的约定文档、补丁存档、向导与同步脚本。同时是两个没 origin 的权威工作区(`%REWARDS_DIR%`、`%WEREAD_DIR%`)的远程落点。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
+| `Zzz210s/scripts-hub` | PUBLIC | 多个完整项目的合集,每个项目一个隔离子目录(`proj-microsoft-rewards/`、`proj-weread-signin/`、`proj-autovisor/`、`proj-epic-free-games/`、`proj-bilibili-tasks/`),外加合集层的约定文档、补丁存档、向导与同步脚本。同时是两个没 origin 的权威工作区(`%REWARDS_DIR%`、`%WEREAD_DIR%`)的远程落点。由 `Zzz210s/home-automation-configs` 删库重建更名而来 | 同时是恢复包 |
 | `Zzz210s/weread-signin` | 已删除(2026-10-04) | 曾是微信读书签到的独立仓库 | 代码已并入 `scripts-hub/proj-weread-signin/`;本机开发克隆 `%WEREAD_DIR%` 保留 |
 | `Zzz210s/automation-suite` | 已删除(2026-10-04) | 曾是自动化脚本与向导的合集仓库(私有) | 已并入 `scripts-hub/docs/`、`scripts-hub/scripts/` |
 | `Zzz210s/wecom-notify` | 已删除(2026-10-04) | 曾是独立的私有企业微信通知 CLI/库 | 已并入 `scripts-hub/`,又于 2026-10-05 拆分:目录删除,只留 `docs/wecom-rules.md` 规则文档,发送实现分散在各项目 |

@@ -23,17 +23,17 @@ Windows 侧(`programs.*`,每个程序一个计划任务):
 
 | 字段 | 含义 | 默认值 |
 | --- | --- | --- |
-| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` |
+| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` -> `bilibili-tasks` |
 | `stagger.baseStartTime` / `slotMinutes` | 第一个程序的每日起始时间 / 相邻程序的间隔 | `08:00` / `30` |
 | `stagger.logonBaseMinutes` / `logonStepMinutes` | 登录后延迟的起点 / 步进 | `3` / `7` |
 | `programs.<id>.startTime` | 每日起始时间 `HH:MM`;`auto` = 按 order+stagger 推导 | `auto` |
-| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60`、Epic `240` |
+| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60`、Epic `240`、B站 `120` |
 | `programs.<id>.windowHours` | 每日触发窗口长度(小时) | `14` |
 | `programs.<id>.maxAttemptsPerDay` | 程序内部一天最多真跑几次(不是触发次数) | `3` |
-| `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10 / 17) |
+| `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10 / 17 / 24) |
 | `programs.<id>.logonRetryMinutes` / `logonRetryWindowMinutes` | 登录触发的重复间隔 / 总时长 | `10` / `60` |
-| `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` 占位符 | 占位符形式 |
-| `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic 默认 `false`,人工登录一次后打开 |
+| `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` / `%EPIC_DIR%` / `%BILIBILI_DIR%` 占位符 | 占位符形式 |
+| `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic 与 B站默认 `false`,各自人工登录一次后打开 |
 
 Linux 侧(`linux`,单套件;与 `scripts/linux/systemd/` 一致):
 

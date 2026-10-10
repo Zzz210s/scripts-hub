@@ -24,6 +24,7 @@ scripts-hub/
 ├── proj-autovisor/           智慧树刷课:只有 Autovisor 配置(程序本体是上游 Windows 包)
 ├── proj-weread-signin/       微信读书签到:程序本体(自动生成的快照,不要直接改这里)
 ├── proj-epic-free-games/     Epic 限免:收编 AGPL 领取引擎 + 探测/状态/企业微信薄壳
+├── proj-bilibili-tasks/      B站任务:上游 C# Console 之上的薄壳 + 企业微信通知
 ├── docs/                     跨项目约定与总览 —— 先看 docs/README.md
 ├── config/                   schedule.json:各程序什么时候跑,生成计划任务/timer 的依据
 ├── patches/                  所有上游补丁,按上游项目分目录
@@ -32,7 +33,7 @@ scripts-hub/
 └── README.md / README.zh-CN.md
 ```
 
-## 四个程序
+## 五个程序
 
 | 程序 | 干什么 | 在哪 |
 | --- | --- | --- |
@@ -40,6 +41,7 @@ scripts-hub/
 | **智慧树刷课** | Autovisor 自动播放智慧树 / 知到的课程视频。 | `proj-autovisor/` |
 | **微信读书签到** | 每天完成微信读书阅读挑战,再用官方只读 API 回读校验时长真被计入。 | `proj-weread-signin/` |
 | **Epic 限免领取** | 每周四领 Epic 商城的限时免费游戏;被 hCaptcha 挡住时退化为推预置结账链接。 | `proj-epic-free-games/` |
+| **B站任务** | 跑 B站每日经验任务,领年度大会员的 B币券,结果推企业微信。 | `proj-bilibili-tasks/` |
 
 另有一条不属于「程序」的计划任务:`AutoShutdown0200` 每天 02:00 无条件关机。代码来源、安装路径、
 跑在哪台机器、调度、通知方式、凭据、云迁移现状、路径约定与许可细节,全都在
@@ -59,6 +61,7 @@ scripts-hub/
 | `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`;离线测试可跳过前两步 |
 | `proj-autovisor/` | 无可执行代码,只有配置;程序本体从上游下载 |
 | `proj-epic-free-games/` | `npm test` + `node src/cli.js status`;真领要 `npm install`、`npx patchright install chromium` 并跑一次设备授权登录(`node src/cli.js login`) |
+| `proj-bilibili-tasks/` | `npm test` + `node src/cli.js run --dry-run`;真跑要构建 Console 镜像并扫码登录一次(`node src/cli.js login`) |
 
 想在新机器上把整套搭起来:
 

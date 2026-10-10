@@ -26,6 +26,7 @@
 | --- | --- | --- | --- |
 | `sync-weread-signin.sh` | 把本机开发克隆 `%WEREAD_DIR%` 的已跟踪文件同步成仓库 `proj-weread-signin/` 的快照 | 每次改完微信读书代码、准备提交前 | 只复制 `git ls-files` 列出的文件;`KEEP` 里的 `QUICKSTART.md` 不被触碰;README 顶部快照说明每次重写 |
 | `sync-microsoft-rewards.sh` | 把权威工作区 `%REWARDS_DIR%` 的已跟踪文件同步成仓库 `proj-microsoft-rewards/` 的快照 | 每次改完微软积分代码或运行器、准备提交前 | 只复制 `git ls-files` + 白名单 `config.json`;跳过 `patches/`;去本机化 + 按机器私有清单脱敏;`--dry-run` 只报告差异 |
+| `sync-bilibili-tasks.sh` | **校验型**:不复制文件,只核 `proj-bilibili-tasks/` 的必要文件、`VENDOR_COMMIT.txt` 与 Dockerfile 的 commit 一致、wecom-core 漂移 | 改完 B站项目、准备提交前;或怀疑 commit/漂移不一致时 | 权威副本就在本仓库(同 `proj-epic-free-games/`),没有东西可同步;将来真拆出独立工作区再照 `sync-weread-signin.sh` 升级 |
 
 ## 部署(把快照刷回本机)
 
@@ -57,6 +58,7 @@
 | `setup-microsoft-rewards.sh` | Node >= 24、`npm ci`、patchright chromium、`.env` 模板、`npm run build`、26 条离线测试 | 默认联网(依赖与浏览器);`--no-install --no-browser --no-build` 可只跑离线测试 |
 | `setup-autovisor.sh` | `configs.ini` 是否存在、课程链接是否受支持、账号密码是否留空、程序本体是否解压 | 不联网 |
 | `setup-epic-free-games.sh` | Node >= 20.11、项目文件与上游引擎、离线测试、`status` 干跑、引擎依赖、登录态与 webhook | 不联网(测试与干跑都不发请求) |
+| `setup-bilibili-tasks.sh` | Node >= 20.11、项目文件与 Dockerfile、离线测试、`run --dry-run` 干跑、登录凭据与 webhook | 不联网(测试与干跑都不发请求、不起子进程) |
 
 ## 调度(时间来自 `config/schedule.json`)
 
@@ -118,6 +120,8 @@
 
 - `sync-weread-signin.sh` 的 `KEEP` 列表决定快照目录里哪些文件不被同步触碰(现在只有 `SNAPSHOT.txt`
   与 `QUICKSTART.md`)。往 `proj-weread-signin/` 放手写文件会让快照目录不再「纯生成」,应改放到 `docs/`。
+- `sync-bilibili-tasks.sh` 是**校验型**同步:权威副本就在本仓库内,它不复制任何文件,只做三件机器判定
+  (必要文件、上游 commit 三处一致、wecom 漂移)。不要给它加复制逻辑 —— 那会与 `proj-epic-free-games/` 的做法冲突。
 - `sync-microsoft-rewards.sh` 的 `KEEP`/`SKIP`/`EXTRA`/`RENAMES` 是一张显式清单:`KEEP` 是本目录
   自维护、不写不删的文件,`SKIP` 是源仓库里不发布的路径前缀,`EXTRA` 是源仓库未跟踪但要发布的文件,
   `RENAMES` 是路径改名。脱敏标识从不写进脚本,而是运行时从机器私有 `sensitive-patterns.txt` 读;

@@ -43,6 +43,15 @@
 **没有密码类凭据**:程序刻意不向引擎传 `EG_EMAIL` / `EG_PASSWORD`,所以不存在「密码泄漏」这条路径。
 上游支持存密码,本项目不用。
 
+## B站任务(`proj-bilibili-tasks/`)
+
+| 凭据 | 文件 | 去哪拿 | 有效期与恢复 |
+| --- | --- | --- | --- |
+| 扫码登录产物 | 服务器 `/srv/apps/automation/bilibili/secrets/cookies.json`(权限 600);容器内由 `run-once.sh` 复制到 `/app/cookies.json` 再用 | 在服务器上跑一次扫码登录(见 `QUICKSTART.md`);产物由上游 Console 写入 | 失效时程序会推一条「需要你处理」,重新扫码一次即可 |
+| 企业微信群机器人 webhook | 服务器 `/srv/apps/automation/bilibili/secrets/wecom-webhook.txt`(权限 600) | 新建一个独立的企业微信机器人(不同群、不同 key) | 文件不存在时不推送,其余照常 |
+
+**没有密码类凭据**:只用扫码登录产物,不存账号密码。
+
 ## 与本仓库无关的私有文件
 
 `~/.config/automation-suite/local-paths.env` 是**路径配置**,不是凭据:它告诉 `scripts/*.sh`

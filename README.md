@@ -32,6 +32,7 @@ scripts-hub/
 ├── proj-autovisor/           Zhihuishu playback: the Autovisor config only (the program is an upstream Windows build)
 ├── proj-weread-signin/       WeRead check-in: the program itself (generated snapshot, do not edit here)
 ├── proj-epic-free-games/     Epic free games: vendored AGPL claim engine plus a probe/state/WeCom shell
+├── proj-bilibili-tasks/      Bilibili daily tasks: a thin Node shell over the upstream C# console, with WeCom notifications
 ├── docs/                     Cross-project conventions and overviews -- read docs/README.md first
 ├── config/                   schedule.json: when each program runs; drives the task/timer generation
 ├── patches/                  Every upstream patch, one folder per upstream project
@@ -40,7 +41,7 @@ scripts-hub/
 └── README.md / README.zh-CN.md
 ```
 
-## The four programs
+## The five programs
 
 | Program | What it does | Where |
 | --- | --- | --- |
@@ -48,6 +49,7 @@ scripts-hub/
 | **Zhihuishu playback** | Autovisor plays Zhihuishu / Zhida course videos automatically. | `proj-autovisor/` |
 | **WeRead check-in** | Completes the daily reading challenge and verifies the counted minutes through the official read-only API. | `proj-weread-signin/` |
 | **Epic free games** | Claims the weekly Epic Games Store free games, with a prefilled-checkout-link fallback when hCaptcha blocks checkout. | `proj-epic-free-games/` |
+| **Bilibili daily tasks** | Runs the daily experience tasks and claims the annual-VIP voucher, then pushes the result through WeCom. | `proj-bilibili-tasks/` |
 
 One scheduled task is not a program: `AutoShutdown0200` powers the machine off at 02:00 every
 day. Code sources, install paths, machines, schedules, notification channels, credentials, the
@@ -69,6 +71,7 @@ Minimum steps from a fresh clone to something that runs:
 | `proj-microsoft-rewards/` | `npm ci` + patchright chromium + `npm run build`; the offline tests skip the first two |
 | `proj-autovisor/` | nothing executable here, config only; the program comes from upstream |
 | `proj-epic-free-games/` | `npm test` + `node src/cli.js status`; a real claim needs `npm install`, `npx patchright install chromium` and one device-authorization login (`node src/cli.js login`) |
+| `proj-bilibili-tasks/` | `npm test` + `node src/cli.js run --dry-run`; a real run needs the Console image built and one QR-code login (`node src/cli.js login`) |
 
 To rebuild the whole setup on a new machine:
 

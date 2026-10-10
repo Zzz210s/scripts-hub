@@ -13,6 +13,7 @@
 | 微信读书签到 | `%WEREAD_DIR%`(本机本地克隆,无远端) | `proj-weread-signin/` | `bash scripts/sync-weread-signin.sh` |
 | 智慧树刷课 | 无代码可改:程序本体是上游 Windows 打包程序,本仓库只存配置 | `proj-autovisor/`(只有 `configs.ini` 与 README) | 直接改配置 |
 | Epic 限免领取 | 代码就在本仓库 `proj-epic-free-games/`(薄壳自研 + 上游引擎快照),不要另建工作区 | 同左 | 直接改;上游引擎按 `proj-epic-free-games/VENDOR_COMMIT.txt` 重新取文件升级 |
+| B站任务 | 代码就在本仓库 `proj-bilibili-tasks/`(薄壳自研 + 上游 C# Console 在构建镜像时按 commit 取用),不要另建工作区 | 同左 | 直接改;`scripts/sync-bilibili-tasks.sh` 是**校验型**(不复制文件,只核 commit 一致与 wecom 漂移) |
 
 企业微信发送不再是独立项目:实现分散在各项目内,共享约束与规则见
 [`docs/wecom-rules.md`](wecom-rules.md),一致性由 `scripts/check-wecom-drift.mjs` 守住。

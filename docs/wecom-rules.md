@@ -14,8 +14,9 @@
 | 微软积分 | `proj-microsoft-rewards/wechat-bridge/lib/wecom.js`(分发在 `lib/channels.js`,排版在 `lib/report.js`、`lib/start.js`、`lib/skip.js`) | `start` / `result` / `skip` / `action` | 每次运行 |
 | 微信读书签到 | `proj-weread-signin/src/notify.js`(策略在 `src/notify-policy.js`,发送时机在 `src/run-notice.js`、`src/run.js`) | `start` / `result` / `skip` / `action` | 每次运行 |
 | Epic 限免领取 | `proj-epic-free-games/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 探测到当期还有没领过的免费游戏时 |
+| B站任务 | `proj-bilibili-tasks/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 守卫通过后每次运行;`action` 只在 cookie 失效或扫码登录时发 |
 
-三份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
+四份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
 由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外层
 (消息排版、webhook 读取、返回形状)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。

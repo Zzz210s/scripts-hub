@@ -17,12 +17,12 @@
 **类型名统一,分工统一**;每条消息只属于一个类型。子形态(例如"结果成功"与"结果有失败")
 只是同一类型的不同文案,不再另起类型名。
 
-| 类型名 | 含义 | 微软积分 | 微信读书签到 | Epic 限免领取 |
-| --- | --- | --- | --- | --- |
-| `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 | `src/run.js` 调 `messages.js` 的 `buildStartMessage` |
-| `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 | `src/messages.js` 的 `buildResultMessage`,由 `src/run.js` 发送 |
-| `skip` 正常跳过 | 触发被规则拦下,这次不跑 —— **2026-10-04 起一律只写运行日志,不推送** | 无(微软 `memory` / `handled` / `exhausted` 已不再调用推送) | 无(reason 不属于 `action` 时 `isSilentSkip` 返回 true) | `src/policy.js` 的 `isSilentSkip` |
-| `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` | 同上,`kind=captcha` / `login` / `blocked`;`captcha` 与 `blocked` 带预置结账链接 |
+| 类型名 | 含义 | 微软积分 | 微信读书签到 | Epic 限免领取 | B站任务 |
+| --- | --- | --- | --- | --- | --- |
+| `start` 开始运行 | 本次真的要跑了,run 之前发 | `wechat-bridge/notify-start.js` | `src/notify-policy.js` 的 `buildStartMessage`,由 `src/run-notice.js` 发送 | `src/run.js` 调 `messages.js` 的 `buildStartMessage` | `src/messages.js` 的 `buildStartMessage`,由 `src/run.js` 发送 |
+| `result` 运行结果 | 每次运行结束发一条:成功 / 有失败 / 中断无数据 | `wechat-bridge/notify-run.js`(排版在 `lib/report.js`) | `src/notify.js` 的 `buildReport`,由 `src/run.js` 发送 | `src/messages.js` 的 `buildResultMessage`,由 `src/run.js` 发送 | `src/messages.js` 的 `buildResultMessage`,由 `src/run.js` 发送;会员券结果并入这一条 |
+| `skip` 正常跳过 | 触发被规则拦下,这次不跑 —— **2026-10-04 起一律只写运行日志,不推送** | 无(微软 `memory` / `handled` / `exhausted` 已不再调用推送) | 无(reason 不属于 `action` 时 `isSilentSkip` 返回 true) | `src/policy.js` 的 `isSilentSkip` | `src/policy.js` 的 `isSilentSkip`;`no-credentials` 也在这一类 |
+| `action` 需要你处理 | 不处理就会一直不跑,不受频率限制;正文第一句就是请你做什么 | `wechat-bridge/notify-skip.js` `nocreds` | 同上,`reason=credential-invalid` 或 `stats-unavailable` | 同上,`kind=captcha` / `login` / `blocked`;`captcha` 与 `blocked` 带预置结账链接 | `src/messages.js` 的 `buildActionMessage`;`kind=login` / `cookie-invalid` / `risk-blocked` |
 
 「正常跳过」**一律不推送**(2026-10-04 用户要求):企业微信只收「需要你处理」那一类。
 跳过原因照旧整条写进运行日志,事后可查「这次为什么没跑」—— 见下面的「静音的跳过」。
