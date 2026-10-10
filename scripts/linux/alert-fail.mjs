@@ -18,6 +18,7 @@ const webhookFiles = {
     微软积分: '/srv/apps/automation/rewards/wechat-bridge/data/wecom-webhook.txt',
     微信读书签到: '/srv/apps/automation/weread/secrets/wecom-webhook.txt',
     'Epic 限免': '/srv/apps/automation/epic/secrets/wecom-webhook.txt',
+    'B站任务': '/srv/apps/automation/bilibili/secrets/wecom-webhook.txt',
     服务器: '/srv/apps/automation/secrets/wecom-server.txt'
 }
 const webhookFile = webhookFiles[program]

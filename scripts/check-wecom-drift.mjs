@@ -19,7 +19,8 @@ const END = '// <<< wecom-core end'
 const FILES = [
     'proj-microsoft-rewards/wechat-bridge/lib/wecom.js',
     'proj-weread-signin/src/notify.js',
-    'proj-epic-free-games/src/notify.js'
+    'proj-epic-free-games/src/notify.js',
+    'proj-bilibili-tasks/src/notify.js'
 ]
 
 /** 取出 `wecom-core begin` 到 `wecom-core end` 之间(含两行标记)的整块源码。 */

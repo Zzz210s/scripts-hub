@@ -106,3 +106,23 @@ services:
     shm_size: 1g
     init: true
     mem_limit: 1800m
+
+  # B站每日任务:上游 .NET Console + 薄壳;没有浏览器,不需要 shm/init
+  bilibili-run:
+    image: automation-bilibili:local
+    container_name: bilibili-run
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/deploy/run-once.sh"]
+    environment:
+      TZ: Asia/Shanghai
+      # 同伴(另几个程序)的单实例锁:错峰判定要用(.env 侧的 BILIBILI_BUSY_PEERS)
+      BILIBILI_BUSY_PEERS: /peers/rewards/run.lock
+    volumes:
+      - ./bilibili/data:/opt/bili/data
+      - ./bilibili/logs:/opt/bili/logs
+      - ./bilibili/secrets:/opt/bili/secrets
+      - ./rewards/logs:/peers/rewards:ro
+      - ./bilibili/deploy:/opt/deploy:ro
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1200m
