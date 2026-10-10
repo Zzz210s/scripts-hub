@@ -1,0 +1,20 @@
+{
+  "name": "bilibili-tasks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unattended Bilibili daily tasks and annual-VIP voucher claim, driven by a thin Node shell over BiliBiliToolPro with WeCom notifications.",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "author": "Zzz210s",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzz210s/scripts-hub.git",
+    "directory": "proj-bilibili-tasks"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

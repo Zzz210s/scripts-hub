@@ -1,0 +1,29 @@
+# 来源与许可
+
+本目录的代码以 **GPL-3.0-only** 授权(见同目录 LICENSE),与它调用的上游项目保持一致。
+
+## 上游项目
+
+| 项目 | 地址 | 固定版本 | 许可 |
+| --- | --- | --- | --- |
+| BiliBiliToolPro | https://github.com/RayWangQvQ/BiliBiliToolPro | commit `2db0fc613f` 2026-10-08T14:37:35Z | GPL-3.0 |
+
+我们做了什么:不修改上游任何代码,以「进程 + HTTP」边界调用它的 Console 程序
+(`dotnet Ray.BiliBiliTool.Console.dll`,任务清单由 `Ray_RunTasks` 环境变量给出)。
+上游源码只在构建镜像时按上面的 commit 取用,**不进本仓库**。
+
+镜像不对外分发(自用),因此不触发 GPL-3.0 的分发附源码义务;若将来要分发,
+必须同时提供上游对应 commit 的完整源码与本仓库的构建脚本。
+
+## 对上游行为的两点现场复核
+
+复核时间 2026-10-11,对象是上面的固定 commit。
+
+1. **`Ray_RunTasks` 必须显式给**:不给的话上游会打印交互菜单并等 stdin,容器里会一直挂到看门狗杀它。
+2. **`Daily` 任务内嵌的领券步骤不受 `VipPrivilegeConfig:IsEnable=false` 控制**:
+   `src/Ray.BiliBiliTool.Application/DailyTaskAppService.cs` 在 Daily 流程里**无条件**调用
+   `vipPrivilegeDomainService.ReceiveVipPrivilege(...)`;而独立的
+   `VipPrivilegeTaskAppService` 才检查 `IsEnable`。所以把 `VipPrivilege` 关掉并不会阻止
+   Daily 去领一次券。重复领取返回业务码 `69801 你已领取过该权益`,无副作用,只是多两次接口调用。
+   本项目的 B币券流程发生在 Console **之前**,因此 Console 里那一次要么是重复、要么已经领过,
+   薄壳随后的自证都能看到已领状态。

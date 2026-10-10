@@ -1,0 +1,4 @@
+RayWangQvQ/BiliBiliToolPro 2db0fc613f6fab92ad0a6ea1babe0b32c9d67392
+日期: 2026-10-08T14:37:35Z
+说明: 上游源码不在本仓库,vendor 只在构建镜像时按这个 commit 取用。
+      scripts/linux/bilibili/Dockerfile 的 ARG UPSTREAM_SHA 必须与这里的短 sha 一致。
