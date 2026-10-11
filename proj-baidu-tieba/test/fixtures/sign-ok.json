@@ -1,0 +1,11 @@
+{
+  "no": 0,
+  "error_code": "0",
+  "error_msg": "",
+  "error": { "errno": 0, "errmsg": "" },
+  "user_info": {
+    "is_sign_in": "1",
+    "sign_bonus_point": 8,
+    "user_sign_rank": 208
+  }
+}
