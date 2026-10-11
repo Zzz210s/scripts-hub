@@ -11,14 +11,16 @@ import os from 'node:os'
 import { pathToFileURL } from 'node:url'
 import { loadConfig } from './config.js'
 import { dateText } from './clock.js'
-import { readCookie, fetchNav, fetchVoucher, receiveVoucher, fetchCoin, fetchFollowingsTotal } from './api.js'
+import { readCookie, fetchNav, fetchVoucher, receiveVoucher, fetchCoin, fetchFollowingsTotal, fetchExpReward } from './api.js'
 import { parseLenient } from './lenient-json.js'
 import { memberFromNav } from './member.js'
 import { voucherDecision } from './voucher.js'
 import { runConsole } from './console-runner.js'
 import { runLogin } from './login.js'
 import { sendWecom } from './notify.js'
-import { buildActionMessage } from './messages.js'
+import { buildActionMessage, renderExpLine } from './messages.js'
+import { expFromReward } from './exp.js'
+import { sanitizeDetail } from './classify.js'
 import { runOnce } from './run.js'
 import { peerRunning } from './lock.js'
 import { attemptsToday, loadState, saveState, setPaused } from './state.js'
@@ -110,6 +112,9 @@ export async function main(argv = process.argv.slice(2), options = {}) {
         } else {
             out('券:非年度大会员,跳过')
         }
+        const reward = await fetchExpReward(credential.cookie, { fetchImpl: injected.fetchImpl })
+        const view = reward.ok ? expFromReward(reward.data?.data) : null
+        out(view ? renderExpLine(view) : `每日任务:取不到 · ${sanitizeDetail(reward.error) || '接口失败'}`)
         return 0
     }
 
@@ -139,6 +144,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
             fetchVoucher: (cookie) => fetchVoucher(cookie, { fetchImpl: injected.fetchImpl }),
             receiveVoucher: (cookie, csrf) => receiveVoucher(cookie, csrf, { fetchImpl: injected.fetchImpl }),
             fetchCoin: (cookie) => fetchCoin(cookie, { fetchImpl: injected.fetchImpl }),
+            fetchExpReward: (cookie) => fetchExpReward(cookie, { fetchImpl: injected.fetchImpl }),
             fetchFollowingsTotal: (cookie, mid) => fetchFollowingsTotal(cookie, mid, { fetchImpl: injected.fetchImpl }),
             runConsole: (tasks, envMap, runDeps) => runConsole(tasks, envMap, { ...runDeps, spawnImpl: injected.spawnImpl }),
             send: async (text) => {

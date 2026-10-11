@@ -58,7 +58,7 @@ test('cookies 不打印 cookie 值', async () => {
     assert.ok(!out.text().includes('csrf9'))
 })
 
-test('check 打印会员类型与硬币余额', async () => {
+test('check 打印会员类型、硬币余额与每日任务真值', async () => {
     const dir = freshDir()
     const names = { sess: 'SESS' + 'DATA', jct: 'bili' + '_jct', did: 'Dede' + 'UserID' }
     const file = path.join(dir, 'cookies.json')
@@ -71,13 +71,16 @@ test('check 打印会员类型与硬币余额', async () => {
             fetchImpl: async (url) => ({
                 ok: true,
                 status: 200,
-                text: async () => (url.includes('site/getCoin')
-                    ? JSON.stringify({ code: 0, data: { money: 99 } })
-                    : JSON.stringify({ code: 0, data: { isLogin: true, vipStatus: 1, vipType: 1, money: 99 } }))
+                text: async () => {
+                    if (url.includes('site/getCoin')) return JSON.stringify({ code: 0, data: { money: 99 } })
+                    if (url.includes('exp/reward')) return JSON.stringify({ code: 0, data: { login: true, watch: true, coins: 50, share: false } })
+                    return JSON.stringify({ code: 0, data: { isLogin: true, vipStatus: 1, vipType: 1, money: 99 } })
+                }
             })
         }
     })
     assert.equal(code, 0)
     assert.ok(out.text().includes('会员:monthly'))
     assert.ok(out.text().includes('硬币余额:99'))
+    assert.ok(out.text().includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 未完成 · 投币 已得 50 · 共 60 经验'), out.text())
 })
