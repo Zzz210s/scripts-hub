@@ -17,6 +17,9 @@
 
 企业微信发送不再是独立项目:实现分散在各项目内,共享约束与规则见
 [`docs/wecom-rules.md`](wecom-rules.md),一致性由 `scripts/check-wecom-drift.mjs` 守住。
+共享块有**单一源**:`scripts/lib/{wecom-core.js,wecom-notify.py}`,由
+`scripts/gen-wecom-core.mjs` 注入到各实现;两个同步脚本在发布快照后会再跑一次生成器,
+把单一源同时注入快照与权威工作区(所以**改共享行为不要在任一副本上改**)。
 
 ***换机后,`%REWARDS_DIR%` 与 `%WEREAD_DIR%` 就是要从本仓库恢复出来的目录。***
 
@@ -31,6 +34,7 @@ git add <显式路径> && git commit
 
 cd <hub>                     # 2. 发布成本仓库的快照
 bash scripts/sync-microsoft-rewards.sh        # 先 --dry-run 看差异也行
+#    该脚本会顺带把共享块(scripts/lib/wecom-core.js)注入到快照与上面的权威工作区
 git add proj-microsoft-rewards && git status     # 3. 复核后提交推送
 git commit && git push
 ```

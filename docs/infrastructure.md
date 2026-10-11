@@ -206,8 +206,8 @@ mirror 比可达历史大出来的部分是仓库里**已不可达的对象**(`g
 - **apprise 已经装着**:`Apprise v2.0.0`,来自 scoop 的 Python(`~/scoop/apps/python/current/Scripts/apprise`)。
 - 它**原生支持企业微信群机器人**:`apprise --details` 列出 `wecombot` schema,
   `apprise --dry-run "wecombot://<key>"` 解析通过。也就是说它与现有发送层是**同一个通道**。
-- 现有实现是三份独立的 `wecom-core`(微软积分 Node、微信读书 Python、Epic Node),
-  由 `scripts/check-wecom-drift.mjs` 锁住**逐字节一致**;契约写在
+- 现有实现是四份各自内嵌的 `wecom-core`(字节相同,单一源在 `scripts/lib/wecom-core.js`,
+  由 `scripts/gen-wecom-core.mjs` 注入),由 `scripts/check-wecom-drift.mjs` 锁住**逐字节一致**;契约写在
   [wecom-rules.md](wecom-rules.md):字节级截断、超时、重试、`errcode` 处理、脱敏。
 
 ### 2.2 上不上

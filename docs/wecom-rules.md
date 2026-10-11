@@ -18,8 +18,23 @@
 
 四份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
 由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外层
-(消息排版、webhook 读取、返回形状)。消息类型、文案与频率的表见
+(消息排版、webhook 读取、返回形状,清单见 §9)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。
+
+**块本身有单一源**:块内容住在 `scripts/lib/wecom-core.js`(以及 shell 侧的
+`scripts/lib/wecom-notify.py`),由 `scripts/gen-wecom-core.mjs` 注入到各实现里。
+改共享行为只改单一源,然后:
+
+```bash
+node scripts/gen-wecom-core.mjs            # 注入,只改与单一源不一致的文件
+node scripts/gen-wecom-core.mjs --check    # 只检查(CI/提交前用)
+node scripts/gen-wecom-core.mjs --dry-run  # 看会改哪些文件
+```
+
+为什么是「内嵌 + 生成」而不是共享包:这四份实现的宿主各自独立部署(容器构建上下文
+互不相通),两个快照项目的真源还在别的工作区里 —— 跨目录 import 会把「改一处」变成
+「改四处工作流」。历史上曾经抽过公共库 `wecom-notify/`(2026-10-04),随后被拆掉
+(`de2deb9`),只留这份规则文档,原因就是同一个。
 
 shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不是项目运行结果):
 
@@ -100,9 +115,15 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
 
 ## 8. 一致性要求
 
-- 各实现的 `wecom-core` 块必须**逐字节一致**;改任何一处,都要把整块同步到其余各处。
-  块内有一行注释只列了最早的两份实现(那两处是生成快照,不能就地改);实际比对的文件清单
-  以 `scripts/check-wecom-drift.mjs` 的 `FILES` 为准。
+- **先改单一源,再生成**。共享块的内容只允许住在 `scripts/lib/wecom-core.js`(Node 侧)与
+  `scripts/lib/wecom-notify.py`(shell 侧);各实现里的副本一律由生成器写入,**不要手改副本**:
+
+  ```bash
+  $EDITOR scripts/lib/wecom-core.js     # 1. 改单一源(块内不要写文件名/项目名)
+  node scripts/gen-wecom-core.mjs       # 2. 注入到各实现
+  node scripts/gen-wecom-core.mjs --check && node scripts/check-wecom-drift.mjs   # 3. 两道检查
+  ```
+
 - 提交前跑漂移检测:
 
   ```bash
@@ -117,10 +138,26 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
   node scripts/check-notify-fidelity.mjs
   ```
 
-- 三份实现里,`proj-microsoft-rewards/` 来自 `%REWARDS_DIR%`、`proj-weread-signin/` 来自 `%WEREAD_DIR%`,
-  两者都是**生成快照**;`proj-epic-free-games/` 的权威副本就在本仓库里。改发送核心要先改共享核心的权威来源
-  (两份快照要改各自的工作区),再跑 `scripts/sync-microsoft-rewards.sh` / `scripts/sync-weread-signin.sh`
-  发布,直接改快照会被下次同步覆盖。工作模型见 [workspace-model.md](workspace-model.md)。
+- `proj-microsoft-rewards/` 与 `proj-weread-signin/` 是**生成快照**(`scripts/sync-*.sh` 从
+  `%REWARDS_DIR%` / `%WEREAD_DIR%` 发布),不要就地改它们里的内容:直接改会被下次同步覆盖。
+  好消息是**共享块不用手工同步** —— 两个同步脚本在复制完快照后会跑一次生成器,
+  把单一源同时注入快照与权威工作区(两侧都不留旧块)。工作模型见 [workspace-model.md](workspace-model.md)。
+
+## 9. 外层允许的差异(已核对的现状)
+
+共享块只统一「发送行为」,不统一公开 API。下面这些差异是**有意保留**的,改动外层时不要以
+「对齐」为名顺手改掉(真要统一就单独立项,它会连带改 4 个项目的调用点与测试):
+
+| 维度 | `proj-microsoft-rewards` | 其它三个项目 |
+| --- | --- | --- |
+| 失败语义 | `sendWecom` **抛异常**;另有 `isConfigured()` / `webhookUrl()` | 返回 `{ ok:false, error }`,不抛;**没有**配置探测 |
+| 可注入的传输层 | 只允许覆盖 `url`;另有 `__deliverWecom` 测试钩子注入 fetch/sleep/重试 | 通过 `options` 传 `fetchImpl` / `sleep` / `retries` / `timeoutMs` / `onRetry` |
+| 消息类型 | 公开 API 只发文本(块内支持 markdown,但没暴露) | `options.msgtype='markdown'` 走 markdown 字段(上限 4096 字节) |
+| 辅助导出 | 无 | `maskSecret()`、`truncateText()`、`loadWebhook()` |
+| 返回细节 | `true`(或抛) | `{ ok:true }`,失败时带 `errcode` |
+
+可验证的效果:2026-10-11 的外部形状差异清单就是用
+`node scripts/check-notify-fidelity.mjs` 逐条跑出来的(所有实现都过)。
 
 ## Key points (English)
 
@@ -130,7 +167,8 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
 - Timeout 10s; retry network/timeout/HTTP errors and `errcode=45009` with exponential backoff
   (1s, 2s); never retry other errcodes. `93000`/`93004` mean manual action is required.
 - Rate limit is about 20 messages per minute per robot; a run sends at most two messages.
-- The `wecom-core` block must stay byte-identical across implementations; run
+- The `wecom-core` block has a single source at `scripts/lib/wecom-core.js`; inject it with
+  `node scripts/gen-wecom-core.mjs` (never hand-edit a copy) and verify with `--check` plus
   `node scripts/check-wecom-drift.mjs`. The three shell `notify()` implementations share a second
   byte-identical block (`wecom-notify`) and pass the body through `argv`, never through stdin.
 - Run `node scripts/check-notify-fidelity.mjs` after touching any sender: it pushes a tricky

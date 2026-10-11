@@ -118,6 +118,17 @@ fi
 
 find "$DEST" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
+# 共享核心块:由 scripts/lib/wecom-core.js 这个单一源注入,快照与**权威工作区**两边都刷 ——
+# 只刷快照的话,工作区那份会留着旧块,而工作区的测试跑的就是它(静默分叉)。
+# 注入只动 `>>> wecom-core begin/end` 之间,不碰发布件的脱敏改写。
+if command -v node >/dev/null 2>&1; then
+  node "$REPO_DIR/scripts/gen-wecom-core.mjs" --group wecom-core \
+    --extra "$SOURCE/src/notify.js" \
+    || { printf '错误:共享核心块注入失败\n' >&2; exit 1; }
+else
+  printf '警告:没有 node,跳过共享核心块注入(记得手动跑 node scripts/gen-wecom-core.mjs)\n' >&2
+fi
+
 {
   printf 'source: local development clone %%WEREAD_DIR%%, tracked files only\n'
   printf 'published in: Zzz210s/scripts-hub -> proj-weread-signin/\n'
