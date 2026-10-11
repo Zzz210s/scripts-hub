@@ -51,7 +51,7 @@ proj-bilibili-tasks/
 On the server, with the suite at `/srv/apps/automation`:
 
 ```
-mkdir -p /srv/apps/automation/bilibili/{data,logs,secrets,deploy}
+mkdir -p /srv/apps/automation/bilibili/{data,logs,logs/console,secrets,deploy}
 cp -r proj-bilibili-tasks/src            /srv/apps/automation/bilibili/src
 cp scripts/linux/bilibili/deploy/run-once.sh /srv/apps/automation/bilibili/deploy/
 cp scripts/linux/bilibili/Dockerfile     /srv/apps/automation/bilibili/Dockerfile
@@ -116,6 +116,20 @@ node src/cli.js cookies        # account ids only, never the cookie value
 From the repository root: `bash scripts/setup-bilibili-tasks.sh` runs the offline self-check, and
 `node scripts/check-wecom-drift.mjs` verifies the notification core is byte-identical to the other
 three copies.
+
+## Diagnostics
+
+| Path | Content |
+| --- | --- |
+| `logs/last-run.log` | host-side output of the last run (previous one in `previous-run.log`) |
+| `logs/console/log<date>.txt` | the upstream Console's own Verbose log |
+
+`logs/console` is mounted onto the container's `/app/Logs` (the Serilog File sink of the upstream
+console, `rollingInterval: Day`), so it outlives the one-shot container. The host runner prunes
+files older than 30 days. When a task silently did nothing, read this log first: the upstream
+`CookieTaskGuard` used to abort a whole run on a 15-second nav timeout while still exiting 0, so
+the thin shell now sets `Ray_CookieCheck__AutoCheckEnabled=false` and also classifies that abort as
+`guard-skipped` instead of success.
 
 ## Rollback
 

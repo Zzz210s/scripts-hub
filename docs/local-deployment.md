@@ -207,3 +207,9 @@ node scripts/apply-schedule.mjs --apply --yes  # 真注册(覆盖同名任务)
 5. `npm ci` + `npx patchright install chromium` + `npm run build`(微软);`--vendor` 克隆底座(微信读书)。
 6. 注册计划任务:`node scripts/apply-schedule.mjs --dry-run` 核对后 `--apply --yes`(时刻来自 `config/schedule.json`);关机任务另按工作区文档。
 7. 跑 `bash scripts/setup-<项目>.sh` 与对应 `deploy-*.sh --dry-run` 逐项核对。
+
+## 9. B站任务(仅服务器,本机不部署)
+
+本机只作 Windows 备用入口。服务器侧的上游 Console Verbose 日志落在
+`/srv/apps/automation/bilibili/logs/console/log<日期>.txt`(容器内 `/app/Logs`,按天滚),
+任务「什么都没做」时先看它;容器化部署细节见 [`docker-deployment.md`](docker-deployment.md)。

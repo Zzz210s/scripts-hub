@@ -120,6 +120,9 @@ services:
     volumes:
       - ./bilibili/data:/opt/bili/data
       - ./bilibili/logs:/opt/bili/logs
+      # 上游 Console 的 Verbose 文件日志(Serilog File sink -> /app/Logs;按天滚,文件名 log<日期>.txt)。
+      # 不挂出来的话容器一退就没了,排障时先看这里(2026-10-11 起)。
+      - ./bilibili/logs/console:/app/Logs
       - ./bilibili/secrets:/opt/bili/secrets
       - ./rewards/logs:/peers/rewards:ro
       - ./bilibili/deploy:/opt/deploy:ro

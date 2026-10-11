@@ -248,6 +248,10 @@ docker builder prune -f                # 清(不影响镜像,只让下次重建�
 
 **`suite-check resources`** 会在宿主上打一份水位(镜像/构建缓存/内存/swap/根分区),只在真该清时提示。
 
+**B站任务的上游 Verbose 日志**(2026-10-11 接入):容器内 Console 把日志写到 `/app/Logs/log<日期>.txt`
+(Serilog File sink,`rollingInterval: Day`)。`compose.yaml` 已把 `bilibili/logs/console` 挂到该路径,
+容器退出不丢;`bilibili/run.sh` 每次运行前清 30 天前的旧文件。任务「什么都没做」时先看它。
+
 ## 7.6 宿主调优(2026-10-05)
 
 先量后调:24 小时均值 `%idle 86.2`、磁盘 `%util 6.3` —— 这台机器平时很闲,尖峰来自 VS Code 的全盘

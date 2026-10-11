@@ -46,7 +46,7 @@ proj-bilibili-tasks/
 服务器上,套件根目录按 `/srv/apps/automation`:
 
 ```
-mkdir -p /srv/apps/automation/bilibili/{data,logs,secrets,deploy}
+mkdir -p /srv/apps/automation/bilibili/{data,logs,logs/console,secrets,deploy}
 cp -r proj-bilibili-tasks/src                /srv/apps/automation/bilibili/src
 cp scripts/linux/bilibili/deploy/run-once.sh /srv/apps/automation/bilibili/deploy/
 cp scripts/linux/bilibili/Dockerfile         /srv/apps/automation/bilibili/Dockerfile
@@ -105,6 +105,18 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 
 在仓库根还有:`bash scripts/setup-bilibili-tasks.sh` 跑离线自检;
 `node scripts/check-wecom-drift.mjs` 校验通知核心与另外三份逐字节一致。
+
+## 诊断日志
+
+| 路径 | 内容 |
+| --- | --- |
+| `logs/last-run.log` | 宿主侧最近一次运行输出(上一次在 `previous-run.log`) |
+| `logs/console/log<日期>.txt` | 上游 Console 自己的 Verbose 日志 |
+
+`logs/console` 挂到容器内的 `/app/Logs`(上游 Console 的 Serilog File sink,`rollingInterval: Day`),
+容器退出不丢;宿主运行器每次跑之前清掉 30 天前的旧文件。任务“什么都没做”时先看它:
+上游 `CookieTaskGuard` 曾在 nav 15 秒超时时整次跳过且退出码仍为 0,薄壳现已设
+`Ray_CookieCheck__AutoCheckEnabled=false`,并把这种中途终止归类为 `guard-skipped` 而不是成功。
 
 ## 回滚
 

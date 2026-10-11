@@ -14,7 +14,9 @@ LOG="$ROOT/logs/last-run.log"
 RLOG="$ROOT/logs/runner.log"
 # 薄壳侧 Console 超时默认 20 分钟,宿主看门狗留余量
 WATCHDOG_MIN="${BILIBILI_RUN_TIMEOUT_MIN:-30}"
-mkdir -p "$ROOT/logs" "$ROOT/data" "$ROOT/secrets" "$SUITE_DIR/state"
+mkdir -p "$ROOT/logs" "$ROOT/data" "$ROOT/secrets" "$SUITE_DIR/state" "$ROOT/logs/console"
+# Console 的 Verbose 日志按天滚(上游 Serilog rollingInterval: Day),只清 30 天前的防无限堆积
+find "$ROOT/logs/console" -type f -name 'log*.txt' -mtime +30 -delete 2>/dev/null || true
 
 REALDAY="$(date +%F)"; CLOCK="$(date +%H:%M:%S)"
 note() { echo "[$REALDAY $CLOCK] $*" >> "$RLOG"; }
