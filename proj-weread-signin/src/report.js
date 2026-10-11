@@ -53,7 +53,10 @@ export function renderWelfareLine({ welfare, weekly, balance, memberCard } = {})
     // 体验卡余额读不到就不显示;只有它没有书币余额时也照样单列
     if (memberCard?.ok) parts.push(`体验卡 ${Number(memberCard.freeCardDays ?? 0)} 天`)
     // verified === undefined 是旧数据,不臆断也不提示;只有明确自证失败才提醒核对
-    const unverified = (weekly?.claimed ?? []).some(item => item.verified === false) || welfare?.verified === false
+    // 只有「确实申请领取过、但没能自证」才算信号:
+    // 没有可领时接口也回 verified=false(压根没领),那不该报 —— 2026-10-11 实测这个假警报每天都可能响。
+    const unverified = (weekly?.claimed ?? []).some(item => item.verified === false)
+        || (welfare?.claimed === true && welfare?.verified === false)
     if (unverified) parts.push('领取未自证,建议核对')
     if (weekly?.failed?.length) parts.push('档位领取失败,下次运行重试')
     // 阅读器书币查询失败多半是瞬时网络问题,不打扰;领取失败才需要知道

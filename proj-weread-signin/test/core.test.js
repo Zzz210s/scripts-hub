@@ -6,7 +6,7 @@ import test from 'node:test'
 
 import { ensureWindow, loadConfig, parseEnv, patchAccountName, patchTargetDuration } from '../src/config.js'
 import { maskSecret, truncateText, sendWecom } from '../src/notify.js'
-import { buildReport } from '../src/report.js'
+import { buildReport, renderWelfareLine } from '../src/report.js'
 import { isPaused, readState, recordRun, setPaused, writeState, appendHistory, readHistory } from '../src/state.js'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'weread-'))
@@ -183,4 +183,17 @@ test('日报福利行:档位总览与逐档领取明细不再进消息,失败与
     // 旧数据没有 verified 字段,不能凭空加提示
     const legacy = buildReport({ ...base, weekly: { claimed: [pick] } })
     assert.doesNotMatch(legacy, /未自证/)
+})
+
+// 2026-10-11:没书币可领时接口也回 verified=false,旧判定会天天报「未自证」(实测假警报)
+test('日报福利行:没有可领时不报未自证,申请过却没证才报', () => {
+    const base = { balance: { ok: true, balance: 9.61, expiryBalance: 0 }, memberCard: { ok: true, freeCardDays: 2 } }
+    const noCoin = { ok: true, reason: 'no-coin', claimed: false, coin: 0, verified: false, verifyOk: false }
+    assert.doesNotMatch(renderWelfareLine({ ...base, welfare: noCoin }), /未自证/)
+    assert.doesNotMatch(buildReport({ plan: { targetMinutes: 57, todayMinutes: 58, remainingDays: 19 }, run: null, config: {}, date: '2026-10-11', accountName: 'TestReader', welfare: noCoin, balance: base.balance, memberCard: base.memberCard }), /未自证/)
+    // 申请了但没自证 —— 这才是要看的信号
+    const claimed = { ok: true, reason: 'claimable', claimed: true, coin: 1, verified: false, verifyOk: true }
+    assert.match(renderWelfareLine({ ...base, welfare: claimed }), /未自证/)
+    // 经验卡领取路径同理:没有档位可领时(welfare 缺省)不报
+    assert.doesNotMatch(renderWelfareLine({ ...base, weekly: { claimed: [], failed: [] } }), /未自证/)
 })
