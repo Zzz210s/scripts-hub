@@ -42,3 +42,6 @@ docs/oracle-za-bank-notes.md
 # 杂项
 Thumbs.db
 .DS_Store
+
+# AI 会话产物(全局规则:这类文件不入库)
+.superpowers/
