@@ -49,15 +49,17 @@ chmod 600 /srv/apps/automation/bilibili/secrets/wecom-webhook.txt
 ## 4. 扫码登录(唯一必须人做的步骤)
 
 ```
-docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run \
-  -e Ray_RunTasks=Login bash -c 'cd /app && dotnet Ray.BiliBiliTool.Console.dll'
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run login
 ```
 
+- 子命令由容器入口 `deploy/run-once.sh` 透传给 `src/cli.js`,所以 `login` / `check` / `status` 都是
+  在服务名后面直接写命令;不带子命令就是跑一次任务。
 - 控制台先打印二维码的半角块字符,随后打印一个
   `https://tool.lu/qrcode/basic.html?text=...` 链接。块字符在服务器终端里往往看不清,
   **用手机 B站 App 扫那个链接里的二维码**。
-- **上游只轮询 10 次 × 5 秒 = 最长约 50 秒**。看到链接就立刻扫;超时了会报「登录超时」,
-  重跑上面的命令即可。
+- **上游轮询 10 次,每次之间约 20 秒,所以窗口约 3 分钟**(2026-10-11 在服务器实测;
+  原先文档写的"10 次 × 5 秒 = 50 秒"是错的 —— 登录轮询也吃 `IntervalSecondsBetweenRequestApi`
+  的 20 秒间隔)。超时会报「登录超时」,重跑上面的命令即可。
 - 成功后确认 `/srv/apps/automation/bilibili/secrets/cookies.json` 存在且里面有 `DedeUserID`。
 
 ## 5. 验证
@@ -71,8 +73,9 @@ node src/cli.js status     # 上次运行、当天次数、硬币台账与券历
 容器内跑同样三条:
 
 ```
-docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run \
-  bash -c 'cd /opt/bili && node src/cli.js check'
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run check
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run cookies
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run status
 ```
 
 ## 6. 启用

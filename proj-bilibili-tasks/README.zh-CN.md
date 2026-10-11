@@ -61,12 +61,12 @@ docker build -f Dockerfile -t automation-bilibili:local .
 printf '%s' '<你的企业微信 webhook 地址>' > /srv/apps/automation/bilibili/secrets/wecom-webhook.txt
 chmod 600 /srv/apps/automation/bilibili/secrets/wecom-webhook.txt
 
-docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run \
-  -e Ray_RunTasks=Login bash -c 'cd /app && dotnet Ray.BiliBiliTool.Console.dll'
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run login
 ```
 
 控制台会打印二维码块字符与一个 `https://tool.lu/qrcode/basic.html?text=...` 链接,
-用手机 B站 App 扫那个链接里的二维码。上游只轮询约 50 秒,看到就立刻扫,超时了就重跑一次。
+用手机 B站 App 扫那个链接里的二维码。上游轮询 10 次、每次之间约 20 秒,所以窗口约 3 分钟
+(2026-10-11 服务器实测);超时了就重跑一次。
 登录产物写到 `secrets/cookies.json`;之后 `node src/cli.js check` 会打印会员类型、硬币余额与券状态。
 
 `cookies.json` 就位后,容器会跟着套件队列跑。`run-all.sh` 每次触发都会调它:还没登录时第一次

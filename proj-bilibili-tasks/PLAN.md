@@ -395,7 +395,7 @@ exit "$code"
    `docs/workspace-model.md` 注明本项目是仓库内手写、`scripts/README.md` 登记两个新脚本、
    `scripts/local-paths.env.example` 加注释掉的 `BILIBILI_DIR`。
 10. `proj-bilibili-tasks/{README.md,README.zh-CN.md,QUICKSTART.md}`:双语 README 顶部互链;
-   QUICKSTART 必须含"扫码登录"的完整步骤与"50 秒窗口"的提醒。
+   QUICKSTART 必须含"扫码登录"的完整步骤与"窗口只有几分钟、慢了就重跑"的提醒。
 
 ### Task 7: Windows 侧运行器(commit 7)
 
@@ -492,14 +492,14 @@ webhook `key=`、本机用户目录路径、盘符绝对路径。
 **在服务器上扫码登录一次。** 确切命令与看点:
 
 ```bash
-cd /srv/apps/automation/bilibili
-docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run -e Ray_RunTasks=Login \
-  bash -c 'cd /app && dotnet Ray.BiliBiliTool.Console.dll'
+cd /srv/apps/automation
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run login
 ```
 
 - 控制台会先打印二维码的半角块字符,随后打印一个 `https://tool.lu/qrcode/basic.html?text=...` 链接;
   用手机 B站 App 扫那个链接里的二维码(块字符在服务器终端里往往看不清)。
-- **上游只轮询 10 次 × 5 秒 = 最长 50 秒**,超时会报"登录超时"。慢了就重跑上面的命令。
+- **上游轮询 10 次,每次之间约 20 秒 = 窗口约 3 分钟**(2026-10-11 服务器实测;原文写的 50 秒是错的),
+  超时会报"登录超时"。慢慢扫也行,超时就重跑上面的命令。
 - 成功后看 `/srv/apps/automation/bilibili/secrets/cookies.json` 是否存在、里面是否出现 `DedeUserID`;
   再用 `node src/cli.js check`(或容器内等价命令)看 `会员类型 / 硬币余额 / 券状态` 三行是否正常。
 - 出了 `扫码登录` 之外的任何事(镜像起不来、接口 4xx)都由实现者排查,不需要用户动手。
@@ -514,7 +514,7 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run -e 
 | 第 4 份 `wecom-core` 漂移 | 整段逐字节复制;块内老注释原样保留,纠正说明写块外;`check-wecom-drift.mjs` 纳入第 4 份(纯加法) |
 | 给陌生人投币 | 运行前查关注数,0 或未知就把 `NumberOfCoins` 置 0;`SupportUpIds` 保持空;残余风险(关注数≥1 但上游取关注列表失败)已写进设计文档 §8.2 |
 | 账号级风控 `-403` | 不绕、不重试、不改设备指纹;只记进 result 的失败行;不推 `action` |
-| 登录窗口只有 50 秒 | 检测到链接立刻推 `action`;QUICKSTART 写明"慢了就重跑";可选 `--wait-minutes` 默认不开 |
+| 登录窗口只有几分钟 | 检测到链接立刻推 `action`;QUICKSTART 写明"超时就重跑";实测 10 轮 × 约 20 秒 |
 | `cookies.json` 落点由 Console 的 cwd 决定 | `console-runner.js` 显式给 `cwd = config.consoleDir` 并写进测试;`run-once.sh` 复制进/出,不用单文件 bind mount |
 | 上游 13 个通知 sink 被误开 | `console-runner.js` 的 D15 前置断言(env 里有非空 `Serilog__WriteTo*` 直接拒绝),有单测 |
 | 云主机拉不到 mcr / GitHub | 部署预检先探;不通则走 vendor 源码或本机交叉 publish 自包含产物的备选(设计文档 §12.5) |

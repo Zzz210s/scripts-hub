@@ -66,13 +66,13 @@ Then put the credentials in place and run the QR-code login once:
 printf '%s' '<your-wecom-webhook-url>' > /srv/apps/automation/bilibili/secrets/wecom-webhook.txt
 chmod 600 /srv/apps/automation/bilibili/secrets/wecom-webhook.txt
 
-docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run \
-  -e Ray_RunTasks=Login bash -c 'cd /app && dotnet Ray.BiliBiliTool.Console.dll'
+docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run login
 ```
 
-The console prints a QR-code block and a `https://tool.lu/qrcode/basic.html?text=...` link. Scan that
-link with the mobile Bilibili app. The upstream polls for about 50 seconds, so scan immediately and
-re-run the command if it times out. The login result is written to
+The console prints a QR-code block and a `https://tool.lu/qrcode/basic.html?text=...` link. Open that
+link and scan it with the mobile Bilibili app. The upstream polls 10 times with roughly 20 seconds
+between polls, so you have about 3 minutes (measured on the server, 2026-10-11); re-run the command
+if it times out. The login result is written to
 `secrets/cookies.json`; `node src/cli.js check` then prints the membership tier, coin balance, and
 voucher state.
 
