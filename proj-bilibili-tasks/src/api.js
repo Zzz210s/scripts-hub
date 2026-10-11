@@ -1,5 +1,6 @@
 // B站 HTTP:只用 cookie,不登录、不保存密码。fetchImpl 可注入,便于离线单测。
 import fs from 'node:fs'
+import { parseLenient } from './lenient-json.js'
 
 const DEFAULT_TIMEOUT_MS = 10000
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
@@ -15,12 +16,14 @@ const match = (text, re) => re.exec(text)?.[1] ?? null
 
 /** 从 cookies.json 的第 index 条里抽出 cookie 串、mid、csrf。绝不返回整份文件。 */
 export function readCookie(cookiesFile, index = 0) {
-    let parsed
+    let text
     try {
-        parsed = JSON.parse(fs.readFileSync(cookiesFile, 'utf8'))
+        text = fs.readFileSync(cookiesFile, 'utf8')
     } catch {
         return null
     }
+    // 上游 Console 用 Newtonsoft 写出的文件带尾逗号,严格 JSON.parse 会失败(2026-10-11 实测) —— 走容错解析
+    const parsed = parseLenient(text)
     const list = parsed?.BiliBiliCookies
     if (!Array.isArray(list) || !list[index]) return null
     const cookie = String(list[index])

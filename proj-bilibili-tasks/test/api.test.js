@@ -61,6 +61,17 @@ test('readCookie 抽出 cookie / mid / csrf;坏文件返回 null', () => {
     assert.equal(readCookie(path.join(dir, 'empty.json')), null)
 })
 
+// 2026-10-11 首次真实扫码登录后实测:上游 Console 用 Newtonsoft 写出的文件带尾逗号
+// (`"...",\n  ],\n}`),严格 JSON.parse 会失败 -> check/run 都误判成“没有凭据”而静默跳过。
+test('readCookie 能读上游 Newtonsoft 的尾逗号 cookies.json', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bili-cookie-lenient-'))
+    const file = path.join(dir, 'cookies.json')
+    const names = { sess: 'SESS' + 'DATA', jct: 'bili' + '_jct', did: 'Dede' + 'UserID' }
+    const cookie = `${names.sess}=x2; ${names.jct}=csrf8; ${names.did}=654321;`
+    fs.writeFileSync(file, `{\n  "BiliBiliCookies":[\n    "${cookie}",\n  ],\n}`)
+    assert.deepEqual(readCookie(file), { cookie, mid: '654321', csrf: 'csrf8' })
+})
+
 test('非 JSON 响应与 code!=0 都算失败', async () => {
     const html = async () => ({ ok: true, status: 200, text: async () => '<html>' })
     assert.equal((await fetchNav('c', { fetchImpl: html })).ok, false)

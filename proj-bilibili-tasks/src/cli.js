@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { loadConfig } from './config.js'
 import { dateText } from './clock.js'
 import { readCookie, fetchNav, fetchVoucher, receiveVoucher, fetchCoin, fetchFollowingsTotal } from './api.js'
+import { parseLenient } from './lenient-json.js'
 import { memberFromNav } from './member.js'
 import { voucherDecision } from './voucher.js'
 import { runConsole } from './console-runner.js'
@@ -83,7 +84,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
             return 1
         }
         let count = 0
-        try { count = JSON.parse(fs.readFileSync(config.cookiesFile, 'utf8'))?.BiliBiliCookies?.length ?? 0 } catch { count = 0 }
+        try { count = parseLenient(fs.readFileSync(config.cookiesFile, 'utf8'))?.BiliBiliCookies?.length ?? 0 } catch { count = 0 }
         out(`cookies 文件:${config.cookiesFile}`)
         out(`条数:${count}`)
         out(`账号末尾四位:${credential.mid ? String(credential.mid).slice(-4) : '未知'}`)
