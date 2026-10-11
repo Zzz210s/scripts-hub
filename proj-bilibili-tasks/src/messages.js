@@ -31,7 +31,9 @@ export function renderDonateLine(donate = {}) {
     }
     // R5:优先报实际发生的投币数(余额前后差值);取不到后值时明确标注这是目标
     const balance = donate.balanceAfter === null || donate.balanceAfter === undefined ? donate.balance : donate.balanceAfter
-    const tail = Number.isFinite(Number(balance)) ? ` · 余额 ${Number(balance).toFixed(1)}` : ''
+    // null / undefined / '' 都不算数字 —— 否则会渲染出 “余额 0.0” 这种没取到的假数字
+    const hasBalance = balance !== null && balance !== undefined && balance !== '' && Number.isFinite(Number(balance))
+    const tail = hasBalance ? ` · 余额 ${Number(balance).toFixed(1)}` : ''
     const actual = donate.actual === null || donate.actual === undefined ? NaN : Number(donate.actual)
     if (Number.isFinite(actual)) {
         return actual === 0 ? `投币:0 枚 · 未投出${tail}` : `投币:${actual} 枚 · 投给关注的 UP${tail}`
@@ -59,7 +61,12 @@ export function renderVoucherLine(voucher = {}) {
     return '会员券:普通会员 · 跳过 B币券'
 }
 
-export const renderMangaLine = (manga) => (manga === 'failed' ? '漫画:签到失败' : '漫画:已执行')
+// 上游把整次任务跳过时什么都没执行 —— 这时说 “漫画:已执行” 是在编造(2026-10-11 实测)
+export const renderMangaLine = (manga) => {
+    if (manga === 'failed') return '漫画:签到失败'
+    if (manga === 'skipped') return ''
+    return '漫画:已执行'
+}
 export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游已知问题 · 不影响其它任务' : '')
 
 export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, bigPoint, failures = [], ok = true }) {

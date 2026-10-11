@@ -63,7 +63,7 @@ else
        cd /srv/apps/automation/bilibili
        docker compose -f /srv/apps/automation/compose.yaml run --rm -T bilibili-run \
          -e Ray_RunTasks=Login bash -c 'cd /app && dotnet Ray.BiliBiliTool.Console.dll'
-       上游只轮询约 50 秒:看到 tool.lu 链接就立刻用手机 B站 App 扫,慢了就重跑。
+       上游轮询约 3 分钟:看到 tool.lu 链接就立刻用手机 B站 App 扫,慢了就重跑。
 EOF
 fi
 if [[ -f "$PROJ/secrets/wecom-webhook.txt" ]]; then

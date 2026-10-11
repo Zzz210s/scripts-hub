@@ -145,7 +145,7 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             exp,
             donate: donate.result,
             voucher: voucher.result,
-            manga: classify.task352 ? 'failed' : 'ok',
+            manga: classify.guardSkipped ? 'skipped' : (classify.task352 ? 'failed' : 'ok'),
             bigPoint: classify.bigPointFlaky ? 'failed' : null,
             failures,
             ok: completed

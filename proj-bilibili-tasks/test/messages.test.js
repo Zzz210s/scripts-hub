@@ -91,3 +91,21 @@ test('每日任务行:真值与估算回落', () => {
 test('多账号标题写 N 个账号', () => {
     assert.ok(buildStartMessage({ date: '2026-10-11', account: '2 个账号' }).includes('B站任务 · 2 个账号 · 2026-10-11 · 开始运行'))
 })
+
+// 2026-10-11 实跑发现的两个诚实性缺口:余额没取到时渲染成 0.0;被上游跳过时仍说「漫画:已执行」
+test('余额为 null 时不渲染余额,不冒充 0.0', () => {
+    const line = renderDonateLine({ target: 5, actual: null, balance: null })
+    assert.equal(line, '投币:目标 ≤5 枚 · 投给关注的 UP')
+    assert.doesNotMatch(line, /余额/)
+    assert.equal(renderDonateLine({ target: 5, actual: null, balance: '' }), '投币:目标 ≤5 枚 · 投给关注的 UP')
+    // 空字符串不算数字,但 0 是真实余额,仍要显示
+    assert.equal(renderDonateLine({ target: 5, actual: 0, balance: 0 }), '投币:0 枚 · 未投出 · 余额 0.0')
+})
+
+test('被上游整次跳过时不渲染「漫画:已执行」', () => {
+    assert.equal(renderMangaLine('skipped'), '')
+    assert.equal(renderMangaLine('ok'), '漫画:已执行')
+    assert.equal(renderMangaLine('failed'), '漫画:签到失败')
+    const text = buildResultMessage({ date: '2026-10-12', exp: { login: '未完成', watch: '未完成', share: '未完成', coins: '未完成', total: 0 }, donate: { target: 5, actual: null, balance: null }, voucher: { action: 'unknown' }, manga: 'skipped', failures: [], ok: false })
+    assert.doesNotMatch(text, /漫画/)
+})
