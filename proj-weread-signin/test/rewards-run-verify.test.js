@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 
-import { renderWelfareLine } from '../src/notify.js'
+import { renderWelfareLine } from '../src/report.js'
 import { collectRewards, weeklyLogLine, weeklyRecord } from '../src/rewards-run.js'
 
 const CONFIG = { curlFile: 'secrets/read-request.curl' }

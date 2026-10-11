@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildReport } from '../src/notify.js'
+import { buildReport } from '../src/report.js'
 import { challengeRecord } from '../src/rewards-coins.js'
 
 const BASE = {

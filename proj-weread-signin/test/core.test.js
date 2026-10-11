@@ -5,7 +5,8 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { ensureWindow, loadConfig, parseEnv, patchAccountName, patchTargetDuration } from '../src/config.js'
-import { buildReport, maskSecret, truncateText, sendWecom } from '../src/notify.js'
+import { maskSecret, truncateText, sendWecom } from '../src/notify.js'
+import { buildReport } from '../src/report.js'
 import { isPaused, readState, recordRun, setPaused, writeState, appendHistory, readHistory } from '../src/state.js'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'weread-'))

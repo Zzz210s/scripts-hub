@@ -1,7 +1,7 @@
 source: local development clone %WEREAD_DIR%, tracked files only
 published in: Zzz210s/scripts-hub -> proj-weread-signin/
-source commit: 366472cd1c06da3951d90078493cf57bb41ea43f
-source commit date: 2026-10-11T17:00:02+08:00
-synced file count: 81
+source commit: c1a600b925b4e84c15d1c8eb9d0d432ca4798b0c
+source commit date: 2026-10-11T17:07:13+08:00
+synced file count: 83
 notes: test/*.js 里的路径不写死盘符(用 os.tmpdir()),快照与源逐字节一致
-synced at: 2026-10-11T17:00:16+08:00
+synced at: 2026-10-11T17:07:32+08:00
