@@ -16,8 +16,10 @@ WORKDIR /src
 # 固定 commit 的源码只在构建期取用,不进本仓库;必须与 VENDOR_COMMIT.txt 里的 sha 一致。
 RUN curl -fsSL "https://codeload.github.com/RayWangQvQ/BiliBiliToolPro/tar.gz/${UPSTREAM_SHA}" \
       | tar xz --strip-components=1
-# 上游只 publish Web,这里的 publish 目标是 Console(一次性执行宿主,退出码 0/1)
-RUN dotnet publish src/Ray.BiliBiliTool.Console/Ray.BiliBiliTool.Console.csproj -c Release -o /out
+# 上游只 publish Web,这里的 publish 目标是 Console(一次性执行宿主,退出码 0/1)。
+# -p:HUSKY=0 必须加:上游 Console.csproj 有个 Husky 目标会跑 dotnet husky install,
+# 而源码 tar 包没有 .git,构建时会以 MSB3073 失败(2026-10-11 实测)。
+RUN dotnet publish src/Ray.BiliBiliTool.Console/Ray.BiliBiliTool.Console.csproj -c Release -o /out -p:HUSKY=0
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0
 ENV TZ=Asia/Shanghai \
