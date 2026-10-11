@@ -118,7 +118,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
             spawnImpl: injected.spawnImpl,
             onLink: async (link) => {
                 out(`二维码链接:${link}`)
-                out('窗口约 50 秒,请立刻用手机 B站 App 扫这个链接里的二维码')
+                out('窗口约 3 分钟,请立刻用手机 B站 App 扫这个链接里的二维码')
                 const sent = await sendWecom(buildActionMessage({ date: dateText(now), kind: 'login', detail: link }), { webhookFile: config.webhookFile, fetchImpl: injected.fetchImpl, sleep: injected.sleep })
                 out(`[通知] 二维码链接${sent.ok ? '已推送' : `推送失败:${sent.error}`}`)
             },
