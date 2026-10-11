@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { expFromReward } from '../src/exp.js'
+import { expFromReward, incompleteTasks } from '../src/exp.js'
 import { renderExpLine } from '../src/messages.js'
 import { computeExp } from '../src/classify.js'
 
@@ -52,4 +52,24 @@ test('renderExpLine 真值行与估算回落标注', () => {
     assert.ok(est.endsWith(' · 按计划口径估算'), est)
     assert.ok(!/[()（）]/.test(truth) && !/[()（）]/.test(est))
     assert.ok(!EMOJI.test(truth) && !EMOJI.test(est))
+})
+
+// R3:读回校验的完成度判定
+test('incompleteTasks:share 未完成 -> 列出 share', () => {
+    assert.deepEqual(incompleteTasks(expFromReward(REAL), { coinTarget: 5 }), ['share'])
+})
+
+test('incompleteTasks:四项全真 -> 无缺失', () => {
+    const view = expFromReward({ login: true, watch: true, share: true, coins: 50 })
+    assert.deepEqual(incompleteTasks(view, { coinTarget: 5 }), [])
+})
+
+test('incompleteTasks:投币目标 0 时不算缺失;目标 5 而经验不足才算', () => {
+    const view = expFromReward({ login: true, watch: true, share: true, coins: 20 })
+    assert.deepEqual(incompleteTasks(view, { coinTarget: 0 }), [])
+    assert.deepEqual(incompleteTasks(view, { coinTarget: 5 }), ['coins'])
+})
+
+test('incompleteTasks:接口取不到时返回空,不因此判未完成', () => {
+    assert.deepEqual(incompleteTasks(null, { coinTarget: 5 }), [])
 })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine, renderMangaLine, renderExpLine } from '../src/messages.js'
+import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine, renderMangaLine, renderBigPointLine, renderExpLine } from '../src/messages.js'
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u
 const EXP = { login: '已得 5', watch: '已得 5', share: '未完成', coins: '已得 50', total: 60 }
@@ -43,7 +43,31 @@ test('投币行按设计文档 §8.4', () => {
     assert.equal(renderDonateLine({ stop: true, reason: 'no-followings' }), '投币:跳过 · 关注列表为空')
     assert.equal(renderDonateLine({ stop: true, reason: 'unknown-followings' }), '投币:跳过 · 无法确认关注列表')
     assert.equal(renderDonateLine({ stop: true, reason: 'no-balance' }), '投币:跳过 · 未取到硬币余额')
-    assert.equal(renderDonateLine({ target: 5, stop: false, balance: 128 }), '投币:5 枚 · 投给关注的 UP · 余额 128.0')
+})
+
+// R5:报实际发生的投币数(余额差值),不是目标值
+test('投币行报实际差值,不报目标', () => {
+    assert.equal(
+        renderDonateLine({ target: 5, stop: false, balance: 128, actual: 3, balanceAfter: 125 }),
+        '投币:3 枚 · 投给关注的 UP · 余额 125.0'
+    )
+    assert.equal(
+        renderDonateLine({ target: 5, stop: false, balance: 128, actual: 0, balanceAfter: 128 }),
+        '投币:0 枚 · 未投出 · 余额 128.0'
+    )
+})
+
+test('投币行取不到后值 -> 回落为明确标注的目标值', () => {
+    assert.equal(
+        renderDonateLine({ target: 5, stop: false, balance: 128, actual: null, balanceAfter: null }),
+        '投币:目标 ≤5 枚 · 投给关注的 UP · 余额 128.0'
+    )
+})
+
+// R6:大积分是上游已知问题,文案要诚实
+test('大积分行指向已知问题,不写成我们坏了', () => {
+    assert.equal(renderBigPointLine('failed'), '大积分:日常领取失败 · 上游已知问题 · 不影响其它任务')
+    assert.equal(renderBigPointLine(null), '')
 })
 
 test('会员券行带余额与有效期', () => {

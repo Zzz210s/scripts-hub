@@ -47,7 +47,12 @@ export function buildConsoleEnv(cfg, { coinTarget } = {}) {
         Ray_DailyTaskConfig__NumberOfProtectedCoins: String(cfg.coinKeep),
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',
-        Ray_AutoRecoverConfig__IsEnable: 'false'
+        Ray_AutoRecoverConfig__IsEnable: 'false',
+        // R1:上游 CookieTaskGuard 在 .NET 侧 nav 慢时会 15 秒超时 -> 抛 InvalidOperationException
+        // -> 整次运行被静默跳过,而退出码仍是 0(2026-10-11 实测:同容器 node 调 nav 214ms,
+        // Console 守卫调 nav 约 11 秒)。薄壳跑 Console 之前已用 node 侧 HTTP 校验过凭据,
+        // 这个守卫是重复的失败点,显式关掉。
+        Ray_CookieCheck__AutoCheckEnabled: 'false'
     }
 }
 

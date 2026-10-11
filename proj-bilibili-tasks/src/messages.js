@@ -29,8 +29,14 @@ export function renderDonateLine(donate = {}) {
         if (typeof rule === 'function') return rule(donate)
         return rule ?? `投币:跳过 · ${donate.reason}`
     }
-    const balance = Number.isFinite(Number(donate.balance)) ? ` · 余额 ${Number(donate.balance).toFixed(1)}` : ''
-    return `投币:${donate.target} 枚 · 投给关注的 UP${balance}`
+    // R5:优先报实际发生的投币数(余额前后差值);取不到后值时明确标注这是目标
+    const balance = donate.balanceAfter === null || donate.balanceAfter === undefined ? donate.balance : donate.balanceAfter
+    const tail = Number.isFinite(Number(balance)) ? ` · 余额 ${Number(balance).toFixed(1)}` : ''
+    const actual = donate.actual === null || donate.actual === undefined ? NaN : Number(donate.actual)
+    if (Number.isFinite(actual)) {
+        return actual === 0 ? `投币:0 枚 · 未投出${tail}` : `投币:${actual} 枚 · 投给关注的 UP${tail}`
+    }
+    return `投币:目标 ≤${donate.target} 枚 · 投给关注的 UP${tail}`
 }
 
 const dateOf = (seconds) => {
@@ -54,7 +60,7 @@ export function renderVoucherLine(voucher = {}) {
 }
 
 export const renderMangaLine = (manga) => (manga === 'failed' ? '漫画:签到失败' : '漫画:已执行')
-export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:失败 · 接口要求升级客户端' : '')
+export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游已知问题 · 不影响其它任务' : '')
 
 export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, bigPoint, failures = [], ok = true }) {
     const lines = [renderExpLine(exp)]

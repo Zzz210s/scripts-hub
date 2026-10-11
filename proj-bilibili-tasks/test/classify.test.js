@@ -38,6 +38,30 @@ test('分享失败与观看失败', () => {
     assert.equal(classifyRun({ exitCode: 0, stdout: '观看视频失败' }).watchFailed, true)
 })
 
+// R2:真实日志行(2026-10-11 实测)——Console 的 CookieTaskGuard 超时后静默跳过整次任务,退出码仍是 0
+test('登录态检查被跳过 -> guard-skipped,退出码 0 也不算成功', () => {
+    const line = '[12:55:15 WRN] 异常:System.InvalidOperationException: 登录态检查暂时失败,本次活动已跳过,稍后自动重试'
+    const r = classifyRun({ exitCode: 0, stdout: line })
+    assert.equal(r.guardSkipped, true)
+    assert.equal(r.ok, false)
+    const failure = r.failures.find((f) => f.kind === 'guard-skipped')
+    assert.ok(failure, JSON.stringify(r.failures))
+    assert.equal(failure.ignored, false)
+    assert.ok(failure.note.includes('未做任何任务'), failure.note)
+})
+
+test('备选特征「本次活动已跳过」也能命中 guard-skipped', () => {
+    assert.equal(classifyRun({ exitCode: 0, stdout: '本次活动已跳过,稍后自动重试' }).guardSkipped, true)
+})
+
+test('guard-skipped 时估算口径也报未完成,不冒充已得', () => {
+    const view = computeExp({ classify: { guardSkipped: true }, target: 5 })
+    assert.equal(view.login, '未完成')
+    assert.equal(view.watch, '未完成')
+    assert.equal(view.share, '未完成')
+    assert.equal(view.total, 0)
+})
+
 test('超时按可重试失败处理', () => {
     const r = classifyRun({ exitCode: null, timedOut: true })
     assert.equal(r.timedOut, true)

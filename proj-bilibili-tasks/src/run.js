@@ -2,54 +2,17 @@
 // -> Console -> 归类 -> result -> 落状态。外部动作全部从 deps 注入,整条链路可离线测试。
 import { buildConsoleEnv, RUN_TASKS } from './console-runner.js'
 import { classifyRun, computeExp } from './classify.js'
-import { expFromReward } from './exp.js'
+import { expFromReward, incompleteTasks } from './exp.js'
 import { coinTarget } from './donate.js'
 import { dayKey, dateText } from './clock.js'
 import { shouldSkipLocally } from './guards.js'
 import { buildActionMessage, buildResultMessage, buildStartMessage } from './messages.js'
 import { memberFromNav } from './member.js'
-import { voucherDecision } from './voucher.js'
+import { handleVoucher } from './voucher-flow.js'
 import { acquireLock, clearLock } from './lock.js'
 import { appendCoinLedger, appendVoucher, attemptsToday, loadState, recordAttempt, saveState, setResult } from './state.js'
 
 const done = (payload) => payload
-
-async function handleVoucher({ deps, credential, member, day, log }) {
-    const skip = (action, extra = {}) => ({
-        result: { action, tier: member.tier, count: 0, ...extra, balance: extra.balance ?? member.couponBalance },
-        history: { day, action, state: extra.state ?? null, expireTime: extra.expireTime ?? null, nextReceiveDays: extra.nextReceiveDays ?? null }
-    })
-    if (member.tier !== 'annual') {
-        log('[券] 非年度大会员,跳过 B币券')
-        return skip('skipped-none')
-    }
-    if (!credential.csrf) {
-        log('[券] cookie 里没有 bili_jct,跳过')
-        return { ...skip('unknown'), failure: { kind: 'voucher-no-csrf', label: '缺少 csrf', note: '会员券 · cookie 里没有 bili_jct · 未领取', ignored: true } }
-    }
-    const first = await deps.fetchVoucher(credential.cookie)
-    const decision = voucherDecision(first.ok ? first.data : null)
-    if (!decision.shouldReceive) {
-        const action = decision.alreadyReceived ? 'already' : (first.ok ? 'skipped-none' : 'unknown')
-        log(`[券] 不领取 · state=${decision.state}`)
-        return skip(action, { state: decision.state, expireTime: decision.expireTime, nextReceiveDays: decision.nextReceiveDays })
-    }
-    await deps.receiveVoucher(credential.cookie, credential.csrf)
-    const again = await deps.fetchVoucher(credential.cookie)
-    const verified = voucherDecision(again.ok ? again.data : null)
-    const received = verified.alreadyReceived
-    log(`[券] 领取${received ? '成功' : '未自证'}`)
-    // 领取后重新取 nav,拿真正入账的券余额(早先那份是领取前的旧值)
-    const after = await deps.fetchNav(credential.cookie)
-    const balance = after.ok ? memberFromNav(after.data).couponBalance : member.couponBalance
-    return skip(received ? 'received' : 'unknown', {
-        count: decision.count,
-        balance,
-        state: verified.state,
-        expireTime: verified.expireTime,
-        nextReceiveDays: verified.nextReceiveDays
-    })
-}
 
 async function handleDonate({ config, deps, credential, log }) {
     const balanceResult = await deps.fetchCoin(credential.cookie)
@@ -155,10 +118,27 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         const reward = typeof deps.fetchExpReward === 'function' ? await deps.fetchExpReward(credential.cookie) : { ok: false }
         const truth = reward?.ok ? expFromReward(reward.data?.data) : null
         const exp = truth ?? computeExp({ classify, target: donate.coin.target })
+        // R3:读回校验的完成度。接口取不到时不据此判未完成(降级为按退出码),由 estimated 口径渲染
+        const incomplete = truth ? incompleteTasks(truth, { coinTarget: donate.coin.target }) : []
+
+        // R5:用硬币余额前后差值报实际投币数(只在实际会投币时再读一次;并不新增外部动作)
+        if (!donate.result.stop && donate.result.target > 0) {
+            const after = await deps.fetchCoin(credential.cookie)
+            const afterMoney = after?.ok ? after.data.money : null
+            donate.result.balanceAfter = afterMoney
+            donate.result.actual = afterMoney !== null && Number.isFinite(Number(donate.result.balance))
+                ? Math.max(0, Math.round((Number(donate.result.balance) - Number(afterMoney)) * 10) / 10)
+                : null
+        }
 
         // 9. result(券结果并入这一条)
         const failures = classify.failures.slice()
         if (voucher.failure) failures.push(voucher.failure)
+        if (incomplete.length > 0) {
+            const names = { login: '登录', watch: '观看', share: '分享', coins: '投币' }
+            failures.push({ kind: 'incomplete', label: '每日任务未完成', note: `每日任务未完成 · ${incomplete.map((name) => names[name] ?? name).join(' ')}未达标` })
+        }
+        const completed = classify.ok && !voucher.failure && incomplete.length === 0
         const result = buildResultMessage({
             date,
             account: state.account || account,
@@ -168,7 +148,7 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             manga: classify.task352 ? 'failed' : 'ok',
             bigPoint: classify.bigPointFlaky ? 'failed' : null,
             failures,
-            ok: classify.ok && !voucher.failure
+            ok: completed
         })
         await send(result)
 
@@ -176,9 +156,9 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         recordAttempt(state, now, config.dayBoundaryHour)
         appendCoinLedger(state, { day, balance: donate.result.balance ?? null, target: donate.coin.target, stop: donate.result.stop ? donate.result.reason : null })
         appendVoucher(state, voucher.history)
-        setResult(state, { day, result: classify.ok && !voucher.failure ? 'success' : 'failure' })
+        setResult(state, { day, result: completed ? 'success' : 'failure' })
         saveState(config.stateFile, state, now)
-        log(`[完成] ${classify.ok ? '运行成功' : '运行有失败'}`)
+        log(`[完成] ${completed ? '运行成功' : '运行有失败'}`)
         return done({ code: 0, messages })
     } finally {
         try { clearLock(config.lockFile) } catch { /* 忽略解锁失败 */ }

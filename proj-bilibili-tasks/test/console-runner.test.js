@@ -42,12 +42,21 @@ test('开关矩阵逐条正确(设计文档 §6.2/§6.3)', () => {
         Ray_DailyTaskConfig__NumberOfProtectedCoins: '20',
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',
-        Ray_AutoRecoverConfig__IsEnable: 'false'
+        Ray_AutoRecoverConfig__IsEnable: 'false',
+        // R1:上游 CookieTaskGuard 的 nav 15 秒超时会静默跳过整次任务且退出码仍为 0
+        Ray_CookieCheck__AutoCheckEnabled: 'false'
     }
     for (const [key, value] of Object.entries(expected)) assert.equal(env[key], value, key)
     assert.equal(Object.keys(env).length, Object.keys(expected).length)
     assert.equal(RUN_TASKS, 'Daily&VipBigPoint&Manga&MangaPrivilege')
     assert.ok(!Object.keys(env).some((key) => /Serilog__WriteTo/i.test(key)))
+})
+
+test('R1:显式关掉 Console 内部登录态检查(它超时会静默跳过整次运行)', () => {
+    const cfg = loadConfig({})
+    const env = buildConsoleEnv(cfg, { coinTarget: { target: 3 } })
+    assert.equal(env.Ray_CookieCheck__AutoCheckEnabled, 'false')
+    assert.ok(Object.keys(env).includes('Ray_CookieCheck__AutoCheckEnabled'))
 })
 
 test('spawn 参数:dotnet + consoleDll + cwd=consoleDir,stdout 逐行回调', async () => {

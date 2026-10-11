@@ -7,8 +7,10 @@ import { loadConfig } from '../src/config.js'
 export const NOW = new Date('2026-10-11T10:00:00')
 export const CRED = { cookie: 'cookie', mid: '123456', csrf: 'csrf' }
 export const ANNUAL = { code: 0, data: { isLogin: true, vipStatus: 1, vipType: 2, money: 128, wallet: { coupon_balance: 5 } } }
-// 2026-10-11 真机实证:login/watch 已完成,share 未完成,coins 已满 50
-export const REWARD = { code: 0, data: { login: true, watch: true, coins: 50, share: false } }
+// 2026-10-11 真机实证:login/watch/coins 已完成。默认用四项全完的基线,分享未完成另用 REWARD_PARTIAL。
+export const REWARD = { code: 0, data: { login: true, watch: true, coins: 50, share: true } }
+// 分享尚未完成时的真实快照(共 60 经验)
+export const REWARD_PARTIAL = { code: 0, data: { login: true, watch: true, coins: 50, share: false } }
 
 export function setup(env = {}, state = null) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bili-run-'))
@@ -22,6 +24,7 @@ export function setup(env = {}, state = null) {
 
 export function makeDeps(overrides = {}) {
     const calls = { sent: [], fetch: [], spawn: [], lock: 0 }
+    let coinReads = 0
     const base = {
         calls,
         log: () => {},
@@ -31,7 +34,7 @@ export function makeDeps(overrides = {}) {
         fetchNav: async () => { calls.fetch.push('nav'); return { ok: true, data: ANNUAL } },
         fetchVoucher: async () => { calls.fetch.push('voucher'); return { ok: true, data: { code: 0, data: { list: [{ type: 1, state: 1, next_receive_days: 31 }] } } } },
         receiveVoucher: async () => { calls.fetch.push('receive'); return { ok: true } },
-        fetchCoin: async () => { calls.fetch.push('coin'); return { ok: true, data: { money: 128 } } },
+        fetchCoin: async () => { calls.fetch.push('coin'); coinReads += 1; return { ok: true, data: { money: coinReads === 1 ? 128 : 125 } } },
         fetchExpReward: async () => { calls.fetch.push('exp'); return { ok: true, data: REWARD } },
         fetchFollowingsTotal: async () => { calls.fetch.push('followings'); return { ok: true, total: 42 } },
         runConsole: async (tasks, env) => { calls.spawn.push({ tasks, env }); return { code: 0, stdout: '', stderr: '', timedOut: false } },

@@ -6,6 +6,8 @@ const FEATURES = {
     cookieInvalid: { markers: ['账号未登录', '未登录', 'login required', 'not logged in'] },
     voucherTaken: { markers: ['69801', '你已领取过该权益'] },
     bigPointFlaky: { markers: ['6007000'] },
+    // R2:上游 CookieTaskGuard 超时后会静默跳过整次任务,退出码仍为 0,必须识别出来
+    'guard-skipped': { markers: ['登录态检查暂时失败', '本次活动已跳过'] },
     shareFailed: { markers: ['分享失败', '分享被拒绝', '分享被风控'] },
     watchFailed: { markers: ['观看失败', '观看视频失败'] }
 }
@@ -15,6 +17,7 @@ const NOTES = {
     task352: { label: '任务失败 352', note: '任务接口返回 352' },
     cookieInvalid: { label: '登录态失效', note: '登录态失效' },
     bigPointFlaky: { label: '接口要求升级客户端', note: '接口要求升级客户端' },
+    'guard-skipped': { label: '运行被上游跳过', note: '运行被上游跳过 · 登录态检查超时 · 未做任何任务' },
     shareFailed: { label: '分享失败', note: '分享被风控拒绝' },
     watchFailed: { label: '观看失败', note: '观看视频失败' }
 }
@@ -75,6 +78,7 @@ export function classifyRun({ exitCode = 0, stdout = '', timedOut = false } = {}
         watchFailed: has('watchFailed'),
         task352: has('task352'),
         bigPointFlaky: has('bigPointFlaky'),
+        guardSkipped: has('guard-skipped'),
         voucherTaken: has('voucherTaken'),
         timedOut: Boolean(timedOut),
         exitCode
@@ -85,15 +89,17 @@ export function classifyRun({ exitCode = 0, stdout = '', timedOut = false } = {}
  *  与 expFromReward 同形,estimated=true 表示这是计划口径估算而非接口真值。 */
 export function computeExp({ classify = {}, target = 0 } = {}) {
     const missing = []
-    const login = classify.cookieInvalid ? '失败' : '已得 5'
-    const watch = classify.watchFailed ? '未完成' : '已得 5'
-    const share = classify.shareFailed ? '未完成' : '已得 5'
-    const coins = target > 0 ? `已得 ${target * 10}` : '跳过'
-    if (classify.cookieInvalid) missing.push('login')
-    if (classify.watchFailed) missing.push('watch')
-    if (classify.shareFailed) missing.push('share')
-    if (target <= 0) missing.push('coins')
-    const total = (classify.cookieInvalid ? 0 : 5) + (classify.watchFailed ? 0 : 5)
-        + (classify.shareFailed ? 0 : 5) + (target > 0 ? target * 10 : 0)
+    // 被上游整次跳过时什么都没做,不能冒充「已得」
+    const skipped = Boolean(classify.guardSkipped)
+    const login = skipped ? '未完成' : (classify.cookieInvalid ? '失败' : '已得 5')
+    const watch = skipped || classify.watchFailed ? '未完成' : '已得 5'
+    const share = skipped || classify.shareFailed ? '未完成' : '已得 5'
+    const coins = skipped ? '未完成' : (target > 0 ? `已得 ${target * 10}` : '跳过')
+    if (skipped || classify.cookieInvalid) missing.push('login')
+    if (skipped || classify.watchFailed) missing.push('watch')
+    if (skipped || classify.shareFailed) missing.push('share')
+    if (skipped || target <= 0) missing.push('coins')
+    const total = (login === '已得 5' ? 5 : 0) + (watch === '已得 5' ? 5 : 0)
+        + (share === '已得 5' ? 5 : 0) + (!skipped && target > 0 ? target * 10 : 0)
     return { login, watch, share, coins, total, missing, estimated: true }
 }
