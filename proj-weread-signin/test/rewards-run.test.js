@@ -17,6 +17,9 @@ function baseDeps(overrides = {}) {
         claimWelfareOnce: async () => ({ ok: true, claimed: false, coin: 0, key: '', reason: 'no-coin' }),
         collectWeekly: async () => ({ ok: true, readingSeconds: 11161, readingDays: 3, claimable: 1, claimed: [], alreadyClaimed: [], failed: [] }),
         queryWeekly: async () => ({ ok: true, readingSeconds: 0, readingDays: 0, awards: [] }),
+        // 自证链路的默认桩:测试里不真等 6-10 秒,也不让重领反证走到真网络
+        claimWeekly: async () => ({ ok: false, status: 499, errcode: -1, alreadyClaimed: false }),
+        sleep: async () => {}, verifyDelayMs: 0,
         // 挑战、余额与体验卡走网络,测试一律注入,避免真实请求
         collectChallenge: async () => ({ ok: true, list: [], reason: null }), readBalance: async () => ({ ok: true, balance: 0, giftBalance: 0, reason: null }),
         readMemberCard: async () => ({ ok: true, freeCardDays: 0, remainDays: 0, reason: null }),
@@ -42,29 +45,6 @@ test('collectRewards 同时返回读者福利与阅读时长福利,并把注入�
     assert.equal(weekly.readingSeconds, 11161)
     assert.equal(typeof seenCtx.fetchImpl, 'function')   // 自证链路的 fetchImpl 不能是 undefined
     assert.equal(seenCtx.token.accessToken, 'tok')
-})
-
-test('collectRewards 领到后自证:状态仍为 2 才 verified=true', async () => {
-    const need = status => baseDeps({
-        collectWeekly: async () => ({ ok: true, readingSeconds: 100, readingDays: 2, claimable: 1, claimed: [PICK], alreadyClaimed: [], failed: [] }),
-        queryWeekly: async () => ({ ok: true, awards: [{ levelId: 1, status }] })
-    })
-
-    const verified = await collectRewards({ cwd: CWD, config: CONFIG, bot: {}, deps: need(2) })
-    assert.equal(verified.weekly.claimed[0].verified, true)
-
-    const unverified = await collectRewards({ cwd: CWD, config: CONFIG, bot: {}, deps: need(1) })
-    assert.equal(unverified.weekly.claimed[0].verified, false)
-})
-
-test('collectRewards 自证查询失败时保留原结果,不抛错也不误标 verified', async () => {
-    const deps = baseDeps({
-        collectWeekly: async () => ({ ok: true, readingSeconds: 100, readingDays: 2, claimable: 1, claimed: [PICK], alreadyClaimed: [], failed: [] }),
-        queryWeekly: async () => { throw new Error('自证查询炸了') }
-    })
-    const { weekly } = await collectRewards({ cwd: CWD, config: CONFIG, bot: {}, deps })
-    assert.equal(weekly.claimed.length, 1)
-    assert.notEqual(weekly.claimed[0].verified, true)
 })
 
 test('collectRewards 阅读时长福利抛错不影响读者福利,反之亦然', async () => {
@@ -132,9 +112,11 @@ test('weeklyRecord:固定字段形状,没结果时 null', () => {
     assert.deepEqual(weeklyRecord({ ok: true, readingSeconds: 9, readingDays: 1, claimable: 2, claimed: [PICK], alreadyClaimed: [PICK], failed: [] }), {
         ok: true,
         reason: null,
-        readingSeconds: 9, readingDays: 1, tiers: { total: 0, claimed: 0, unreached: 0, claimable: 0 }, claimable: 2, claimed: [PICK], alreadyClaimed: [PICK], failed: []
+        readingSeconds: 9, readingDays: 1, tiers: { total: 0, claimed: 0, unreached: 0, claimable: 0 }, claimable: 2,
+        // 自证字段逐项落盘(旧数据没有就补 null);unverified 是给事后排查的汇总
+        claimed: [{ ...PICK, verified: null, via: null }], alreadyClaimed: [PICK], failed: [], unverified: []
     })
-    assert.deepEqual(weeklyRecord({}), { ok: false, reason: null, readingSeconds: 0, readingDays: 0, tiers: { total: 0, claimed: 0, unreached: 0, claimable: 0 }, claimable: 0, claimed: [], alreadyClaimed: [], failed: [] })
+    assert.deepEqual(weeklyRecord({}), { ok: false, reason: null, readingSeconds: 0, readingDays: 0, tiers: { total: 0, claimed: 0, unreached: 0, claimable: 0 }, claimable: 0, claimed: [], alreadyClaimed: [], failed: [], unverified: [] })
     assert.deepEqual(weeklyRecord({ ok: false, reason: 'query-failed' }).reason, 'query-failed')
 })
 

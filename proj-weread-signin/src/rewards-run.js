@@ -5,7 +5,8 @@ import path from 'node:path'
 import { callWithRefresh, credentialsPath, ensureAppToken, tokenPath } from './app-auth.js'
 import { shouldNotifyOnce } from './notify-policy.js'
 import { collectChallengeAndBalance, logChallenge } from './rewards-coins.js'
-import { collectWeekly, queryWeekly } from './weekly.js'
+import { collectWeekly } from './weekly.js'
+import { verifyWeekly } from './weekly-verify.js'
 import { claimWelfareOnce, logWelfare, redactError, welfareSafely } from './welfare-run.js'
 
 export { balanceRecord, challengeLogLine, challengeRecord, logChallenge, memberCardRecord } from './rewards-coins.js'
@@ -15,6 +16,8 @@ const WEEKLY_LOG_PREFIX = '[WEEKLY]'
 /** 历史落盘形状:字段固定下来,没结果时给 null。纯函数,便于钉住落盘格式。 */
 export function weeklyRecord(weekly) {
     if (!weekly) return null
+    // 自证结果必须进历史:否则事后无法判断当时是「没领到」还是「查早了」(E4)
+    const claimed = (weekly.claimed ?? []).map(item => ({ ...item, verified: item.verified ?? null, via: item.via ?? null }))
     return {
         // ok/reason 带上:否则「查询失败」「没凭据」「确实没档位可领」在历史里完全同形,事后无法排查
         ok: Boolean(weekly.ok),
@@ -23,7 +26,8 @@ export function weeklyRecord(weekly) {
         readingDays: weekly.readingDays ?? 0,
         tiers: weekly.tiers ?? { total: 0, claimed: 0, unreached: 0, claimable: 0 },
         claimable: weekly.claimable ?? 0,
-        claimed: weekly.claimed ?? [],
+        claimed,
+        unverified: claimed.filter(item => item.verified === false).map(item => item.levelId),
         alreadyClaimed: weekly.alreadyClaimed ?? [],
         failed: weekly.failed ?? []
     }
@@ -50,6 +54,12 @@ export function weeklyForReport(weekly, { dataDir, date, notifyOnce = shouldNoti
     return { claimed, failed }
 }
 
+/** 逐档自证标记:verified 未置位的是旧数据,什么都不打(不臆断)。 */
+function claimLabel(item) {
+    const mark = item.verified === true ? ':verified' : item.verified === false ? ':unverified' : ''
+    return `${item.levelDesc}:${item.choiceType === 2 ? 'coin' : 'card'}x${item.awardNum}${mark}`
+}
+
 /** 每个运行周期一行可检索的日志:只带档位描述与状态,不带 token / cookie / 账号。 */
 export function weeklyLogLine(weekly) {
     if (!weekly) return `${WEEKLY_LOG_PREFIX} skipped (no credentials)`
@@ -58,9 +68,12 @@ export function weeklyLogLine(weekly) {
     if (weekly.reason === 'no-credentials' && weekly.error) {
         return `${WEEKLY_LOG_PREFIX} reason=no-credentials error=${redactError(weekly.error)}`
     }
-    const claimed = (weekly.claimed ?? []).map(c => `${c.levelDesc}:${c.choiceType === 2 ? 'coin' : 'card'}x${c.awardNum}`).join(',')
+    const claimed = weekly.claimed ?? []
+    const claimText = claimed.map(claimLabel).join(',')
     const failed = (weekly.failed ?? []).map(f => `${f.levelDesc}:${f.errcode}`).join(',')
-    return `${WEEKLY_LOG_PREFIX} read=${weekly.readingSeconds}s days=${weekly.readingDays} claimable=${weekly.claimable} claimed=[${claimed}] failed=[${failed}]`
+    const unverified = claimed.filter(c => c.verified === false).map(c => c.levelDesc).join(',')
+    const via = claimed.filter(c => c.via).map(c => `${c.levelDesc}:${c.via}`).join(',')
+    return `${WEEKLY_LOG_PREFIX} read=${weekly.readingSeconds}s days=${weekly.readingDays} claimable=${weekly.claimable} claimed=[${claimText}] failed=[${failed}] unverified=[${unverified}] via=[${via}]`
 }
 
 /** 写进运行日志(stdout 由 run-daily.bat 重定向到 logs/last-run.log)。日志只是旁路,异常吞掉。 */
@@ -75,10 +88,13 @@ export function logWeekly(weekly, write = console.log) {
 export async function collectRewards({ cwd, config, bot, deps = {} }) {
     const ensureToken = deps.ensureAppToken ?? ensureAppToken
     const claimReader = deps.claimWelfareOnce ?? claimWelfareOnce
-    const claimWeekly = deps.collectWeekly ?? collectWeekly
-    const query = deps.queryWeekly ?? queryWeekly
+    const claimWeeklyOnce = deps.collectWeekly ?? collectWeekly
     // 显式默认到 globalThis.fetch:传 undefined 会覆盖 weekly.js 里的默认值,自证会静默失效
     const fetchImpl = deps.fetchImpl ?? globalThis.fetch
+    const verifyDeps = {
+        query: deps.queryWeekly, reclaim: deps.claimWeekly, sleep: deps.sleep,
+        attempts: deps.verifyAttempts, delayMs: deps.verifyDelayMs
+    }
 
     const tokenArgs = {
         curlFile: path.join(cwd, config.curlFile),
@@ -97,9 +113,9 @@ export async function collectRewards({ cwd, config, bot, deps = {} }) {
         const token = await ensureToken(tokenArgs)
         if (token.ok) {
             // 失效就换一枚重试一次(共用实现);自证必须用换过的那枚 token,否则会再撞 401 而静默跳过
-            const weeklyRun = await callWithRefresh({ token, tokenArgs, ensureToken, fn: t => claimWeekly({ token: t, fetchImpl }) })
+            const weeklyRun = await callWithRefresh({ token, tokenArgs, ensureToken, fn: t => claimWeeklyOnce({ token: t, fetchImpl }) })
             weekly = weeklyRun.result
-            weekly = await verifyWeekly({ token: weeklyRun.token, fetchImpl }, weekly, query)
+            weekly = await verifyWeekly({ token: weeklyRun.token, fetchImpl }, weekly, verifyDeps)
 
             // 挑战、余额与体验卡共用这枚(可能已换新的)凭据,三步各自兜底,失败只落日志与历史
             const coins = await collectChallengeAndBalance({
@@ -128,23 +144,4 @@ export async function collectRewards({ cwd, config, bot, deps = {} }) {
     logChallenge(challenge, balance, memberCard)
 
     return { reader, weekly, challenge, balance, memberCard }
-}
-
-/**
- * 领取自证:领到后再查一次,把状态确认为已领取(2)的标 verified。
- * recv 类接口存在「200 但没真发放」的先例(见 src/welfare.js 头部注释),所以日报只认 verified 的。
- */
-async function verifyWeekly({ token, fetchImpl }, weekly, query = queryWeekly) {
-    if (!weekly?.claimed?.length) return weekly
-    try {
-        const after = await query({ token, fetchImpl })
-        if (!after.ok) return weekly
-        const status = new Map((after.awards ?? []).map(a => [a.levelId, a.status]))
-        return {
-            ...weekly,
-            claimed: weekly.claimed.map(item => ({ ...item, verified: status.get(item.levelId) === 2 }))
-        }
-    } catch {
-        return weekly
-    }
 }
