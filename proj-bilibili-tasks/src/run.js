@@ -2,6 +2,7 @@
 // -> Console -> 归类 -> result -> 落状态。外部动作全部从 deps 注入,整条链路可离线测试。
 import { buildConsoleEnv, RUN_TASKS } from './console-runner.js'
 import { classifyRun, computeExp } from './classify.js'
+import { expFromReward } from './exp.js'
 import { coinTarget } from './donate.js'
 import { dayKey, dateText } from './clock.js'
 import { shouldSkipLocally } from './guards.js'
@@ -15,7 +16,7 @@ const done = (payload) => payload
 
 async function handleVoucher({ deps, credential, member, day, log }) {
     const skip = (action, extra = {}) => ({
-        result: { action, tier: member.tier, count: 0, balance: member.couponBalance, ...extra },
+        result: { action, tier: member.tier, count: 0, ...extra, balance: extra.balance ?? member.couponBalance },
         history: { day, action, state: extra.state ?? null, expireTime: extra.expireTime ?? null, nextReceiveDays: extra.nextReceiveDays ?? null }
     })
     if (member.tier !== 'annual') {
@@ -38,8 +39,12 @@ async function handleVoucher({ deps, credential, member, day, log }) {
     const verified = voucherDecision(again.ok ? again.data : null)
     const received = verified.alreadyReceived
     log(`[券] 领取${received ? '成功' : '未自证'}`)
+    // 领取后重新取 nav,拿真正入账的券余额(早先那份是领取前的旧值)
+    const after = await deps.fetchNav(credential.cookie)
+    const balance = after.ok ? memberFromNav(after.data).couponBalance : member.couponBalance
     return skip(received ? 'received' : 'unknown', {
         count: decision.count,
+        balance,
         state: verified.state,
         expireTime: verified.expireTime,
         nextReceiveDays: verified.nextReceiveDays
@@ -146,13 +151,18 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         const run = await deps.runConsole(RUN_TASKS, env, { config, now, onLine: (line) => log(`  ${line}`) })
         const classify = classifyRun({ exitCode: run.code, stdout: run.stdout, timedOut: run.timedOut })
 
+        // 每日任务经验:接口真值优先,取不到才回落估算口径(消息里会标注)
+        const reward = typeof deps.fetchExpReward === 'function' ? await deps.fetchExpReward(credential.cookie) : { ok: false }
+        const truth = reward?.ok ? expFromReward(reward.data?.data) : null
+        const exp = truth ?? computeExp({ classify, target: donate.coin.target })
+
         // 9. result(券结果并入这一条)
         const failures = classify.failures.slice()
         if (voucher.failure) failures.push(voucher.failure)
         const result = buildResultMessage({
             date,
             account: state.account || account,
-            exp: computeExp({ classify, target: donate.coin.target }),
+            exp,
             donate: donate.result,
             voucher: voucher.result,
             manga: classify.task352 ? 'failed' : 'ok',

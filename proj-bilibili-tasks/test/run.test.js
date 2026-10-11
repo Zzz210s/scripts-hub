@@ -1,44 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { runOnce } from '../src/run.js'
-import { loadConfig } from '../src/config.js'
 import { loadState } from '../src/state.js'
-
-const NOW = new Date('2026-10-11T10:00:00')
-const CRED = { cookie: 'cookie', mid: '123456', csrf: 'csrf' }
-const ANNUAL = { code: 0, data: { isLogin: true, vipStatus: 1, vipType: 2, money: 128, wallet: { coupon_balance: 5 } } }
-
-function setup(env = {}, state = null) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bili-run-'))
-    const config = loadConfig({ BILIBILI_DIR: dir, ...env })
-    if (state) {
-        fs.mkdirSync(path.dirname(config.stateFile), { recursive: true })
-        fs.writeFileSync(config.stateFile, JSON.stringify(state))
-    }
-    return { dir, config }
-}
-
-function makeDeps(overrides = {}) {
-    const calls = { sent: [], fetch: [], spawn: [], lock: 0 }
-    const base = {
-        calls,
-        log: () => {},
-        readCookie: () => CRED,
-        peerRunning: () => false,
-        freeMb: () => 4096,
-        fetchNav: async () => { calls.fetch.push('nav'); return { ok: true, data: ANNUAL } },
-        fetchVoucher: async () => { calls.fetch.push('voucher'); return { ok: true, data: { code: 0, data: { list: [{ type: 1, state: 1, next_receive_days: 31 }] } } } },
-        receiveVoucher: async () => { calls.fetch.push('receive'); return { ok: true } },
-        fetchCoin: async () => { calls.fetch.push('coin'); return { ok: true, data: { money: 128 } } },
-        fetchFollowingsTotal: async () => { calls.fetch.push('followings'); return { ok: true, total: 42 } },
-        runConsole: async (tasks, env) => { calls.spawn.push({ tasks, env }); return { code: 0, stdout: '', stderr: '', timedOut: false } },
-        send: async (text) => { calls.sent.push(text); return { ok: true } }
-    }
-    return { ...base, ...overrides, calls: overrides.calls ?? calls }
-}
+import { NOW, makeDeps, setup } from './run-helpers.js'
 
 test('没有登录凭据 -> 静音跳过,零消息零网络', async () => {
     const { config } = setup()
@@ -70,7 +35,8 @@ test('正常一次:先 start 再 result,状态落 success', async () => {
     assert.ok(result.messages[0].includes(' · 开始运行'))
     assert.ok(result.messages[1].includes(' · 运行成功'))
     assert.ok(result.messages[1].includes('投币:5 枚 · 投给关注的 UP · 余额 128.0'))
-    assert.ok(result.messages[1].includes('每日任务:登录 5 · 观看 5 · 分享 5 · 投币 50 · 共 65 经验'))
+    assert.ok(result.messages[1].includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 未完成 · 投币 已得 50 · 共 60 经验'))
+    assert.ok(deps.calls.fetch.includes('exp'))
     assert.deepEqual(deps.calls.spawn[0].env.Ray_DailyTaskConfig__NumberOfCoins, '5')
     const { state } = loadState(config.stateFile)
     assert.equal(state.lastResult, 'success')

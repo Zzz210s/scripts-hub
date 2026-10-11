@@ -1,13 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine } from '../src/messages.js'
+import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine, renderMangaLine, renderExpLine } from '../src/messages.js'
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u
+const EXP = { login: '已得 5', watch: '已得 5', share: '未完成', coins: '已得 50', total: 60 }
 
 test('四条消息都不含圆括号与 emoji', () => {
     const messages = [
         buildStartMessage({ date: '2026-10-11' }),
-        buildResultMessage({ date: '2026-10-11', exp: { login: '5', watch: '5', share: '5', coin: '50', total: 65 }, donate: { target: 5, stop: false, balance: 128 }, voucher: { action: 'received', count: 1, balance: 5, nextReceiveDays: 31 }, manga: 'ok' }),
+        buildResultMessage({ date: '2026-10-11', exp: EXP, donate: { target: 5, stop: false, balance: 128 }, voucher: { action: 'received', count: 1, balance: 5, expireTime: 1794326400, nextReceiveDays: 16 }, manga: 'ok' }),
         buildSkipMessage({ date: '2026-10-11', reason: 'done-today' }),
         buildActionMessage({ date: '2026-10-11', kind: 'cookie-invalid' })
     ]
@@ -23,7 +24,7 @@ test('标题四段且以 · 分隔', () => {
 })
 
 test('result 成功/有失败的动作词与原因缩进', () => {
-    const base = { date: '2026-10-11', exp: { login: '5', watch: '5', share: '5', coin: '50', total: 65 }, donate: { target: 5, stop: false, balance: 128 }, voucher: { action: 'received', count: 1 } }
+    const base = { date: '2026-10-11', exp: EXP, donate: { target: 5, stop: false, balance: 128 }, voucher: { action: 'received', count: 1 } }
     assert.ok(buildResultMessage({ ...base, ok: true }).includes(' · 运行成功'))
     const failed = buildResultMessage({ ...base, ok: false, failures: [{ note: '分享被风控拒绝 · 账号级风控 · 会自行过期' }] })
     assert.ok(failed.startsWith(`${PROGRAM} · 1 个账号 · 2026-10-11 · 运行有失败`))
@@ -45,11 +46,22 @@ test('投币行按设计文档 §8.4', () => {
     assert.equal(renderDonateLine({ target: 5, stop: false, balance: 128 }), '投币:5 枚 · 投给关注的 UP · 余额 128.0')
 })
 
-test('会员券行', () => {
+test('会员券行带余额与有效期', () => {
+    assert.equal(renderVoucherLine({ action: 'received', count: 1, balance: 5, expireTime: 1794326400, nextReceiveDays: 16 }), '会员券:B币券已领取 1 张 · 余额 5 · 有效至 2026-11-11 · 下次可领 16 天后')
     assert.equal(renderVoucherLine({ action: 'received', count: 1, balance: 5, nextReceiveDays: 31 }), '会员券:B币券已领取 1 张 · 余额 5 · 下次可领 31 天后')
     assert.equal(renderVoucherLine({ action: 'already' }), '会员券:B币券已领取 0 张 · 今日已领过')
     assert.equal(renderVoucherLine({ action: 'skipped-none' }), '会员券:普通会员 · 跳过 B币券')
     assert.equal(renderVoucherLine({ action: 'unknown' }), '会员券:状态未知 · 跳过 B币券')
+})
+
+test('漫画行只说可核实的', () => {
+    assert.equal(renderMangaLine('ok'), '漫画:已执行')
+    assert.equal(renderMangaLine('failed'), '漫画:签到失败')
+})
+
+test('每日任务行:真值与估算回落', () => {
+    assert.equal(renderExpLine(EXP), '每日任务:登录 已得 5 · 观看 已得 5 · 分享 未完成 · 投币 已得 50 · 共 60 经验')
+    assert.ok(renderExpLine({ ...EXP, estimated: true }).endsWith(' · 按计划口径估算'))
 })
 
 test('多账号标题写 N 个账号', () => {

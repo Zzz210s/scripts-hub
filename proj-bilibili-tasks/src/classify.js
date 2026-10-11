@@ -19,6 +19,26 @@ const NOTES = {
     watchFailed: { label: '观看失败', note: '观看视频失败' }
 }
 
+const DETAIL_LIMIT = 60
+const BRACES = /["{}[\]]/g
+const PARENS = /[（）()]/g
+const SEPARATORS = /[：:，,；;]/g
+
+/** 把一行 Console 原始日志净化成能进消息的短句:去日志前缀/JSON 片段与字段名残留,
+ *  保留错误码数字,换掉圆括号,压空白,硬上限 60 字符。无有效信息时返回空串。 */
+export function sanitizeDetail(line = '') {
+    let text = String(line ?? '')
+    text = text.replace(/^\s*\[[^\]]*\]\s*/, '')                       // [12:30:26 INF] / [2026-10-11 12:30:26 INF]
+    text = text.replace(/\{[^{}]*\}/g, (fragment) => {                 // JSON 片段只留错误码
+        const codes = [...fragment.matchAll(/"(?:Code|code)"\s*:\s*(-?\d+)/g)].map((m) => m[1])
+        return codes.length ? ` ${codes.join(' ')} ` : ' '
+    })
+    text = text.replace(BRACES, ' ').replace(PARENS, ' ')
+    text = text.replace(SEPARATORS, ' · ').replace(/\s+/g, ' ').trim()
+    text = text.replace(/(?:\s*·\s*)+/g, ' · ').replace(/^·\s*|\s*·$/g, '').trim()
+    return text.length > DETAIL_LIMIT ? text.slice(0, DETAIL_LIMIT).trim() : text
+}
+
 export function detectFeatures(stdout = '') {
     const hit = {}
     for (const line of String(stdout).split(/\r?\n/)) {
@@ -27,7 +47,7 @@ export function detectFeatures(stdout = '') {
             if (hit[name]) continue
             if (!feature.markers.some((marker) => low.includes(marker.toLowerCase()))) continue
             if (feature.keywords && !feature.keywords.some((keyword) => low.includes(keyword.toLowerCase()))) continue
-            hit[name] = line.trim().slice(0, 200)
+            hit[name] = sanitizeDetail(line)
         }
     }
     return hit
@@ -61,12 +81,19 @@ export function classifyRun({ exitCode = 0, stdout = '', timedOut = false } = {}
     }
 }
 
-/** 每日任务经验行由薄壳自己算,不从上游日志抠数字(上限 65,失败项显示失败并计入已取到的部分)。 */
+/** 每日任务经验行由薄壳自己算(接口取不到时的回落口径),上限 65,失败项显示失败并计入已取到的部分。
+ *  与 expFromReward 同形,estimated=true 表示这是计划口径估算而非接口真值。 */
 export function computeExp({ classify = {}, target = 0 } = {}) {
-    const login = classify.cookieInvalid ? '失败' : '5'
-    const watch = classify.watchFailed ? '观看失败' : '5'
-    const share = classify.shareFailed ? '分享失败' : '5'
-    const coin = target > 0 ? String(target * 10) : '跳过'
-    const total = [login, watch, share].reduce((sum, value) => sum + (Number(value) || 0), 0) + (target > 0 ? target * 10 : 0)
-    return { login, watch, share, coin, total }
+    const missing = []
+    const login = classify.cookieInvalid ? '失败' : '已得 5'
+    const watch = classify.watchFailed ? '未完成' : '已得 5'
+    const share = classify.shareFailed ? '未完成' : '已得 5'
+    const coins = target > 0 ? `已得 ${target * 10}` : '跳过'
+    if (classify.cookieInvalid) missing.push('login')
+    if (classify.watchFailed) missing.push('watch')
+    if (classify.shareFailed) missing.push('share')
+    if (target <= 0) missing.push('coins')
+    const total = (classify.cookieInvalid ? 0 : 5) + (classify.watchFailed ? 0 : 5)
+        + (classify.shareFailed ? 0 : 5) + (target > 0 ? target * 10 : 0)
+    return { login, watch, share, coins, total, missing, estimated: true }
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyRun, detectFeatures, computeExp } from '../src/classify.js'
+import { classifyRun, detectFeatures, computeExp, sanitizeDetail } from '../src/classify.js'
 
 test('-403 需要同行关键词;裸 -403 不命中', () => {
     assert.equal(classifyRun({ exitCode: 0, stdout: '投币失败 -403 账号异常' }).risk403, true)
@@ -57,11 +57,38 @@ test('detectFeatures 逐行匹配', () => {
     assert.ok(hit.risk403.includes('-403'))
 })
 
-test('computeExp 自己算经验', () => {
-    assert.deepEqual(computeExp({ classify: { ok: true }, target: 5 }), { login: '5', watch: '5', share: '5', coin: '50', total: 65 })
+test('computeExp 仍按计划口径估算,带估算标记', () => {
+    const view = computeExp({ classify: { ok: true }, target: 5 })
+    assert.equal(view.login, '已得 5')
+    assert.equal(view.watch, '已得 5')
+    assert.equal(view.share, '已得 5')
+    assert.equal(view.coins, '已得 50')
+    assert.equal(view.total, 65)
+    assert.equal(view.estimated, true)
     const failed = computeExp({ classify: { shareFailed: true }, target: 5 })
-    assert.equal(failed.share, '分享失败')
+    assert.equal(failed.share, '未完成')
     assert.equal(failed.total, 60)
-    assert.equal(computeExp({ classify: {}, target: 0 }).coin, '跳过')
+    assert.equal(computeExp({ classify: {}, target: 0 }).coins, '跳过')
     assert.equal(computeExp({ classify: { cookieInvalid: true }, target: 0 }).login, '失败')
+})
+
+test('sanitizeDetail 净化症状里的真实日志行', () => {
+    const line = '[12:30:26 INF] 领取任务失败：{"Code":6007000,"Message":"请将客户端更新至最新版本"}'
+    const clean = sanitizeDetail(line)
+    assert.ok(!clean.includes('INF'), clean)
+    assert.ok(!clean.includes('{'), clean)
+    assert.ok(clean.includes('6007000'), clean)
+    assert.ok(!/[()（）]/.test(clean), clean)
+})
+
+test('sanitizeDetail 去掉圆括号并超长截断', () => {
+    assert.ok(!/[()（）]/.test(sanitizeDetail('投币失败(风控)')))
+    assert.ok(sanitizeDetail('x'.repeat(200)).length <= 60)
+})
+
+test('detectFeatures 存的是净化后的 detail', () => {
+    assert.equal(detectFeatures('分享 -403 账号异常').risk403, '分享 -403 账号异常')
+    const big = detectFeatures('[12:30:26 INF] 领取任务失败：{"Code":6007000,"Message":"请将客户端更新至最新版本"}')
+    assert.ok(!big.bigPointFlaky.includes('INF'))
+    assert.ok(big.bigPointFlaky.includes('6007000'))
 })

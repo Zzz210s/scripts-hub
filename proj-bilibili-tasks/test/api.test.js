@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { readCookie, fetchNav, fetchVoucher, receiveVoucher, fetchCoin, fetchFollowingsTotal } from '../src/api.js'
+import { readCookie, fetchNav, fetchVoucher, receiveVoucher, fetchCoin, fetchFollowingsTotal, fetchExpReward } from '../src/api.js'
 
 const json = (data, status = 200) => ({ ok: status < 400, status, text: async () => JSON.stringify(data) })
 const capture = () => {
@@ -24,6 +24,15 @@ test('各接口 URL 与请求头', async () => {
     assert.ok(calls[3].url.includes('vmid=12345&pn=1&ps=1'))
     assert.equal(calls[0].options.headers.Cookie, 'SESSDATA=x')
     assert.ok(calls[0].options.headers['User-Agent'])
+})
+
+test('exp/reward 走只读 GET 且带 cookie', async () => {
+    const { calls, fetchImpl } = capture()
+    const result = await fetchExpReward('SESSDATA=x', { fetchImpl })
+    assert.equal(calls[0].url, 'https://api.bilibili.com/x/member/web/exp/reward')
+    assert.equal(calls[0].options.method, 'GET')
+    assert.equal(calls[0].options.headers.Cookie, 'SESSDATA=x')
+    assert.deepEqual(result, { ok: true, data: { code: 0, data: {} } })
 })
 
 test('getCoin 首选成功', async () => {

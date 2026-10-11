@@ -8,6 +8,7 @@ const URLS = {
     nav: 'https://api.bilibili.com/x/web-interface/nav',
     voucher: 'https://api.bilibili.com/x/vip/privilege/my',
     receive: 'https://api.bilibili.com/x/vip/privilege/receive',
+    expReward: 'https://api.bilibili.com/x/member/web/exp/reward',
     coin: 'https://account.bilibili.com/site/getCoin',
     followings: 'https://api.bilibili.com/x/relation/followings'
 }
@@ -58,6 +59,7 @@ async function request(url, { cookie, deps = {}, method = 'GET', headers = {} } 
 }
 
 export const fetchNav = (cookie, deps = {}) => request(URLS.nav, { cookie, deps })
+export const fetchExpReward = (cookie, deps = {}) => request(URLS.expReward, { cookie, deps })
 export const fetchVoucher = (cookie, deps = {}) => request(URLS.voucher, { cookie, deps })
 export const receiveVoucher = (cookie, csrf, deps = {}) =>
     request(`${URLS.receive}?type=1&csrf=${encodeURIComponent(csrf ?? '')}`, { cookie, deps, method: 'POST' })

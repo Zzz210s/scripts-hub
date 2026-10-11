@@ -10,8 +10,10 @@ const headline = (account, date, action) => [PROGRAM, account || DEFAULT_ACCOUNT
 
 export const buildStartMessage = ({ date, account = '' }) => headline(account, date, '开始运行')
 
-export const renderExpLine = (exp = {}) =>
-    `每日任务:登录 ${exp.login} · 观看 ${exp.watch} · 分享 ${exp.share} · 投币 ${exp.coin} · 共 ${exp.total} 经验`
+export const renderExpLine = (exp = {}) => {
+    const tail = exp.estimated ? `${SEP}按计划口径估算` : ''
+    return `每日任务:登录 ${exp.login}${SEP}观看 ${exp.watch}${SEP}分享 ${exp.share}${SEP}投币 ${exp.coins}${SEP}共 ${exp.total} 经验${tail}`
+}
 
 const DONATE_STOP = {
     'balance-zero': '投币:跳过 · 硬币余额为 0',
@@ -31,18 +33,27 @@ export function renderDonateLine(donate = {}) {
     return `投币:${donate.target} 枚 · 投给关注的 UP${balance}`
 }
 
+const dateOf = (seconds) => {
+    const value = Number(seconds)
+    if (!Number.isFinite(value) || value <= 0) return ''
+    // 券在北京时间零点过期,用固定 UTC+8 换算,与运行机器的本地时区无关
+    return new Date((value + 8 * 3600) * 1000).toISOString().slice(0, 10)
+}
+
 export function renderVoucherLine(voucher = {}) {
     if (voucher.action === 'received') {
-        const balance = Number.isFinite(Number(voucher.balance)) ? ` · 余额 ${Number(voucher.balance)}` : ''
-        const next = Number.isFinite(Number(voucher.nextReceiveDays)) ? ` · 下次可领 ${Number(voucher.nextReceiveDays)} 天后` : ''
-        return `会员券:B币券已领取 ${voucher.count ?? 1} 张${balance}${next}`
+        const balance = Number.isFinite(Number(voucher.balance)) ? `${SEP}余额 ${Number(voucher.balance)}` : ''
+        const expiry = dateOf(voucher.expireTime)
+        const due = expiry ? `${SEP}有效至 ${expiry}` : ''
+        const next = Number.isFinite(Number(voucher.nextReceiveDays)) ? `${SEP}下次可领 ${Number(voucher.nextReceiveDays)} 天后` : ''
+        return `会员券:B币券已领取 ${voucher.count ?? 1} 张${balance}${due}${next}`
     }
     if (voucher.action === 'already') return '会员券:B币券已领取 0 张 · 今日已领过'
     if (voucher.action === 'unknown') return '会员券:状态未知 · 跳过 B币券'
     return '会员券:普通会员 · 跳过 B币券'
 }
 
-export const renderMangaLine = (manga) => (manga === 'failed' ? '漫画:签到失败' : '漫画:签到 1 · 漫读券已领')
+export const renderMangaLine = (manga) => (manga === 'failed' ? '漫画:签到失败' : '漫画:已执行')
 export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:失败 · 接口要求升级客户端' : '')
 
 export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, bigPoint, failures = [], ok = true }) {
