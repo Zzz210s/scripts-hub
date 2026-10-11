@@ -21,7 +21,10 @@ const webhookFiles = {
     'B站任务': '/srv/apps/automation/bilibili/secrets/wecom-webhook.txt',
     服务器: '/srv/apps/automation/secrets/wecom-server.txt'
 }
-const webhookFile = webhookFiles[program]
+// NOTIFY_WEBHOOK_URL 既可以是 URL 也可以是文件路径(本机自测/演练用,不碰真实群)。
+const overrideUrl = process.env.NOTIFY_WEBHOOK_URL || ''
+const isUrl = value => /^https?:\/\//.test(value)
+const webhookFile = overrideUrl || webhookFiles[program]
 
 // logFile 可能被调用方传成非字符串(会触发 Node 的 DEP0187 警告),先收口
 const logPath = typeof logFile === 'string' ? logFile : undefined
@@ -46,12 +49,12 @@ const text = [
     tail
 ].join('\n')
 
-if (!webhookFile || !fs.existsSync(webhookFile)) {
+if (!webhookFile || (!isUrl(webhookFile) && !fs.existsSync(webhookFile))) {
     console.error(`未找到 webhook 文件:${webhookFile ?? '(未知程序)'}`)
     process.exit(1)
 }
 
-const response = await fetch(webhookFile.startsWith('http') ? webhookFile : fs.readFileSync(webhookFile, 'utf8').trim(), {
+const response = await fetch(isUrl(webhookFile) ? webhookFile : fs.readFileSync(webhookFile, 'utf8').trim(), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ msgtype: 'text', text: { content: text } })

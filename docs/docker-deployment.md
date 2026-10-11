@@ -317,7 +317,7 @@ BBR 生效的验证:`ss -tin state established` 里能看到用 `bbr` 的连接;
 
 | 端 | 触发 | 脚本 | 动作 |
 | --- | --- | --- | --- |
-| 本机 `F: -Note` | Windows 计划任务 `NoteSync`,每 5 分钟 | `scripts/note-sync/note-sync.sh` | pull --rebase --autostash → **只提交 2 分钟没被改过的文件** → 脱敏闸门 → 提交 → push(重试 3 次) |
+| 本机 `F:\0-Note` | Windows 计划任务 `NoteSync`,每 5 分钟 | `scripts/note-sync/note-sync.sh` | pull --rebase --autostash → **只提交 2 分钟没被改过的文件** → 脱敏闸门 → 提交 → push(重试 3 次) |
 | 服务器 `/srv/apps/note/repo` | systemd `note-sync.timer`,每 5 分钟 | `/srv/apps/automation/note-sync.sh` | 同上;拉取成功后博客重建按 sha 变化自动重建 |
 
 配置:本机 `~/.note-sync/config.env`;服务器复用 `suite.env`。冲突一律**停下 + 企业微信通知**,绝不 force。

@@ -25,12 +25,34 @@ log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
 notify() {
     log "通知:$1"
     [ -f "$WEBHOOK_FILE" ] || return 0
-    python3 - "$WEBHOOK_FILE" "$1" <<'PY' >/dev/null 2>&1 || true
+    # 与 scripts/note-sync/notify-wecom.sh、另一个 Linux 侧实现共用同一段 python(漂移由
+    # scripts/check-wecom-drift.mjs 校验)。正文走 argv:python 的 stdin 被 heredoc 占用,
+    # 而 Windows 上 stdin 还是 cp936 —— 两者都会把中文读坏。
+    local out
+    out="$(python3 - "$WEBHOOK_FILE" "$1" <<'PY' 2>&1
+# >>> wecom-notify begin
 import json, sys, urllib.request
-url = open(sys.argv[1]).read().strip()
-body = json.dumps({"msgtype": "text", "text": {"content": sys.argv[2]}}).encode()
-urllib.request.urlopen(urllib.request.Request(url, body, {"content-type": "application/json"}), timeout=15)
+
+url = open(sys.argv[1], encoding="utf-8").read().strip()
+text = sys.argv[2]
+raw = text.encode("utf-8")
+if len(raw) > 2000:                     # 企业微信 text 上限 2048 字节,留一点余量
+    text = raw[:2000].decode("utf-8", "ignore") + "...(已截断)"
+body = json.dumps({"msgtype": "text", "text": {"content": text}}).encode("utf-8")
+req = urllib.request.Request(url, body, {"content-type": "application/json; charset=utf-8"})
+try:
+    resp = json.loads(urllib.request.urlopen(req, timeout=15).read().decode("utf-8", "replace"))
+except Exception as exc:
+    print("发送失败: %s" % exc)
+    sys.exit(1)
+if resp.get("errcode", 1) != 0:
+    print("发送被拒 errcode=%s errmsg=%s" % (resp.get("errcode"), resp.get("errmsg")))
+    sys.exit(1)
+# <<< wecom-notify end
 PY
+)" || log "notify: ${out:-未知失败}"
+    [ -n "$out" ] && log "notify: $out"
+    return 0
 }
 
 cd "$NOTE_DIR" 2>/dev/null || { log "找不到 $NOTE_DIR"; exit 2; }

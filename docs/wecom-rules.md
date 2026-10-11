@@ -21,6 +21,20 @@
 (消息排版、webhook 读取、返回形状)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。
 
+shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不是项目运行结果):
+
+| 触发者 | 实现文件 | 发什么 |
+| --- | --- | --- |
+| 本机 note-sync(以及其它本机脚本) | `scripts/note-sync/notify-wecom.sh` | 同步冲突/闸门拦截/推送失败 |
+| 服务器 note-sync | `scripts/linux/note-sync/note-sync.sh` 内的 `notify()` | 同上(服务器侧) |
+| 服务器内存守卫 | `scripts/linux/mem-guard/mem-guard.sh` 内的 `notify()` | swap/load 告警 |
+| 程序失败兜底 | `scripts/linux/alert-fail.mjs` | 「程序 · 日期 · 需要你处理」 |
+
+这三个 `notify()` 里的 python 发送块也**逐字节一致**(`wecom-notify` 组,同样由
+`scripts/check-wecom-drift.mjs` 校验)。正文一律走 `argv` 传递:用 `python - <<'PY'` 会让 heredoc
+占用 stdin,而 Windows 上 python 的 stdin 默认是 cp936 —— 两者叠在一起会把中文读成乱码
+(2026-10-11 的乱码事故就是这么来的)。
+
 ## 2. 接口与形态
 
 - 地址:`POST https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<KEY>`。
@@ -96,6 +110,13 @@
   node scripts/check-wecom-drift.mjs --verbose  # 打印各块大小与首个差异位置
   ```
 
+- 改完发送层还要跑**保真检测**:把含全角标点、反斜杠路径、生僻字(扩展区)的样例送进每个通道,
+  用本地假端点收回来断言逐字节一致(不碰真实群),顺带验证超长截断与"没有把 stdin 当 UTF-8 读"的护栏:
+
+  ```bash
+  node scripts/check-notify-fidelity.mjs
+  ```
+
 - 三份实现里,`proj-microsoft-rewards/` 来自 `%REWARDS_DIR%`、`proj-weread-signin/` 来自 `%WEREAD_DIR%`,
   两者都是**生成快照**;`proj-epic-free-games/` 的权威副本就在本仓库里。改发送核心要先改共享核心的权威来源
   (两份快照要改各自的工作区),再跑 `scripts/sync-microsoft-rewards.sh` / `scripts/sync-weread-signin.sh`
@@ -110,4 +131,7 @@
   (1s, 2s); never retry other errcodes. `93000`/`93004` mean manual action is required.
 - Rate limit is about 20 messages per minute per robot; a run sends at most two messages.
 - The `wecom-core` block must stay byte-identical across implementations; run
-  `node scripts/check-wecom-drift.mjs`.
+  `node scripts/check-wecom-drift.mjs`. The three shell `notify()` implementations share a second
+  byte-identical block (`wecom-notify`) and pass the body through `argv`, never through stdin.
+- Run `node scripts/check-notify-fidelity.mjs` after touching any sender: it pushes a tricky
+  sample through every channel into a local fake endpoint and asserts byte-exact delivery.
