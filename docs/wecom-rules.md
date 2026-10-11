@@ -124,6 +124,9 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
   node scripts/gen-wecom-core.mjs --check && node scripts/check-wecom-drift.mjs   # 3. 两道检查
   ```
 
+- 提交时会自动跑:全局 git 钩子 `~/.githooks/pre-commit`(真源 `config-ai/host/git/hooks/pre-commit`)
+  在本次提交动了共享块相关文件时跑 `gen-wecom-core.mjs --check`,不一致直接拦下 ——
+  不需要靠人记得跑检查。逃生舱:`GENERATOR_GATE=0 git commit ...`。
 - 提交前跑漂移检测:
 
   ```bash
