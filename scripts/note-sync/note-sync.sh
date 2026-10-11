@@ -32,10 +32,13 @@ log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
 
 # 文本转 JSON 字符串(优先 python3,退回 python,再退回 sed)—— 失败通知要用
 json_escape() {
+    # 必须走 sys.stdin.buffer 再显式按 UTF-8 解码:Windows 上 python 的 stdin 编码是 cp936,
+    # 直接 sys.stdin.read() 会把 UTF-8 中文读成乱码,json.dumps 一转义就把乱码永久固化进通知
+    # (2026-10-11 实测:通知正文的中文全变成「澶辫触」这类 GBK 乱码,surrogate 位还会丢字)
     if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'
+        python3 -c 'import json,sys;print(json.dumps(sys.stdin.buffer.read().decode("utf-8","replace")))'
     elif command -v python >/dev/null 2>&1; then
-        python -c 'import json,sys;print(json.dumps(sys.stdin.read()))'
+        python -c 'import json,sys;print(json.dumps(sys.stdin.buffer.read().decode("utf-8","replace")))'
     else
         sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/^/"/;s/$/"/'
     fi

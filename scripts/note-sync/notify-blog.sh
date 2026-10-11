@@ -53,7 +53,8 @@ runs_json="$(timeout 30 gh api "repos/$BLOG_REPO/actions/workflows/$BLOG_WORKFLO
     || { log "跳过:查不到 $BLOG_REPO 的运行记录"; exit 0; }
 recent="$(printf '%s' "$runs_json" | python3 -c '
 import json, sys, datetime
-d = json.load(sys.stdin)
+# 按字节读再显式 UTF-8 解码:Windows 的 python stdin 默认是 cp936,直接 json.load(sys.stdin) 会把中文读成乱码
+d = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
 mins = int(sys.argv[1])
 now = datetime.datetime.now(datetime.timezone.utc)
 for r in d.get("workflow_runs", []):
@@ -85,7 +86,7 @@ else
 
     last_run="$(printf '%s' "$runs_json" | python3 -c '
 import json, sys
-d = json.load(sys.stdin)
+d = json.loads(sys.stdin.buffer.read().decode("utf-8", "replace"))
 r = (d.get("workflow_runs") or [{}])[0]
 print("%s\t%s" % (r.get("created_at", ""), r.get("conclusion") or "-"))
 ' 2>/dev/null)"
