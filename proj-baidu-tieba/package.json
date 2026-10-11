@@ -1,0 +1,20 @@
+{
+  "name": "baidu-tieba",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-account Baidu Tieba daily sign-in with read-back verification of the followed-forum list, plus WeCom notifications.",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "author": "Zzz210s",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzz210s/scripts-hub.git",
+    "directory": "proj-baidu-tieba"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

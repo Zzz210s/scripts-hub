@@ -1,0 +1,26 @@
+# 来源与许可
+
+本目录的代码以 **GPL-3.0-only** 授权(见仓库根 LICENSE),与仓库其它程序保持一致。
+
+本项目的实现**全部是自己写的**,没有复制任何第三方项目的代码。下面是所用协议事实
+(签名 salt、参数集合、返回码)的核对出处 —— 只取了「协议长什么样」这一层事实,
+不取实现代码、不取常量表以外的任何文件内容。事实条目本身来自本机两份调研文档
+`2026-10-11-百度贴吧签到脚本调研.md` 与 `2026-10-11-贴吧读回校验调研.md`,
+可自行按下面的符号核实。
+
+## 协议事实的核对出处
+
+| 事实 | 出处(源码符号) |
+| --- | --- |
+| 签名 salt `tiebaclient!!!`;签名 = `md5(按 key 升序直接拼 "k=v" + salt).upper()`,不 urlencode、无分隔符 | `LuoSue/TiebaSignIn-1` 的 `tieba_client.py`:`SIGN_KEY` / `signature()`;`Sitoi/dailycheckin` 的 `dailycheckin/tieba/main.py`:`SIGN_KEY` / `encode_data()`;`Aruelius/tieba_sign` 的 `tieba_sign.py`:`MD5_KEY` / `calc_sign()`;`aiotieba` 的 `src/aiotieba/helper/crypto/const.py`:`APP_SALT`(经 `src/aiotieba/core/http.py` 的 `pack_form_request()` 使用) |
+| 签到接口 `POST http(s)://c.tieba.baidu.com/c/c/forum/sign`;必需参数 `BDUSS`/`fid`/`kw`/`tbs`/`timestamp` | `LuoSue/TiebaSignIn-1` 的 `SIGN_URL` / `BASE_SIGN_DATA` / `sign_forum()`;`Sitoi/dailycheckin` 的 `SIGN_URL` / `SIGN_DATA`;`Aruelius/tieba_sign` 的 `SIGN_URL` / `sign()` |
+| 客户端伪装字段 `_client_type=2`、`_client_version=9.7.8.0`、`_phone_imei=000000000000000`、`model=MI+5`、`net_type=1` | 同上三处的 `BASE_SIGN_DATA` / `SIGN_DATA` |
+| 返回码 `0` 成功、`160002` 今日已签到、`340006` 贴吧已被屏蔽、`320022` TBS 校验失败 | `LuoSue/tieba_client.py` 的 `sign_forum()`;`Sitoi/dailycheckin` 的 `sign_forums()`;`aiotieba` 的 `docs/tutorial/many_utils.md`(判成功用 `code not in [160002, 340006]`);`Aruelius/tieba_sign` issue #17 的原始报错 `{'error': {'errno': 320022, 'errmsg': '', 'usermsg': 'TBS校验失败'}}` |
+| 顶层 `error_code == "0"` 不等于成功,真实错误可能只在嵌套 `error.errno` | 同上 issue #17 |
+| 取 tbs `GET https://tieba.baidu.com/dc/common/tbs`(返回 `is_login` / `tbs`) | `LuoSue/tieba_client.py` 的 `TBS_URL` / `get_tbs()`;`Sitoi/dailycheckin` 的 `TBS_URL` / `get_user_info()` |
+| 关注吧列表 `POST .../c/f/forum/forumGuide`,含 `forum_name` / `forum_id` / `is_sign` | `Aruelius/tieba_sign` 与 `Sitoi/dailycheckin` 的列表读取路径,见读回校验调研文档第 3 节 |
+
+## 测试夹具
+
+`test/fixtures/sign-*.json` 是**按上面出处记载的响应形状人工重写的样例**,只保留判定所
+需的字段层级,不含任何真实账号的 `BDUSS`、`STOKEN`、cookie 或昵称。它们不是抓包原件。
