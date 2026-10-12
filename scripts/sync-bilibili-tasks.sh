@@ -7,7 +7,7 @@
 # 保留这个脚本名与调用形态,只做三件可机器判定的事:
 #   1) 目录必要文件存在;
 #   2) VENDOR_COMMIT.txt 的 commit 与 Dockerfile 里的 ARG UPSTREAM_SHA 一致;
-#   3) wecom-core 漂移检测通过(含本项目这第 4 份)。
+#   3) wecom-core 漂移检测通过(含本项目这一份)。
 # 将来若真拆出独立工作区,照 sync-weread-signin.sh 升级为真同步。
 #
 # 用法:bash scripts/sync-bilibili-tasks.sh
@@ -44,7 +44,7 @@ if [[ -f "$PROJ/VENDOR_COMMIT.txt" && -f "$DOCKERFILE" ]]; then
   fi
 fi
 
-# 3. wecom-core 漂移(含第 4 份)
+# 3. wecom-core 漂移(含本项目这一份)
 if node "$REPO_DIR/scripts/check-wecom-drift.mjs" >/tmp/bilibili-drift.log 2>&1; then
   ok "$(cat /tmp/bilibili-drift.log)"
 else

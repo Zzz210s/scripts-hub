@@ -34,10 +34,10 @@ run_drift() {
     head_ "企业微信发送实现一致性(check-wecom-drift)"
     if out=$(node "$REPO/scripts/check-wecom-drift.mjs" 2>&1); then
         echo "$out" | sed 's/^/  /'
-        ok "三份实现的核心块一致"
+        ok "wecom-core 核心块各份一致"
     else
         echo "$out" | sed 's/^/  /'
-        bad "三份实现已漂移(容器里的代码是从本机搬的,最容易在这里不一致)"
+        bad "wecom-core 核心块已漂移(容器里的代码是从本机搬的,最容易在这里不一致)"
     fi
 }
 

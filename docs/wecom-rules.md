@@ -34,7 +34,7 @@ node scripts/gen-wecom-core.mjs --dry-run  # 看会改哪些文件
 
 为什么是「内嵌 + 生成」而不是共享包:这些实现的宿主各自独立部署(容器构建上下文
 互不相通),两个快照项目的真源还在别的工作区里 —— 跨目录 import 会把「改一处」变成
-「改四处工作流」。历史上曾经抽过公共库 `wecom-notify/`(2026-10-04),随后被拆掉
+「改多处工作流」。历史上曾经抽过公共库 `wecom-notify/`(2026-10-04),随后被拆掉
 (`de2deb9`),只留这份规则文档,原因就是同一个。
 
 shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不是项目运行结果):
@@ -150,13 +150,13 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
 ## 9. 外层允许的差异(已核对的现状)
 
 共享块只统一「发送行为」,不统一公开 API。下面这些差异是**有意保留**的,改动外层时不要以
-「对齐」为名顺手改掉(真要统一就单独立项,它会连带改 4 个项目的调用点与测试):
+「对齐」为名顺手改掉(真要统一就单独立项,它会连带改多个项目的调用点与测试):
 
 | 维度 | `proj-microsoft-rewards` | 其它项目 |
 | --- | --- | --- |
 | 失败语义 | `sendWecom` **抛异常**;另有 `isConfigured()` / `webhookUrl()` | 返回 `{ ok:false, error }`,不抛;**没有**配置探测 |
 | 可注入的传输层 | 只允许覆盖 `url`;另有 `__deliverWecom` 测试钩子注入 fetch/sleep/重试 | 通过 `options` 传 `fetchImpl` / `sleep` / `retries` / `timeoutMs` / `onRetry` |
-| 消息类型 | 公开 API 只发文本(块内支持 markdown,但没暴露) | `options.msgtype='markdown'` 走 markdown 字段(上限 4096 字节) |
+| 消息类型 | 公开 API 只发文本(块内支持 markdown,但没暴露) | 同样只发文本:公开 `sendWecom` 不透传 `msgtype`,块内的 markdown 分支没有出口 |
 | 辅助导出 | 无 | `maskSecret()`、`truncateText()`、`loadWebhook()` |
 | 返回细节 | `true`(或抛) | `{ ok:true }`,失败时带 `errcode` |
 

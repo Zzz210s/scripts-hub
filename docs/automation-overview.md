@@ -112,8 +112,7 @@
   `git apply`。同步会把本机路径改成 `%REWARDS_DIR%`、按机器私有清单脱敏;缺清单脚本拒绝运行。
   完整工作模型见 `docs/workspace-model.md`。
 - 改任一份企业微信发送核心 → 权威实现是 `wecom-core` 标记之间的整块,共享规则见 `docs/wecom-rules.md`;
-  现在三份实现在 `proj-microsoft-rewards/wechat-bridge/lib/wecom.js`、`proj-weread-signin/src/notify.js` 与
-  `proj-epic-free-games/src/notify.js`,再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印各块大小)。改一处必须同步其余各处,只允许外壳
+  现有各份实现的清单在 `scripts/gen-wecom-core.mjs` 的 `targets` 里(不在这里复述,免得新增实现后先过期),再跑 `node scripts/check-wecom-drift.mjs`(不一致退出 1,`--verbose` 打印各块大小)。改一处必须同步其余各处,只允许外壳
   (消息排版、webhook 读取、返回形状)不同,核心必须一致(按 LF 归一后逐字节)。
 - 改 Epic 限免领取 → 代码就在本仓库 `proj-epic-free-games/`(不是生成快照,直接改);
   但 `proj-epic-free-games/vendor/free-games-claimer/` 是上游快照,**不要就地改上游代码** ——

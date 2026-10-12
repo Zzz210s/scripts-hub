@@ -9,7 +9,7 @@
 // 改运行时依赖风险高;所以这里用「各实现内嵌同一块 + 漂移检测」。
 //
 // 两组:
-//   wecom-core   Node 侧的发送核心(postWecom 等),4 份
+//   wecom-core   Node 侧的发送核心(postWecom 等),份数见下方 files 列表
 //   wecom-notify 通知脚本里的 python 发送块,3 份(本机 helper + 两个 Linux 侧实现)
 import fs from 'node:fs'
 import path from 'node:path'

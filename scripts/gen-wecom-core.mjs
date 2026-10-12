@@ -8,8 +8,8 @@
 //   node scripts/gen-wecom-core.mjs --group wecom-core --extra <文件>
 //                                                     额外目标(快照项目在权威工作区那份)
 //
-// 为什么是"生成"而不是"共享包":四份实现的宿主各自独立部署(容器构建上下文互不相通),
-// 两个快照项目的真源还在别的工作区里;跨目录 import 会把"改一处"变成"改四处工作流"。
+// 为什么是"生成"而不是"共享包":各实现的宿主各自独立部署(容器构建上下文互不相通),
+// 两个快照项目的真源还在别的工作区里;跨目录 import 会把"改一处"变成"改多处工作流"。
 // 单一源放 scripts/lib/,注入后仍是各自内嵌,部署形态零变化。历史背景见 docs/wecom-rules.md。
 import fs from 'node:fs'
 import path from 'node:path'

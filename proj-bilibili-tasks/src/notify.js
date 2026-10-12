@@ -1,10 +1,8 @@
 // 企业微信群机器人推送:脱敏 + 与其它项目逐字节一致的 wecom-core 发送核心。
 //
-// 本项目的 notify 层是第四份实现。块内自带的那行说明只列了最初的两份实现
-// (proj-microsoft-rewards/wechat-bridge/lib/wecom.js 与 proj-weread-signin/src/notify.js),
-// 那两处是生成快照、不能在这里改;更正说明只能像 proj-epic-free-games/src/notify.js 那样写在块外。
-// 要改共享核心,先改 docs/wecom-rules.md,再把块整段同步到四处(含两份快照的权威工作区),
-// 最后跑 scripts/check-wecom-drift.mjs。
+// 要改共享核心,先改单一源 scripts/lib/wecom-core.js,再跑 node scripts/gen-wecom-core.mjs
+// 注入到各份(清单见它的 targets,含两份快照的权威工作区),最后跑 scripts/check-wecom-drift.mjs;
+// 规则见 docs/wecom-rules.md。
 import fs from 'node:fs'
 // >>> wecom-core begin —— 企业微信发送实现的共同核心,改一处必须同步其余各处
 // 本块由生成器从单一源注入到各实现的发送层,逐字节一致,由漂移检测脚本校验;

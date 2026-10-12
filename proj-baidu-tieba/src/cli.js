@@ -112,7 +112,13 @@ async function runReport({ config, deps, now, dry, log }) {
     return 0;
   }
   const sent = await deps.send(text);
-  log(`[通知] 企业微信${sent?.ok === false ? '发送失败' : '已发送'}`);
+  if (sent?.ok === false) {
+    // errcode 是“需要人工处理”(93000/93004)与限流的唯一信号,最后一环不能丢。
+    const code = sent.errcode === undefined ? '' : ` · errcode ${sent.errcode}`;
+    log(`[通知] 企业微信发送失败 · ${sent.error}${code}`);
+  } else {
+    log('[通知] 企业微信已发送');
+  }
   return 0;
 }
 

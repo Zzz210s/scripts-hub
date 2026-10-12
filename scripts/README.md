@@ -90,7 +90,7 @@
 
 | 脚本 | 干什么 | 什么时候用 | 关键说明 |
 | --- | --- | --- | --- |
-| `check-wecom-drift.mjs` | 比对三份企业微信发送实现(`proj-microsoft-rewards/wechat-bridge/lib/wecom.js`、`proj-weread-signin/src/notify.js`、`proj-epic-free-games/src/notify.js`)里 `wecom-core` 核心块是否彼此逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印各块大小与差异位置;规则见 `../docs/wecom-rules.md` |
+| `check-wecom-drift.mjs` | 比对各份企业微信发送实现(清单见 `gen-wecom-core.mjs` 的 `targets`)里 `wecom-core` 核心块是否彼此逐字节一致 | 改过任一份企业微信发送核心后,提交前 | `node scripts/check-wecom-drift.mjs` 不一致退出 1;`--verbose` 打印各块大小与差异位置;规则见 `../docs/wecom-rules.md` |
 | `check-privacy.mjs` | 扫 `git ls-files` 的每个文件:本机路径、真实邮箱、`wrk-` 真 key、webhook 真 key、手机号、机器私有标识清单里的词 | 提交前、发布前,或定期体检 | `node scripts/check-privacy.mjs` 命中退出 1;`--verbose` 打印规则数;私有清单读 `SENSITIVE_PATTERNS_FILE`(默认 `~/.config/automation-suite/sensitive-patterns.txt`),读不到只跑通用规则 |
 
 ## 路径与凭据

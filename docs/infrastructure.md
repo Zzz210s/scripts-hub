@@ -206,7 +206,7 @@ mirror 比可达历史大出来的部分是仓库里**已不可达的对象**(`g
 - **apprise 已经装着**:`Apprise v2.0.0`,来自 scoop 的 Python(`~/scoop/apps/python/current/Scripts/apprise`)。
 - 它**原生支持企业微信群机器人**:`apprise --details` 列出 `wecombot` schema,
   `apprise --dry-run "wecombot://<key>"` 解析通过。也就是说它与现有发送层是**同一个通道**。
-- 现有实现是四份各自内嵌的 `wecom-core`(字节相同,单一源在 `scripts/lib/wecom-core.js`,
+- 现有实现是每个程序各自内嵌一份 `wecom-core`(字节相同,单一源在 `scripts/lib/wecom-core.js`,
   由 `scripts/gen-wecom-core.mjs` 注入),由 `scripts/check-wecom-drift.mjs` 锁住**逐字节一致**;契约写在
   [wecom-rules.md](wecom-rules.md):字节级截断、超时、重试、`errcode` 处理、脱敏。
 
@@ -215,14 +215,14 @@ mirror 比可达历史大出来的部分是仓库里**已不可达的对象**(`g
 | | 换 apprise | 保持现状 |
 | --- | --- | --- |
 | 好处 | 一处配置多通道(企业微信 + ntfy + 邮件);重试/去重是现成的;新增程序不用再抄 `wecom-core` | 契约已在文档里写死并有漂移检测;消息排版在程序侧,完全可控;无额外进程 |
-| 代价 | 要为 `wecom-core` 的字节截断语义重新做人;每发一条要起一个 Python 进程(约 200-400ms);`check-wecom-drift.mjs` 得重写或废弃;三份实现与文档 [wecom-rules.md](wecom-rules.md) 要同步改 | 新增通道要再写一遍发送层 |
+| 代价 | 要为 `wecom-core` 的字节截断语义重新做人;每发一条要起一个 Python 进程(约 200-400ms);`check-wecom-drift.mjs` 得重写或废弃;各份实现与文档 [wecom-rules.md](wecom-rules.md) 都要同步改 | 新增通道要再写一遍发送层 |
 
 **结论:三个套件程序不动。** 换过去唯一的真实收益是「多通道」,而现在不需要;
 代价是把一个已经被检测锁死的稳定层重做一遍。
 **新基础设施(备份失败、更新失败、监控告警)可以直接用 apprise**,因为那些还没有任何发送层 ——
 这是它的正确用法,也是它能力的下限。
 
-工作量:若将来真要换,约 1 天(改文档 + 三处实现 + 重写漂移检测 + 联调)。
+工作量:若将来真要换,约 1 天(改文档 + 各处实现 + 重写漂移检测 + 联调)。
 
 ---
 

@@ -85,6 +85,7 @@ test('超长多字节正文按字节截断:不超 2048 字节、不截半、不�
   assert.equal(res.ok, true);
   const content = bodyOf(calls[0]).text.content;
   assert.ok(Buffer.byteLength(content, 'utf8') <= 2048);
+  assert.ok(Buffer.byteLength(content, 'utf8') >= 2040, '不能截得比上限短太多');
   assert.ok(content.endsWith('...'));
   assert.ok(!content.includes('\uFFFD'));
   assert.ok(long.startsWith(content.slice(0, -3)), '截断点必须落在字符边界上');
@@ -120,4 +121,46 @@ test('webhook 文件缺失:视为未配置,失败但不抛且不联网', async (
   assert.equal(loadWebhook(file), WEBHOOK);
   const ok = await sendWecom('hi', { webhookFile: file, fetchImpl });
   assert.equal(ok.ok, true);
+});
+
+test('HTTP 200 但正文不是 JSON:判为失败,不当成功', async () => {
+  const { calls, fetchImpl } = stub(() => ({ text: '<html>502 Bad Gateway</html>' }));
+  const res = await sendWecom('hi', { webhook: WEBHOOK, fetchImpl, sleep: noSleep, retries: 0 });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /不是 JSON/);
+  assert.equal(calls.length, 1);
+});
+
+test('errcode 缺失:判为失败且不重试', async () => {
+  const { calls, fetchImpl } = stub(() => ({ text: JSON.stringify({ errmsg: 'weird' }) }));
+  const res = await sendWecom('hi', { webhook: WEBHOOK, fetchImpl, sleep: noSleep });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /errcode=缺失/);
+  assert.equal(calls.length, 1);
+});
+
+test('onRetry 拿到掩码后的错误,不把 key 原文交给日志', async () => {
+  const seen = [];
+  const { fetchImpl } = stub(() => ({ throw: new Error(`request to ${WEBHOOK} failed`) }));
+  const res = await sendWecom('hi', { webhook: WEBHOOK, fetchImpl, sleep: noSleep, retries: 1, onRetry: (error) => seen.push(error.message) });
+  assert.equal(res.ok, false);
+  assert.equal(seen.length, 1);
+  assert.ok(!seen[0].includes(KEY));
+  assert.ok(seen[0].includes('key=****'));
+  assert.ok(!res.error.includes(KEY));
+});
+
+test('webhook 文件路径是目录:不抛穿,按未配置失败', async () => {
+  const dir = tmp();
+  const { calls, fetchImpl } = stub(() => OK);
+  const res = await sendWecom('hi', { webhookFile: dir, fetchImpl });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /未配置/);
+  assert.equal(calls.length, 0);
+});
+
+test('公开 API 不透传 msgtype:传 markdown 也只发 text', async () => {
+  const { calls, fetchImpl } = stub(() => OK);
+  await sendWecom('hi', { webhook: WEBHOOK, fetchImpl, msgtype: 'markdown' });
+  assert.equal(bodyOf(calls[0]).msgtype, 'text');
 });

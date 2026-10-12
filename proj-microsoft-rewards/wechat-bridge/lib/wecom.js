@@ -7,8 +7,8 @@ import path from 'node:path'
 import { DATA_DIR } from './store.js'
 
 // >>> wecom-core begin —— 企业微信发送实现的共同核心,改一处必须同步其余各处
-// 本块在 proj-microsoft-rewards/wechat-bridge/lib/wecom.js 与 proj-weread-signin/src/notify.js
-// 中逐字节一致,由 scripts/check-wecom-drift.mjs 校验;共享规则见 docs/wecom-rules.md。
+// 本块由生成器从单一源注入到各实现的发送层,逐字节一致,由漂移检测脚本校验;
+// 共享规则见 docs/wecom-rules.md。不写具体实现名,免得新增实现后这行先过期。
 const WECOM_TEXT_MAX_BYTES = 2048
 const WECOM_MARKDOWN_MAX_BYTES = 4096
 const WECOM_TIMEOUT_MS = 10000
@@ -22,6 +22,19 @@ class WecomError extends Error {
         this.name = 'WecomError'
         this.errcode = errcode
     }
+}
+
+/** 掩码 webhook key:重试回调、日志与错误信息都不许出现密钥原文。 */
+function maskWecomKey(text) {
+    return String(text).replace(/(key=)[A-Za-z0-9-]{6,}/g, '$1****')
+}
+
+/** 重试回调只该看到掩码后的信息(错误原文可能带密钥),errcode 原样保留给调用方。 */
+function maskWecomError(error) {
+    const masked = new Error(maskWecomKey(error?.message ?? error))
+    masked.name = error?.name ?? 'Error'
+    if (error?.errcode !== undefined) masked.errcode = error.errcode
+    return masked
 }
 
 /** 按 UTF-8 字节截断,多字节字符不会被截半;超长时以 ... 结尾。 */
@@ -54,10 +67,13 @@ async function postOnce(url, body, fetchImpl, timeoutMs) {
         }
 
         if (!res.ok) throw new Error(`HTTP ${res.status} ${raw.slice(0, 120)}`)
-        if (parsed && parsed.errcode !== 0) {
-            throw new WecomError(`企业微信返回 errcode=${parsed.errcode} errmsg=${parsed.errmsg}`, parsed.errcode)
+        // 成功 = HTTP 200 且 errcode 为 0;网关塞回 HTML 或 JSON 里缺 errcode 都算失败。
+        if (parsed === null) throw new Error(`响应不是 JSON:${raw.slice(0, 120)}`)
+        if (parsed.errcode !== 0) {
+            const code = parsed.errcode === undefined ? '缺失' : parsed.errcode
+            throw new WecomError(`企业微信返回 errcode=${code} errmsg=${parsed.errmsg ?? ''}`, parsed.errcode)
         }
-        return parsed ?? {}
+        return parsed
     } finally {
         clearTimeout(timer)
     }
@@ -78,7 +94,7 @@ async function postWecom({ url, text, msgtype = 'text', retries = 2, timeoutMs =
         } catch (error) {
             lastError = error
             if ((error instanceof WecomError && !WECOM_RETRYABLE_ERRCODES.has(error.errcode)) || attempt === retries) break
-            onRetry?.(error, attempt + 1)
+            onRetry?.(maskWecomError(error), attempt + 1)
             await sleep(1000 * 2 ** attempt)
         }
     }
