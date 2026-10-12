@@ -69,8 +69,10 @@ function accountLines(accounts, reconcile) {
   const perAccount = Array.isArray(reconcile?.perAccount) ? reconcile.perAccount : null;
   const lines = [];
   for (const item of Array.isArray(accounts) ? accounts : []) {
-    // 匹配用原始账号名,显示才消毒 —— 否则带圆括号的账号名会对不上对账条目
-    const verified = perAccount ? perAccount.find((one) => one?.name === item?.name) : undefined;
+    // 匹配优先用唯一 id(重名账号 / 消毒后同名的账号靠它配对),没带 id 的历史记录才退到名字
+    const verified = perAccount
+      ? perAccount.find((one) => (item?.id && one?.id === item.id) || one?.name === item?.name)
+      : undefined;
     const name = safeText(item?.name) || '未命名';
     const parts = countParts(item?.counts);
     if (perAccount) parts.push(`对账 ${verifyWord(verified)}`);

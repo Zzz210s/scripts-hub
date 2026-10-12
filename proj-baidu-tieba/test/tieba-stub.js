@@ -1,6 +1,7 @@
 // run/cli 集成测试共用的完整贴吧协议桩(不匹配 *.test.js,不会被 node --test 当用例跑)。
-// `accounts` 键为 cookie 串,值为 { ok?: false, forums: [{ fid, kw, isSign?, isForbidden? }] }。
-// `honorSign: false` 模拟「第一层说成功但读回 is_sign 仍为 0」的谎报,用来驱动对账不通过。
+// `accounts` 键为 cookie 串,值为 { ok?: false, forums: [{ fid, kw, isSign?, isForbidden? }],
+//   honorSign?: false 该账号的签到不计入已签,guideFailures?: n 前 n 次关注列表请求回 500 }。
+// `honorSign: false`(顶层)模拟「第一层说成功但读回 is_sign 仍为 0」的谎报,用来驱动对账不通过。
 import { stub } from './stub.js';
 
 export const TBS_URL = 'https://tieba.baidu.com/dc/common/tbs';
@@ -23,6 +24,10 @@ export function tiebaStub({ accounts = {}, honorSign = true, tbs = 'TBS1' } = {}
     if (!account || account.ok === false) return json({ is_login: 0, like_forum: [] });
     if (url === GUIDE_URL) {
       seen.guide.push(cookie);
+      if (account.guideFailures > 0) {
+        account.guideFailures -= 1;
+        return { status: 500, text: 'guide 暂时不可用' };
+      }
       const forums = (account.forums ?? []).map((forum) => ({
         forum_id: forum.fid,
         forum_name: forum.kw,
@@ -34,7 +39,7 @@ export function tiebaStub({ accounts = {}, honorSign = true, tbs = 'TBS1' } = {}
     const body = new URLSearchParams(options.body);
     const kw = body.get('kw');
     seen.sign.push({ cookie, kw });
-    if (honorSign) signed.add(`${cookie}|${kw}`);
+    if (honorSign && account.honorSign !== false) signed.add(`${cookie}|${kw}`);
     return json({ error_code: '0', user_info: { sign_bonus_point: 3 } });
   });
   return { fetchImpl, calls, seen, signed };

@@ -35,14 +35,20 @@ export function parseEnv(text) {
 
 const pick = (env, key, fallback) => (env[key] === undefined || env[key] === '' ? fallback : env[key]);
 
-const int = (value, fallback) => {
+/** 解析整数:非数字或低于下界(min)一律回落默认值。有些键的 0 无意义(见 maxAttempts)。 */
+const int = (value, fallback, min = 0) => {
   const parsed = Number.parseInt(String(value ?? ''), 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback;
 };
 
 /**
  * 账号列表:`ACCOUNT_n_BDUSS` 是必需键,按 n 的数值升序(不是字典序,ACCOUNT_10 在 ACCOUNT_2 之后)。
  * cookie 串只由 BDUSS 与可选 STOKEN 组成;`ACCOUNT_n_NAME` 只影响消息里的显示名。
+ *
+ * 每个账号带一个**唯一 `id`**(`acct-<n>`)—— 全链路(凭据体检 / 读回列表 / 对账)都以它
+ * 为键,显示名只用于渲染。两个账号同名时若拿名字当键,靠后的账号会覆盖靠前的:轻则
+ * 可用账号被当成失效而整天不签,重则把「其实没签全」误报成 `ok:true` 并锁死当天。
+ * 同名的显示名在这里顺带消歧(`名字 #n`),让消息里的人也能分清是哪一条。
  */
 export function accountsFrom(env) {
   const found = [];
@@ -59,7 +65,15 @@ export function accountsFrom(env) {
       cookie: stoken ? `BDUSS=${bduss}; STOKEN=${stoken}` : `BDUSS=${bduss}`,
     });
   }
-  return found.sort((a, b) => a.index - b.index).map((account) => ({ name: account.name, cookie: account.cookie }));
+  const used = new Set();
+  return found
+    .sort((a, b) => a.index - b.index)
+    .map((account) => {
+      const name = used.has(account.name) ? `${account.name} #${account.index}` : account.name;
+      used.add(account.name);
+      used.add(name);
+      return { id: `acct-${account.index}`, name, cookie: account.cookie };
+    });
 }
 
 /** 目标吧白名单:`TIEBA_FORUMS` 逗号分隔;空 = 签全部已关注吧,用 null 表示「不过滤」。 */
@@ -82,7 +96,8 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     accounts: accountsFrom(merged),
     filter: filterFrom(merged),
     intervalMs: int(pick(merged, 'TIEBA_INTERVAL_MS', null), DEFAULTS.intervalMs),
-    maxAttempts: int(pick(merged, 'TIEBA_MAX_ATTEMPTS', null), DEFAULTS.maxAttempts),
+    // 下界 1:`TIEBA_MAX_ATTEMPTS=0` 会让 attempts-exhausted 守卫恒真 —— 每天只推一条 action、永远不签。
+    maxAttempts: int(pick(merged, 'TIEBA_MAX_ATTEMPTS', null), DEFAULTS.maxAttempts, 1),
     quietStart: String(pick(merged, 'TIEBA_QUIET_START', DEFAULTS.quietStart)),
     quietEnd: String(pick(merged, 'TIEBA_QUIET_END', DEFAULTS.quietEnd)),
     shutdownTime: String(pick(merged, 'TIEBA_SHUTDOWN_TIME', DEFAULTS.shutdownTime)),

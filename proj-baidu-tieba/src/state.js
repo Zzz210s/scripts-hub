@@ -109,6 +109,20 @@ export function setPaused(state, value) {
   return state.paused;
 }
 
+/**
+ * 只把当天结论补成「已完成」,不再加尝试次数。
+ * 尝试次数在真正开跑前就已记下(进程被 kill 也要消耗一次),对账通过后用本函数补结论 ——
+ * 否则「记一次尝试」会被推到整条网络链路之后,没走到那一步的结束就永远不吃次数。
+ */
+export function markDayDone(state, { day = logicalDay(), now = new Date() } = {}) {
+  const entry = (state.days[day] ??= { attempts: 0, ok: false, checkedAt: null });
+  entry.ok = true;
+  entry.checkedAt = now.toISOString();
+  state.lastRunDay = day;
+  state.lastResult = 'success';
+  return entry;
+}
+
 /** 追加一条历史 JSONL,只留最近 keep 条;整文件重写,不会留下半行。 */
 export function appendHistory(entry, dir, { fsImpl = fs, now = new Date(), keep = HISTORY_KEEP } = {}) {
   const file = historyFile(dir);

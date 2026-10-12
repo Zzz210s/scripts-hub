@@ -2,7 +2,8 @@
 // 顺序固定,只报第一个命中的原因 —— 与姊妹程序一致:
 // paused -> done-today -> attempts-exhausted -> peer-running -> quiet-hours
 // -> before-shutdown -> low-memory。
-// 单实例锁不在这里:run.js 先调 lock.js 的 acquireLock,拿到锁才进这一段。
+// 单实例锁不在这里:本段是只读判定,run.js 让它在取锁**之前**先跑 —— 不联网就能跳过的
+// 情况(暂停、今天已完成、安静时段等)不该先抢锁;取到锁后才做在线守卫与逐账号签到。
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

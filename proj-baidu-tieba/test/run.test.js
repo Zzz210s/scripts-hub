@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import { loadConfig } from '../src/config.js';
 import { runOnce } from '../src/run.js';
-import { doneToday, emptyState, readState, stateFile, writeState } from '../src/state.js';
+import { doneToday, emptyState, historyFile, readState, stateFile, writeState } from '../src/state.js';
 import { tiebaStub } from './tieba-stub.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tieba-run-'));
@@ -142,4 +142,21 @@ test('没有账号 → 推送一条请你配置 BDUSS 的 action', async () => {
   assert.equal(result.reason, 'no-credentials');
   assert.equal(sent.length, 1);
   assert.match(sent[0], /BDUSS/);
+});
+
+test('账号级流程失败但读回显示全签 → 对账仍通过并锁当天', async () => {
+  const dir = tmp();
+  // 第一次关注列表请求回 500,让 signAccount 记 ok:false;随后的读回成功且 is_sign 全为 1。
+  const stub = tiebaStub({
+    accounts: { 'BDUSS=A': { forums: [{ fid: 11, kw: '吧一', isSign: true }], guideFailures: 1 } },
+  });
+  const { result, config } = await run({ dir, stub });
+  assert.equal(result.ok, true);
+  assert.equal(result.exitCode, 0);
+  const { state } = readState(config.stateDir);
+  assert.equal(doneToday(state, DAY), true);
+  const rows = fs.readFileSync(historyFile(config.stateDir), 'utf8').trim().split('\n');
+  const entry = JSON.parse(rows[rows.length - 1]);
+  assert.equal(entry.ok, true);
+  assert.equal(entry.accounts[0].ok, false);
 });

@@ -66,6 +66,10 @@ test('report --dry 只打印当天记录,不发送', async () => {
   const real = await main(['report'], { cwd: dir, now: NOW, env, log, deps });
   assert.equal(real, 0);
   assert.equal(sent.length, 1);
+  // TIEBA_DRY_RUN=1 是安全开关:report 也必须只打印,不新增发送。
+  const envDry = await main(['report'], { cwd: dir, now: NOW, env: { ...env, TIEBA_DRY_RUN: '1' }, log, deps });
+  assert.equal(envDry, 0);
+  assert.equal(sent.length, 1);
 });
 
 test('run --dry 走 CLI 时不发送、不联网', async () => {

@@ -66,7 +66,7 @@ async function runCheck({ config, deps, now, log }) {
   const resultsByAccount = {};
   let allOk = true;
   for (const account of config.accounts) {
-    resultsByAccount[account.name] = [];
+    resultsByAccount[account.id] = [];
     const tbs = await fetchTbs({ cookie: account.cookie, deps });
     if (!tbs.ok) {
       allOk = false;
@@ -74,7 +74,7 @@ async function runCheck({ config, deps, now, log }) {
       continue;
     }
     const list = await fetchFollowedForums({ cookie: account.cookie, deps });
-    forumsAfter[account.name] = list;
+    forumsAfter[account.id] = list;
     if (!list.ok) {
       allOk = false;
       log(`${account.name} · tbs 可取 · 关注列表取不到 · ${list.error ?? list.reason}`);
@@ -124,7 +124,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
   const injected = options.deps ?? {};
   const now = options.now ?? new Date();
   const cwd = options.cwd ?? process.cwd();
-  const dry = flags.has('--dry') || flags.has('--dry-run');
+  const flagDry = flags.has('--dry') || flags.has('--dry-run');
 
   if (flags.has('-h') || flags.has('--help') || command === 'help') {
     log(USAGE);
@@ -132,6 +132,8 @@ export async function main(argv = process.argv.slice(2), options = {}) {
   }
 
   const config = injected.config ?? loadConfig(cwd, { env: options.env ?? process.env, fsImpl: injected.fsImpl });
+  // 环境变量里的 TIEBA_DRY_RUN=1 与 --dry 同权:安全开关不能被 report 忽略。
+  const dry = flagDry || config.dryRun === true;
   const deps = {
     ...injected,
     config,

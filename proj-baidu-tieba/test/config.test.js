@@ -44,6 +44,21 @@ test('loadConfig 读 <cwd>/.env,显式 env 覆盖文件里同名键', () => {
   assert.equal(config.stateDir, path.join(dir, 'data'));
 });
 
+test('重名账号自动消歧且 id 唯一;maxAttempts 的 0 回落默认值', () => {
+  const config = loadConfig('/no/such/dir', {
+    env: {
+      ACCOUNT_1_BDUSS: 'A',
+      ACCOUNT_2_BDUSS: 'B',
+      ACCOUNT_1_NAME: '同名',
+      ACCOUNT_2_NAME: '同名',
+      TIEBA_MAX_ATTEMPTS: '0',
+    },
+  });
+  assert.deepEqual(config.accounts.map((one) => one.name), ['同名', '同名 #2']);
+  assert.equal(new Set(config.accounts.map((one) => one.id)).size, 2);
+  assert.equal(config.maxAttempts, 3); // 0 会让守卫恒真、永远不签
+});
+
 test('没有账号时 accounts 为空、filter 为 null、默认值可用', () => {
   const config = loadConfig('/no/such/dir', { env: {} });
   assert.deepEqual(config.accounts, []);
