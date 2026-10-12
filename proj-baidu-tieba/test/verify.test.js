@@ -1,42 +1,11 @@
-// Task 5:第二层对账的纯函数测试。全部离线:关注列表与账号结果都是手写的字面量。
-// 对账是「今天到底签全了没有」的唯一权威口径,所以这里的用例重点是「不许静默通过」。
-
+// Task 5 核心对账用例:全签 / 漏签 / 屏蔽吧 / 列表取不到 / 截断 / 空列表 / 无账号 / 纯函数。
+// 对账是「今天到底签全了没有」的唯一权威口径,这里的重点全是「不许静默通过」。
+// 多账号、expected 白名单、标签回落分别见 verify-accounts / verify-expected / verify-labels。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { reconcile } from '../src/verify.js';
-
-/** 关注列表里的一条。默认未签、未屏蔽。 */
-const forum = (kw, { isSign = false, isForbidden = false, fid = kw } = {}) => ({
-  fid,
-  kw,
-  isSign,
-  isForbidden,
-});
-
-/** fetchFollowedForums 的成功返回。 */
-const list = (forums, extra = {}) => ({
-  ok: true,
-  forums,
-  count: forums.length,
-  hasMore: false,
-  error: null,
-  reason: 'ok',
-  ...extra,
-});
-
-/** 对账列表请求失败的返回(形状同 fetchFollowedForums 的失败分支)。 */
-const listFailed = (error, reason) => ({
-  ok: false,
-  forums: null,
-  count: 0,
-  hasMore: false,
-  error,
-  reason,
-});
-
-/** signAccount 的返回(reconcile 只用键确定账号名,值不参与 is_sign 判定)。 */
-const account = (name) => ({ name, ok: true, results: [], counts: {}, error: null, reason: 'ok' });
+import { account, entry, forum, list, listFailed } from './verify-helpers.js';
 
 test('reconcile:全部 isSign 为真 -> ok:true', () => {
   const out = reconcile({
@@ -45,18 +14,24 @@ test('reconcile:全部 isSign 为真 -> ok:true', () => {
   });
   assert.equal(out.ok, true);
   assert.equal(out.reason, 'ok');
+  assert.deepEqual(out.reasons, ['ok']);
   assert.equal(out.missingTotal, 0);
-  assert.deepEqual(out.perAccount, [{ name: 'alice', missing: [], blocked: [] }]);
+  assert.deepEqual(out.perAccount, [entry('alice')]);
+  assert.equal(out.error, null);
+  assert.deepEqual(out.unresolvedAccounts, []);
 });
 
-test('reconcile:某吧未签 -> ok:false 且列出 kw', () => {
+test('reconcile:某吧未签 -> ok:false 且列出标签,perAccount 标明该账号未签', () => {
   const out = reconcile({
     forumsAfter: list([forum('吧一', { isSign: true }), forum('吧二')]),
     resultsByAccount: { alice: account('alice') },
   });
   assert.equal(out.ok, false);
   assert.equal(out.reason, 'missing');
+  assert.deepEqual(out.reasons, ['missing']);
   assert.deepEqual(out.perAccount[0].missing, ['吧二']);
+  assert.equal(out.perAccount[0].ok, false);
+  assert.equal(out.perAccount[0].reason, 'missing');
   assert.equal(out.missingTotal, 1);
 });
 
@@ -81,7 +56,11 @@ test('reconcile:对账请求失败 -> ok:null 并带原因(不把「查不到」
   });
   assert.equal(out.ok, null);
   assert.equal(out.reason, 'list-failed');
-  assert.ok(out.error);
+  assert.deepEqual(out.reasons, ['list-failed']);
+  assert.equal(out.error, '关注列表 HTTP 503');
+  assert.deepEqual(out.unresolvedAccounts, ['alice']);
+  assert.equal(out.perAccount[0].ok, null);
+  assert.equal(out.perAccount[0].reason, 'list-failed');
 });
 
 test('reconcile:hasMore 截断 -> ok 绝不为 true,且带 truncated', () => {
@@ -106,76 +85,11 @@ test('reconcile:关注 0 个吧 -> ok 不为 true,且带 emptyForums', () => {
   assert.equal(out.reason, 'empty-forums');
 });
 
-test('reconcile:expected 白名单外的吧不判 missing', () => {
-  const out = reconcile({
-    forumsAfter: list([forum('要签的吧', { isSign: true }), forum('没选中的吧')]),
-    resultsByAccount: { alice: account('alice') },
-    expected: ['要签的吧'],
-  });
-  assert.equal(out.ok, true);
-  assert.deepEqual(out.perAccount[0].missing, []);
-});
-
-test('reconcile:expected 谓词同义', () => {
-  const out = reconcile({
-    forumsAfter: list([forum('a', { isSign: true }), forum('b')]),
-    resultsByAccount: { alice: account('alice') },
-    expected: (f) => f.kw === 'a',
-  });
-  assert.equal(out.ok, true);
-});
-
-test('reconcile:expected 匹配 0 个吧 -> ok:false,白名单写错不静默通过', () => {
-  const out = reconcile({
-    forumsAfter: list([forum('吧一', { isSign: true })]),
-    resultsByAccount: { alice: account('alice') },
-    expected: ['不存在的吧'],
-  });
-  assert.equal(out.ok, false);
-  assert.equal(out.expectedEmpty, true);
-});
-
-test('reconcile:按账号名各传一份关注列表 -> 逐账号判定', () => {
-  const out = reconcile({
-    forumsAfter: {
-      alice: list([forum('吧一', { isSign: true })]),
-      bob: list([forum('吧一')]),
-    },
-    resultsByAccount: { alice: account('alice'), bob: account('bob') },
-  });
-  assert.equal(out.ok, false);
-  assert.equal(out.missingTotal, 1);
-  assert.deepEqual(out.perAccount, [
-    { name: 'alice', missing: [], blocked: [] },
-    { name: 'bob', missing: ['吧一'], blocked: [] },
-  ]);
-});
-
-test('reconcile:任一账号列表查不到 -> ok:null(未知,不当通过)', () => {
-  const out = reconcile({
-    forumsAfter: {
-      alice: list([forum('吧一')]),
-      bob: listFailed('未登录或凭据已失效', 'auth'),
-    },
-    resultsByAccount: { alice: account('alice'), bob: account('bob') },
-  });
-  assert.equal(out.ok, null);
-  assert.ok(out.error);
-});
-
-test('reconcile:单个共享列表应用于所有账号', () => {
-  const out = reconcile({
-    forumsAfter: list([forum('吧一', { isSign: true })]),
-    resultsByAccount: { alice: account('alice'), bob: account('bob') },
-  });
-  assert.equal(out.ok, true);
-  assert.deepEqual(out.perAccount.map((a) => a.name), ['alice', 'bob']);
-});
-
 test('reconcile:没有账号 -> ok:false(不静默通过)', () => {
   const out = reconcile({ forumsAfter: list([]), resultsByAccount: {} });
   assert.equal(out.ok, false);
   assert.equal(out.reason, 'no-accounts');
+  assert.deepEqual(out.reasons, ['no-accounts']);
 });
 
 test('reconcile:纯函数,不改动入参', () => {
