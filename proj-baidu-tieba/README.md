@@ -44,7 +44,7 @@ proj-baidu-tieba/
   src/*.js                  pure modules: client, sign, verify, guards, lock, state, messages, notify
   src/notify.js             the shared wecom-core send block · one of the byte-identical copies
   test/*.test.js            offline tests · network, clock and send are all injected stubs
-  scripts/windows/          standby Windows entry point used by peer checks
+  scripts/windows/          lock-state and free-memory query entry · platform-agnostic · used by peer checks
 ```
 
 - The runner owns: guards, single-instance lock, per-account signing, read-back reconciliation,
@@ -143,8 +143,8 @@ node src/cli.js run --dry      # prints the messages it would send, sends nothin
 node src/cli.js report --dry   # re-renders today's last result
 ```
 
-`check` exits 1 when an account cannot fetch `tbs`, so a deployment probe can gate on it.
-`run --dry` and `TIEBA_DRY_RUN=1` do not touch the network or disk.
+`check` exits 1 when an account cannot fetch `tbs` or the followed-forum list, so a deployment probe can gate on it.
+`run --dry` and `TIEBA_DRY_RUN=1` do not go online and write no state; they still read `.env` and `data/state.json`.
 
 From the repository root, `node scripts/check-wecom-drift.mjs` verifies the notification core is
 byte-identical to the other four copies.

@@ -23,17 +23,17 @@ Windows 侧(`programs.*`,每个程序一个计划任务):
 
 | 字段 | 含义 | 默认值 |
 | --- | --- | --- |
-| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` -> `bilibili-tasks` |
+| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` -> `bilibili-tasks` -> `baidu-tieba` |
 | `stagger.baseStartTime` / `slotMinutes` | 第一个程序的每日起始时间 / 相邻程序的间隔 | `08:00` / `30` |
 | `stagger.logonBaseMinutes` / `logonStepMinutes` | 登录后延迟的起点 / 步进 | `3` / `7` |
 | `programs.<id>.startTime` | 每日起始时间 `HH:MM`;`auto` = 按 order+stagger 推导 | `auto` |
-| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60`、Epic `240`、B站 `120` |
+| `programs.<id>.intervalMinutes` | 窗口内每隔多少分钟触发一次 | 微软 `120`、微信读书 `60`、Epic `240`、B站 `120`、贴吧 `120` |
 | `programs.<id>.windowHours` | 每日触发窗口长度(小时) | `14` |
 | `programs.<id>.maxAttemptsPerDay` | 程序内部一天最多真跑几次(不是触发次数) | `3` |
-| `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10 / 17 / 24) |
+| `programs.<id>.logonDelayMinutes` | 登录后延迟几分钟触发;`auto` = 推导 | `auto`(推出 3 / 10 / 17 / 24 / 31) |
 | `programs.<id>.logonRetryMinutes` / `logonRetryWindowMinutes` | 登录触发的重复间隔 / 总时长 | `10` / `60` |
 | `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` / `%EPIC_DIR%` / `%BILIBILI_DIR%` 占位符 | 占位符形式 |
-| `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic 与 B站默认 `false`,各自人工登录一次后打开 |
+| `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic / B站 / 贴吧默认 `false`,各自人工登录或真机验证后打开 |
 
 Linux 侧(`linux`,单套件;与 `scripts/linux/systemd/` 一致):
 
@@ -64,8 +64,8 @@ Linux 侧(`linux`,单套件;与 `scripts/linux/systemd/` 一致):
 
 | 项 | Windows 本机 | Linux / 云主机容器 |
 | --- | --- | --- |
-| 触发粒度 | **每个程序一个计划任务**(`MicrosoftRewardsScript` / `WeReadSignIn` / `EpicFreeGames`) | **单套件** `automation-suite.timer` -> `automation-suite.service` |
-| 触发时刻 | 登录后延迟(3 / 10 / 17 分钟)+ 08:00 / 08:30 / 09:00 起,窗口内周期重复 | 每天 **08:00 与 12:00** 各一次 |
+| 触发粒度 | **每个程序一个计划任务**(`MicrosoftRewardsScript` / `WeReadSignIn` / `EpicFreeGames` / `BilibiliTasks` / `TiebaSignIn`) | **单套件** `automation-suite.timer` -> `automation-suite.service` |
+| 触发时刻 | 登录后延迟(3 / 10 / 17 / 24 / 31 分钟)+ 08:00 / 08:30 / 09:00 / 09:30 / 10:00 起,窗口内周期重复 | 每天 **08:00 与 12:00** 各一次 |
 | 补跑 | **不补跑**:关机/忙碌错过的那次直接丢,靠窗口内下一次补 | `Persistent=true`:关机/重启错过的触发**开机后补跑一次** |
 | 顺序 | **靠错峰时刻 + 同伴互查**去赌不重叠 | **`run-all.sh` 严格串行**(先微软积分,返回后才启动微信读书) |
 | 单实例锁 | 程序目录 `logs\run.lock`(JSON)+ 进程实况判残锁 | 宿主 `state/suite.flock`(编排级)+ 各程序自己的 `flock`/锁文件 |
@@ -75,8 +75,8 @@ Linux 侧(`linux`,单套件;与 `scripts/linux/systemd/` 一致):
 **为什么可以不同**:
 
 - Windows 的计划任务有丰富的触发器(登录触发 + 每日起点 + 周期重复 + 窗口),用**错峰时刻**把
-  三个程序摊开最省事;代价是机器不一定在线,错过不补,只能靠窗口内多次机会兜。
-- Linux 的 systemd timer 只有 `OnCalendar`(定时)与 `Persistent`(补跑)。与其写三个错峰 timer
+  五个程序摊开最省事;代价是机器不一定在线,错过不补,只能靠窗口内多次机会兜。
+- Linux 的 systemd timer 只有 `OnCalendar`(定时)与 `Persistent`(补跑)。与其写五个错峰 timer
   去赌「微软积分那次 40 分钟能按时结束」,不如**一个 timer + 一个 oneshot 编排脚本**:顺序由脚本
   保证,一项结束才启动下一项,永远不重叠。08:00 主力、12:00 兜底,两次触发也不怕 —— 幂等守卫让
   已完成的那天一秒跳过。这与 Windows 的「多次机会」思路一致,只是把「机会」从 7 次压缩到 2 次,
@@ -91,11 +91,11 @@ Windows 侧,下表是 `config/schedule.json` 的默认值;真实时刻以配置�
 | 微软积分 | 登录后 3 分钟(其后 1 小时内每 10 分钟重试)+ 08:00 起每 120 分钟一次 | `logs\last-run.state` 记 `日期 9` = 当天已完成 |
 | 微信读书签到 | 登录后 10 分钟(1 小时内每 10 分钟重试)+ 08:30 起每 60 分钟一次 | `data\state.json` 的 `done` 与尝试次数 |
 | Epic 限免领取 | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 09:00 起每 240 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,人工登录一次后在配置里打开** | `data\state.json` 的已领记录与当日尝试次数 |
-| B站任务 | 登录后 24 分钟 · 1 小时内每 10 分钟重试,+ 09:30 起每 120 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,扫码登录后在配置里打开** | `data/state.json` 的对账结论与当日尝试次数 |
-| 百度贴吧签到 | 登录后 31 分钟 · 1 小时内每 10 分钟重试,+ 10:00 起每 120 分钟一次,窗口 14 小时;**默认 `enabled: false`,真机验证后在配置里打开**,Windows 仅备用 | `data/state.json` 的对账结论与当日尝试次数 |
+| B站任务 | 登录后 24 分钟 · 1 小时内每 10 分钟重试,+ 09:30 起每 120 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,扫码登录后在配置里打开** | `data/state.json` 的 `lastRunDay` 与当日尝试次数 |
+| 百度贴吧签到 | 登录后 31 分钟 · 1 小时内每 10 分钟重试,+ 10:00 起每 120 分钟一次,窗口 14 小时;**默认 `enabled: false`,真机验证后在配置里打开**,Windows 仅备用 | `data/state.json` 的逐日 `ok` 与尝试次数 · 对账明细在 `data/history.jsonl` |
 
-- 每个程序占一个 **30 分钟槽位**,新程序顺延(08:00 微软 -> 08:30 微信读书 -> 09:00 Epic -> 09:30 B站 -> 10:00 贴吧)。
-- 登录延迟按 **7 分钟步进**错开(3 -> 10 -> 17 -> 24 -> 31),因为开机瞬间网络与系统未必就绪。
+- 每个程序占一个 **30 分钟槽位**,新程序顺延 · 08:00 微软 -> 08:30 微信读书 -> 09:00 Epic -> 09:30 B站 -> 10:00 贴吧。
+- 登录延迟按 **7 分钟步进**错开 · 3 -> 10 -> 17 -> 24 -> 31,因为开机瞬间网络与系统未必就绪。
 - 白天用「14 小时时间窗 + 周期重复」给多次机会;错过的靠窗口内下一次补。
 
 Linux 侧**不需要错峰时刻**:套件按 `run-all.sh` 里的固定顺序串行执行,顺序与 `config/schedule.json`

@@ -40,7 +40,7 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T tieba-run check
 ```
 
 `check` 不写状态、不发送、不签到。它会打印每个账号的 `tbs` 是否可取、关注的吧数量、今天已签的
-吧数量,最后给一条对账结论。有账号取不到 `tbs` 时退出码为 1,可以据此做部署巡检。
+吧数量,最后给一条对账结论。有账号取不到 `tbs` 或关注列表时退出码为 1,可以据此做部署巡检。
 
 ## 3. 真跑一次
 
@@ -63,7 +63,7 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T tieba-run
 ```
 
 真跑会签到、读回核对、落状态,并发一条 `start` 与一条 `result` 到企业微信。看到 `result` 的
-标题写 `运行成功 · 对账:通过` 才算这次真的成了。
+标题写 `运行成功`、正文里有 `对账:通过` 才算这次真的成了。
 
 ## 4. 验证通过后再开 `enabled`
 

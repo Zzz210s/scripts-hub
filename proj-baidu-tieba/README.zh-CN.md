@@ -39,7 +39,7 @@ proj-baidu-tieba/
   src/*.js                  纯模块:client、sign、verify、guards、lock、state、messages、notify
   src/notify.js             共享的 wecom-core 发送块 · 与其余实现逐字节一致的一份
   test/*.test.js            离线测试 · 网络、时钟、发送全部用注入的桩
-  scripts/windows/          同伴互查要用到的 Windows 备用入口
+  scripts/windows/          锁状态与内存查询入口 · 与平台无关 · 同伴互查用
 ```
 
 - 运行器负责:守卫、单实例锁、逐账号签到、读回对账、本地状态、通知。
@@ -133,8 +133,8 @@ node src/cli.js run --dry      # 只打印会推送什么,不发送、不落盘
 node src/cli.js report --dry   # 把当天最后一条结果重渲染出来
 ```
 
-有账号取不到 `tbs` 时 `check` 退出码为 1,部署侧可以据此做巡检。
-`run --dry` 与 `TIEBA_DRY_RUN=1` 都不碰网络与磁盘。
+有账号取不到 `tbs` 或关注列表时 `check` 退出码为 1,部署侧可以据此做巡检。
+`run --dry` 与 `TIEBA_DRY_RUN=1` 都不联网、不写状态;仍会读 `.env` 与 `data/state.json`。
 
 在仓库根,`node scripts/check-wecom-drift.mjs` 校验通知核心与另外四份逐字节一致。
 
