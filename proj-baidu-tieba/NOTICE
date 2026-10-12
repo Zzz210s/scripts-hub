@@ -19,6 +19,7 @@
 | 顶层 `error_code == "0"` 不等于成功,真实错误可能只在嵌套 `error.errno` | 同上 issue #17 |
 | 取 tbs `GET https://tieba.baidu.com/dc/common/tbs`(返回 `is_login` / `tbs`) | `LuoSue/tieba_client.py` 的 `TBS_URL` / `get_tbs()`;`Sitoi/dailycheckin` 的 `TBS_URL` / `get_user_info()` |
 | 关注吧列表 `POST .../c/f/forum/forumGuide`,含 `forum_name` / `forum_id` / `is_sign` | `Aruelius/tieba_sign` 与 `Sitoi/dailycheckin` 的列表读取路径,见读回校验调研文档第 3 节 |
+| 关注吧列表分页:请求参数 `page_no`(页号)与 `res_num`(每页条数,实现取 200),响应字段 `like_forum_has_more`(`"1"` 继续翻页) | 读回校验调研文档第 3 节;`aiotieba` 的 `get_self_follow_forums` (`_classdef.py`)、`tbsign_go` 的 `GetForumList2`、`Tieba-Cloud-Sign` 的 `getTieba3` |
 
 ## 测试夹具
 

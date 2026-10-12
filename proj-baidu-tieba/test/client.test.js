@@ -22,7 +22,7 @@ test('fetchTbs:GET /dc/common/tbs,带 cookie/UA/Referer,成功返回 tbs', async
 
 test('fetchTbs:is_login 为假判失败且 reason=auth,不把空 tbs 当成功', async () => {
   const { fetchImpl } = stub(jsonReply({ is_login: 0, tbs: '' }));
-  const result = await fetchTbs({ cookie: 'BDUSS=', deps: { fetchImpl } });
+  const result = await fetchTbs({ cookie: 'BDUSS=SOMEVALUE', deps: { fetchImpl } });
   assert.equal(result.ok, false);
   assert.equal(result.tbs, null);
   assert.equal(result.reason, 'auth');
@@ -80,11 +80,20 @@ test('fetchTbs:超时经 AbortController 打断,归一为 ok:false/reason=networ
   assert.ok(seen.signal.aborted);
 });
 
-test('fetchTbs:cookie 为空时不带 Cookie 头(不发出字面量 undefined)', async () => {
-  const { calls, fetchImpl } = stub(jsonReply({ is_login: 1, tbs: 'T' }));
-  const result = await fetchTbs({ deps: { fetchImpl } });
-  assert.equal(result.ok, true);
-  assert.equal('Cookie' in calls[0].options.headers, false);
+test('fetchTbs:cookie 为空或缺 BDUSS 时判 no-cookie 且不发匿名请求', async () => {
+  let called = false;
+  const { fetchImpl } = stub(() => {
+    called = true;
+    return { text: '{"is_login":1,"tbs":"T"}' };
+  });
+  const empty = await fetchTbs({ deps: { fetchImpl } });
+  const noBduss = await fetchTbs({ cookie: 'STOKEN=x', deps: { fetchImpl } });
+  assert.equal(empty.ok, false);
+  assert.equal(empty.tbs, null);
+  assert.equal(empty.reason, 'no-cookie');
+  assert.equal(noBduss.ok, false);
+  assert.equal(noBduss.reason, 'no-cookie');
+  assert.equal(called, false);
 });
 
 test('fetchTbs:deps 为 null 不抛(默认 globalThis.fetch)', async () => {
@@ -138,6 +147,18 @@ test('signForum:嵌套 320022 判为 tbs-stale(reason 仍是 ok,带原文文案)
   assert.equal(result.status, SIGN_STATUS.TBS_STALE);
   assert.equal(result.reason, 'ok');
   assert.match(result.error, /TBS校验失败/);
+});
+
+test('signForum:HTTP 200 但响应不可判定时 reason=parse(不再一律 ok)', async () => {
+  const { fetchImpl } = stub(() => ({ text: '{}' }));
+  const result = await signForum({
+    cookie: 'BDUSS=BDUSS_SAMPLE',
+    forum: { fid: 1, kw: 'a' },
+    tbs: 'TBS_SAMPLE',
+    deps: { fetchImpl },
+  });
+  assert.equal(result.status, SIGN_STATUS.FAILED);
+  assert.equal(result.reason, 'parse');
 });
 
 test('signForum:HTTP 500 归为 failed/reason=http,不抛', async () => {
