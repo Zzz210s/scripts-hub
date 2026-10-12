@@ -6,6 +6,11 @@
 // Windows 是每个程序一个计划任务,不走这里。
 //
 // 为什么 Linux 侧不是逐程序 timer:见 docs/scheduling-convention.md 第 1 节。
+//
+// 每个程序的 Linux 启用判定只有一处实现:scripts/linux/program-enabled.mjs(它要单独部署到
+// 套件根目录,所以住在那里);这里转出给 schedule.mjs 的干跑清单用,两边永远同源。
+import { linuxEnabledState } from '../linux/program-enabled.mjs'
+export { linuxEnabledState }
 
 export const LINUX_DEFAULTS = {
     unit: 'automation-suite',
@@ -21,14 +26,19 @@ const isHHMM = (v) => {
     return !!m && Number(m[1]) <= 23 && Number(m[2]) <= 59
 }
 
-/** 校验并归一化配置里的 `linux` 段;问题写进 errors,返回带默认值的对象。 */
-export function normalizeLinux(raw, errors) {
+/** 校验并归一化配置里的 `linux` 段;问题写进 errors,返回带默认值的对象。
+ *  programs 传进来只为顺带体检各程序的 enabled/linuxEnabled 是不是合法布尔 —— 取值非法按
+ *  「读不到」报错,不悄悄取一个方向,这样干跑与 run-all.sh 的闸门行为一致。 */
+export function normalizeLinux(raw, errors, programs) {
     const linux = { ...LINUX_DEFAULTS, ...(raw || {}) }
     const times = Array.isArray(linux.times) ? linux.times.map(String) : []
     if (!times.length || !times.every(isHHMM)) errors.push(`linux.times 必须是非空的 HH:MM 数组:${JSON.stringify(linux.times)}`)
     if (typeof linux.persistent !== 'boolean') errors.push(`linux.persistent 必须是布尔值:${linux.persistent}`)
     for (const key of ['unit', 'suiteDir', 'user']) {
         if (typeof linux[key] !== 'string' || !linux[key]) errors.push(`linux.${key} 必须是非空字符串:${linux[key]}`)
+    }
+    for (const [id, p] of Object.entries(programs || {})) {
+        if (linuxEnabledState(p) === null) errors.push(`${id} 的 Linux 启用取值必须是布尔,实际 linuxEnabled=${JSON.stringify(p.linuxEnabled)} enabled=${JSON.stringify(p.enabled)}`)
     }
     return { ...linux, times }
 }

@@ -6,7 +6,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { normalizeLinux } from './schedule-linux.mjs'
+import { normalizeLinux, linuxEnabledState } from './schedule-linux.mjs'
 
 export const REPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -156,11 +156,11 @@ export function normalize(raw) {
             runScript: String(p.runScript || ''),
             actionVbs: String(p.actionVbs || ''),
             enabled: p.enabled !== false,
-            linuxEnabled: p.linuxEnabled === undefined ? p.enabled !== false : p.linuxEnabled !== false,
+            linuxEnabled: linuxEnabledState(p),
             opportunities
         }
     }
-    const linux = normalizeLinux(raw.linux, errors)
+    const linux = normalizeLinux(raw.linux, errors, raw.programs)
     if (errors.length) throw new ScheduleError(`调度配置有 ${errors.length} 处问题:\n  - ${errors.join('\n  - ')}`)
     const timezone = String(raw.timezone || HARD_DEFAULTS.timezone)
     return { version: raw.version ?? 1, timezone, linux, order: Object.keys(resolved).sort((a, b) => resolved[a].order - resolved[b].order), stagger, programs: resolved, notes }

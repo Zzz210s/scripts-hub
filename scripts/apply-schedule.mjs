@@ -48,7 +48,13 @@ if (apply && !has('--yes')) {
     process.exit(2)
 }
 
-const { schedule, source, warnings } = loadSchedule()
+let schedule, source, warnings
+try {
+    ({ schedule, source, warnings } = loadSchedule())
+} catch (err) {
+    console.error(`[错误] ${err.message}`)
+    process.exit(1)
+}
 for (const w of warnings) console.error(`[警告] ${w}`)
 console.error(`[配置] ${source}  时区 ${schedule.timezone}`)
 for (const n of schedule.notes) console.error(`[注意] ${n}`)

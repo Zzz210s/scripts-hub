@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { enabledIds, linuxEnabled } from '../linux/program-enabled.mjs';
+import { enabledIds, linuxEnabled, linuxEnabledState, scheduleProblems } from '../linux/program-enabled.mjs';
 import { loadSchedule, REPO_DIR } from '../lib/schedule.mjs';
 
 const GATE = path.join(REPO_DIR, 'scripts', 'linux', 'program-enabled.mjs');
@@ -64,4 +64,77 @@ test('闸门对自定义配置与坏输入的行为', () => {
     assert.equal(gate(['list', path.join(dir, 'bad.json')]).status, 2);
     assert.equal(gate(['list']).status, 2);
     assert.deepEqual(enabledIds({ order: ['x', 'y'], programs: { x: { enabled: true }, y: { enabled: true } } }), ['x', 'y']);
+});
+
+// 非布尔取值只认「读不到」:闸门退出 2,干跑同样拒绝给清单,两边不各取一个方向。
+test('非布尔 linuxEnabled:闸门与干跑都按读不到处理', () => {
+    const loadWith = (file) => {
+        const old = process.env.HAC_SCHEDULE_FILE;
+        process.env.HAC_SCHEDULE_FILE = file;
+        try { return loadSchedule(); } finally {
+            if (old === undefined) delete process.env.HAC_SCHEDULE_FILE; else process.env.HAC_SCHEDULE_FILE = old;
+        }
+    };
+    for (const value of [null, 'true', 1, 0, {}]) {
+        const dir = tmp();
+        const file = path.join(dir, 'schedule.json');
+        fs.writeFileSync(file, JSON.stringify({ order: ['itself'], programs: { itself: { enabled: true, linuxEnabled: value } } }), 'utf8');
+        assert.equal(gate(['is-enabled', file, 'itself']).status, 2, `linuxEnabled=${JSON.stringify(value)}`);
+        assert.equal(gate(['list', file]).status, 2);
+        assert.throws(() => loadWith(file), /必须是布尔/);
+        assert.equal(linuxEnabledState({ enabled: true, linuxEnabled: value }), null);
+    }
+    assert.equal(linuxEnabled({ enabled: true, linuxEnabled: 'true' }), false);
+    assert.equal(scheduleProblems({ order: ['a'], programs: {} }).length, 1);
+});
+
+// 闸门读不到时 run-all.sh 必须 fail-closed:跑固定四程序,贴吧不跑,并写告警。
+const posix = (p) => p.replace(/\\/g, '/');
+const hasBash = spawnSync('bash', ['-c', 'exit 0']).status === 0;
+const PROGRAMS = [['microsoft-rewards', 'rewards'], ['weread-signin', 'weread'], ['epic-free-games', 'epic'], ['bilibili-tasks', 'bilibili'], ['baidu-tieba', 'tieba']];
+
+function runSuite(scheduleBody) {
+    const dir = posix(tmp());
+    const bin = `${dir}/bin`;
+    fs.mkdirSync(bin, { recursive: true });
+    fs.mkdirSync(`${dir}/home`, { recursive: true });
+    fs.writeFileSync(`${bin}/flock`, '#!/bin/sh\nexit 0\n');
+    fs.chmodSync(`${bin}/flock`, 0o755);
+    fs.copyFileSync(GATE, `${dir}/program-enabled.mjs`);
+    fs.copyFileSync(path.join(REPO_DIR, 'scripts', 'linux', 'run-all.sh'), `${dir}/run-all.sh`);
+    for (const [id, folder] of PROGRAMS) {
+        fs.mkdirSync(`${dir}/${folder}`, { recursive: true });
+        fs.writeFileSync(`${dir}/${folder}/run.sh`, `#!/bin/sh\necho ${id} >> "${dir}/logs/ran.log"\n`);
+        fs.chmodSync(`${dir}/${folder}/run.sh`, 0o755);
+    }
+    if (scheduleBody !== null) fs.writeFileSync(`${dir}/schedule.json`, scheduleBody);
+    const result = spawnSync('bash', [`${dir}/run-all.sh`], {
+        encoding: 'utf8',
+        env: { ...process.env, SUITE_DIR: dir, HOME: `${dir}/home`, PATH: `${bin}:${posix(process.env.PATH ?? '')}` },
+    });
+    const read = (rel) => (fs.existsSync(`${dir}/${rel}`) ? fs.readFileSync(`${dir}/${rel}`, 'utf8') : '');
+    return { status: result.status, stderr: result.stderr, ran: read('logs/ran.log'), ledger: read('logs/suite.log') };
+}
+
+const FOUR = ['microsoft-rewards', 'weread-signin', 'epic-free-games', 'bilibili-tasks'];
+
+test('run-all.sh:坏 JSON 不静默全跳过,退回四程序且贴吧不跑', { skip: !hasBash }, () => {
+    const { status, ran, ledger, stderr } = runSuite('{not json');
+    assert.equal(status, 0, stderr);
+    assert.deepEqual(ran.trim().split('\n'), FOUR);
+    assert.match(ledger, /调度闸门不可用/);
+    assert.doesNotMatch(ledger, /百度贴吧退出码/);
+});
+
+test('run-all.sh:缺配置 fail-closed 四程序清单', { skip: !hasBash }, () => {
+    const { status, ran, ledger } = runSuite(null);
+    assert.equal(status, 0);
+    assert.deepEqual(ran.trim().split('\n'), FOUR);
+    assert.match(ledger, /调度闸门不可用/);
+});
+
+test('run-all.sh:正常配置四个照跑贴吧跳过', { skip: !hasBash }, () => {
+    const { status, ran } = runSuite(fs.readFileSync(path.join(REPO_DIR, 'config', 'schedule.json'), 'utf8'));
+    assert.equal(status, 0);
+    assert.deepEqual(ran.trim().split('\n'), FOUR);
 });
