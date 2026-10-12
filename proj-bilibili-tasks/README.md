@@ -28,7 +28,7 @@ proj-bilibili-tasks/
   src/cli.js                run / login / status / cookies / check / pause / resume
   src/run.js                one run: guards -> voucher -> console -> classify -> notify -> state
   src/*.js                  pure modules (member, voucher, donate, classify, messages, guards, ...)
-  src/notify.js             the shared wecom-core send block (4th copy, drift-checked)
+  src/notify.js             the shared wecom-core send block (one of the byte-identical copies, drift-checked)
   test/*.test.js            offline tests; network and subprocesses are stubbed
   scripts/windows/          standby Windows runner
 ```
@@ -115,7 +115,7 @@ node src/cli.js cookies        # account ids only, never the cookie value
 
 From the repository root: `bash scripts/setup-bilibili-tasks.sh` runs the offline self-check, and
 `node scripts/check-wecom-drift.mjs` verifies the notification core is byte-identical to the other
-three copies.
+four copies.
 
 ## Diagnostics
 

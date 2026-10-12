@@ -24,7 +24,7 @@ proj-bilibili-tasks/
   src/cli.js                run / login / status / cookies / check / pause / resume
   src/run.js                一次运行:守卫 -> 券 -> Console -> 归类 -> 通知 -> 落状态
   src/*.js                  纯模块(member、voucher、donate、classify、messages、guards 等)
-  src/notify.js             共享的 wecom-core 发送块(第 4 份,由漂移检测锁住)
+  src/notify.js             共享的 wecom-core 发送块(与其余实现逐字节一致的一份,由漂移检测锁住)
   test/*.test.js            离线测试;网络与子进程全部用桩
   scripts/windows/          Windows 备用入口
 ```
@@ -104,7 +104,7 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 ```
 
 在仓库根还有:`bash scripts/setup-bilibili-tasks.sh` 跑离线自检;
-`node scripts/check-wecom-drift.mjs` 校验通知核心与另外三份逐字节一致。
+`node scripts/check-wecom-drift.mjs` 校验通知核心与另外四份逐字节一致。
 
 ## 诊断日志
 

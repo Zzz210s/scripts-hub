@@ -14,7 +14,7 @@ four things that project does not have:
    few times a day costs almost nothing.
 2. **Local dedup state** — what was already claimed, how many attempts today, what was already
    notified; a game already claimed or already in the library is never touched again.
-3. **WeCom notifications per the shared rules** — the same `wecom-core` sender as the other two
+3. **WeCom notifications per the shared rules** — the same `wecom-core` sender as the other four
    projects, pinned byte-for-byte by `scripts/check-wecom-drift.mjs`.
 4. **A degradation path** — if hCaptcha appears, push a prefilled checkout link instead of
    retrying into a wall. Epic's weekly freebie cannot be claimed after it expires, so retrying
