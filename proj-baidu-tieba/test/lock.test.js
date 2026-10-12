@@ -2,6 +2,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,11 +43,11 @@ test('peerBusy:查不通时只有 10 分钟内的新锁保守让路', () => {
   const boom = () => {
     throw new Error('lock-status 查不通');
   };
-  const fresh = peerBusy([lock], { exec: boom, now: fs.statSync(lock).mtimeMs + 60000 });
+  const fresh = peerBusy([lock], { exec: boom, nowMs: fs.statSync(lock).mtimeMs + 60000 });
   assert.equal(fresh.busy, true);
   assert.match(fresh.detail, /可能刚启动/);
 
-  const old = peerBusy([lock], { exec: boom, now: fs.statSync(lock).mtimeMs + 3600000 });
+  const old = peerBusy([lock], { exec: boom, nowMs: fs.statSync(lock).mtimeMs + 3600000 });
   assert.equal(old.busy, false);
 });
 
@@ -57,13 +58,41 @@ test('defaultIsAlive:自己的进程活着,非法 pid 判死', () => {
   assert.equal(defaultIsAlive('x'), false);
 });
 
+test('defaultIsAlive:确定已死的 pid 判死,EPERM 算活着', () => {
+  // 跑一个立即退出的子进程,拿到一个确定已结束的真实 pid。
+  const exited = spawnSync(process.execPath, ['-e', ''], { windowsHide: true });
+  assert.equal(Number.isInteger(exited.pid), true);
+  assert.equal(defaultIsAlive(exited.pid), false);
+
+  // 探活系统调用直接抛错时,看错误码:EPERM = 进程在但不属于我们。
+  const withKill = (code, fn) => {
+    const original = process.kill;
+    process.kill = () => {
+      const error = new Error('stub');
+      error.code = code;
+      throw error;
+    };
+    try {
+      return fn();
+    } finally {
+      process.kill = original;
+    }
+  };
+  assert.equal(withKill('EPERM', () => defaultIsAlive(1234)), true);
+  assert.equal(withKill('ESRCH', () => defaultIsAlive(1234)), false);
+});
+
 test('acquireLock:没锁就拿到;活着的持有者挡住;残锁立即回收', () => {
   const dir = tmpDir();
   const file = lockFile(dir);
   const now = new Date('2026-10-11T09:00:00');
 
   const first = acquireLock(dir, { now });
-  assert.deepEqual(first, { ok: true, stale: false, holder: { pid: process.pid, startedAt: now.toISOString() } });
+  assert.deepEqual(first, {
+    ok: true,
+    stale: false,
+    holder: { pid: process.pid, host: os.hostname(), startedAt: now.toISOString() },
+  });
   assert.equal(readLock(file).pid, process.pid);
 
   const blocked = acquireLock(dir, { now });
@@ -76,7 +105,7 @@ test('acquireLock:没锁就拿到;活着的持有者挡住;残锁立即回收', 
   assert.equal(stale.stale, true);
   assert.equal(readLock(file).pid, 4242);
 
-  releaseLock(dir);
+  releaseLock(dir, { pid: 4242 }); // 当前持有者是 4242,只有它能释放
   assert.equal(fs.existsSync(file), false);
   assert.equal(acquireLock(dir, { now }).ok, true);
 });
@@ -95,9 +124,36 @@ test('acquireLock:空文件或坏内容的锁当成残锁,不当成活持有者'
   assert.equal(acquireLock(dir).stale, true);
 });
 
-test('writeLock:锁里记 pid 与开始时间', () => {
+test('acquireLock:host 不同的锁即使 pid 活着也当残锁回收', () => {
+  const dir = tmpDir();
+  const file = lockFile(dir);
+  const now = new Date('2026-10-11T09:00:00');
+  // 上一次运行在别的容器里留下锁,它的 pid 恰好被本容器复用了(用当前进程 pid 模拟)。
+  writeLock(file, { now, pid: process.pid, hostname: 'container-old' });
+  assert.equal(defaultIsAlive(process.pid), true);
+
+  const taken = acquireLock(dir, { now, hostname: 'container-new' });
+  assert.equal(taken.ok, true);
+  assert.equal(taken.stale, true);
+  assert.equal(readLock(file).host, 'container-new');
+});
+
+test('releaseLock:持有者不是自己时不删别人的锁', () => {
+  const dir = tmpDir();
+  const file = lockFile(dir);
+  writeLock(file, { now: new Date(), pid: 4242, hostname: 'container-other' });
+  const denied = releaseLock(dir, { pid: process.pid, hostname: 'container-new' });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.reason, 'not-holder');
+  assert.equal(fs.existsSync(file), true);
+
+  assert.equal(releaseLock(dir, { pid: 4242, hostname: 'container-other' }).ok, true);
+  assert.equal(fs.existsSync(file), false);
+});
+
+test('writeLock:锁里记 pid、host 与开始时间', () => {
   const dir = tmpDir();
   const now = new Date('2026-10-11T09:00:00');
-  writeLock(lockFile(dir), { now, pid: 7 });
-  assert.deepEqual(readLock(lockFile(dir)), { pid: 7, startedAt: now.toISOString() });
+  writeLock(lockFile(dir), { now, pid: 7, hostname: 'box-a' });
+  assert.deepEqual(readLock(lockFile(dir)), { pid: 7, host: 'box-a', startedAt: now.toISOString() });
 });

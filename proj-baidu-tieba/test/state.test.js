@@ -10,6 +10,8 @@ import path from 'node:path';
 import {
   appendHistory,
   attemptsOn,
+  DAYS_KEEP,
+  doneToday,
   emptyState,
   historyFile,
   isDayDone,
@@ -88,6 +90,43 @@ test('recordAttempts:ok:true 锁当天,之后再来一次失败也不解锁', ()
   recordAttempts(state, { day: '2026-10-11', ok: false, now });
   assert.equal(isDayDone(state, '2026-10-11'), true);
   assert.equal(attemptsOn(state, '2026-10-11'), 2);
+  // 当天结论单调:失败尝试不得把 lastResult 从 success 翻回 failure。
+  assert.equal(state.lastResult, 'success');
+  assert.equal(doneToday(state, '2026-10-11'), true);
+});
+
+test('doneToday:只认当天对账通过,不认「最后一次尝试」', () => {
+  const state = emptyState();
+  recordAttempts(state, { day: '2026-10-10', ok: true });
+  assert.equal(doneToday(state, '2026-10-10'), true);
+  assert.equal(doneToday(state, '2026-10-11'), false);
+  recordAttempts(state, { day: '2026-10-11', ok: false });
+  assert.equal(doneToday(state, '2026-10-11'), false);
+  assert.equal(state.lastResult, 'failure');
+});
+
+test('recordAttempts:days 只保留最近 60 天', () => {
+  const state = emptyState();
+  const dayAt = (n) => new Date(Date.UTC(2026, 0, 1 + n)).toISOString().slice(0, 10);
+  for (let i = 0; i < DAYS_KEEP + 5; i++) recordAttempts(state, { day: dayAt(i), ok: false });
+  assert.equal(Object.keys(state.days).length, DAYS_KEEP);
+  assert.equal(Object.hasOwn(state.days, dayAt(0)), false);
+  assert.equal(Object.hasOwn(state.days, dayAt(DAYS_KEEP + 4)), true);
+});
+
+test('writeState:写盘失败时内存态不被半更新', () => {
+  const dir = tmpDir();
+  const state = emptyState(new Date('2026-10-11T09:00:00'));
+  const before = state.updatedAt;
+  const boomFs = {
+    mkdirSync: fs.mkdirSync,
+    writeFileSync: () => {
+      throw new Error('disk full');
+    },
+  };
+  assert.throws(() => writeState(state, dir, new Date('2026-10-11T10:00:00'), { fsImpl: boomFs }), /disk full/);
+  assert.equal(state.updatedAt, before);
+  assert.equal(fs.existsSync(stateFile(dir)), false);
 });
 
 test('recordAttempts:不同逻辑日互不影响', () => {

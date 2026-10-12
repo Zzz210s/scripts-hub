@@ -85,7 +85,8 @@ export function checkOnlineGuards({ credentials = [] } = {}) {
   if (!Array.isArray(credentials) || credentials.length === 0) {
     return { action: 'skip', reason: 'no-credentials', detail: '未配置账号' };
   }
-  const usable = credentials.filter((item) => item?.ok !== false);
+  // 收紧为显式 ok:true 才算可用 —— 缺字段必须是禁用而不是放行(fail-closed)。
+  const usable = credentials.filter((item) => item?.ok === true);
   if (usable.length === 0) {
     return { action: 'skip', reason: 'credentials-invalid', detail: `全部 ${credentials.length} 个账号凭据失效` };
   }
@@ -101,8 +102,9 @@ export function checkOnlineGuards({ credentials = [] } = {}) {
  * 同伴是否在跑:读同伴的锁文件,存在就调它自己的 `run-state.js lock-status`
  * (它知道残锁与进程实况)。不看锁文件年龄 —— 早期实现按年龄判定出过误报。
  * 只有查不通时才用「10 分钟内的新锁保守让路」兜底。
+ * `nowMs` 是毫秒时间戳(与 stat.mtimeMs 同单位),不是 Date —— 调方别传 Date。
  */
-export function peerBusy(lockFiles, { exec = execFileSync, timeoutMs = 60000, now = Date.now() } = {}) {
+export function peerBusy(lockFiles, { exec = execFileSync, timeoutMs = 60000, nowMs = Date.now() } = {}) {
   for (const file of lockFiles ?? []) {
     let stat;
     try {
@@ -112,7 +114,7 @@ export function peerBusy(lockFiles, { exec = execFileSync, timeoutMs = 60000, no
     }
     const projectDir = path.resolve(path.dirname(file), '..');
     const project = path.basename(projectDir);
-    const ageMinutes = Math.max(0, Math.round((now - stat.mtimeMs) / 60000));
+    const ageMinutes = Math.max(0, Math.round((nowMs - stat.mtimeMs) / 60000));
 
     let verdict = '';
     const checkScript = path.join(projectDir, 'scripts', 'windows', 'run-state.js');

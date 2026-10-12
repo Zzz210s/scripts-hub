@@ -98,6 +98,12 @@ test('checkLocalGuards:六条守卫各命中一次,顺序只报第一个', () =>
 test('checkOnlineGuards:没有可用凭据才拦,单账号失效不影响整轮', () => {
   assert.deepEqual(checkOnlineGuards({}), { action: 'skip', reason: 'no-credentials', detail: '未配置账号' });
   assert.equal(checkOnlineGuards({ credentials: [{ name: 'a', ok: true }] }).action, 'run');
+  // 缺 ok 字段必须当不可用(fail-closed),不能默认放行。
+  assert.deepEqual(checkOnlineGuards({ credentials: [{ name: 'a' }] }), {
+    action: 'skip',
+    reason: 'credentials-invalid',
+    detail: '全部 1 个账号凭据失效',
+  });
   assert.deepEqual(checkOnlineGuards({ credentials: [{ name: 'a', ok: true }, { name: 'b', ok: false }] }), {
     action: 'run',
     reason: 'ok',

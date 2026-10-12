@@ -9,6 +9,7 @@ import { logicalDay } from './clock.js';
 
 export const STATE_VERSION = 1;
 export const HISTORY_KEEP = 200;
+export const DAYS_KEEP = 60;
 
 export const stateFile = (dir) => path.join(dir, 'state.json');
 export const historyFile = (dir) => path.join(dir, 'history.jsonl');
@@ -60,14 +61,31 @@ export function readState(dir, { fsImpl = fs } = {}) {
 }
 
 export function writeState(state, dir, now = new Date(), { fsImpl = fs } = {}) {
-  state.updatedAt = now.toISOString();
-  writeAtomic(stateFile(dir), `${JSON.stringify(state, null, 2)}\n`, { fsImpl });
+  // 先序列化副本、写盘成功后才回写内存:写失败时原对象保持原样,不留半更新状态。
+  const next = { ...state, updatedAt: now.toISOString() };
+  writeAtomic(stateFile(dir), `${JSON.stringify(next, null, 2)}\n`, { fsImpl });
+  state.updatedAt = next.updatedAt;
   return state;
 }
 
 export const dayRecord = (state, day) => state?.days?.[day] ?? null;
 export const attemptsOn = (state, day) => dayRecord(state, day)?.attempts ?? 0;
-export const isDayDone = (state, day) => dayRecord(state, day)?.ok === true;
+
+/**
+ * 今天是否已完成 —— Task 9 判断「今天还跑不跑」只许用这个函数。
+ * 不许自己拼 lastRunDay + lastResult:lastResult 记的是「最后一次尝试」,
+ * 跨日与同日后补失败尝试的边界容易拼错,而 days[day].ok 是当天的权威结论。
+ */
+export const doneToday = (state, day = logicalDay()) => dayRecord(state, day)?.ok === true;
+export const isDayDone = doneToday;
+
+/** days 只留最近 keep 天(按 YYYY-MM-DD 字典序即时间序),防止长期运行无限膨胀。 */
+export function pruneDays(state, keep = DAYS_KEEP) {
+  const keys = Object.keys(state.days).sort();
+  if (keys.length <= keep) return state;
+  for (const day of keys.slice(0, keys.length - keep)) delete state.days[day];
+  return state;
+}
 
 /**
  * 记一次尝试。`ok` 是「对账全部通过」这个权威结论,不是「流程跑完」——
@@ -79,7 +97,10 @@ export function recordAttempts(state, { day = logicalDay(), ok = false, now = ne
   entry.checkedAt = now.toISOString();
   if (ok === true) entry.ok = true;
   state.lastRunDay = day;
-  state.lastResult = entry.ok ? 'success' : 'failure';
+  // 当天的结论单调:entry.ok 只增不减,一旦当天成功,之后的失败尝试不得把
+  // lastResult 改回 failure(否则姊妹项目那套 lastRunDay + lastResult 的守卫会重跑)。
+  state.lastResult = entry.ok === true ? 'success' : 'failure';
+  pruneDays(state);
   return entry;
 }
 
