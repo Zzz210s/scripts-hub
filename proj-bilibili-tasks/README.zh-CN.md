@@ -118,6 +118,13 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 上游 `CookieTaskGuard` 曾在 nav 15 秒超时时整次跳过且退出码仍为 0,薄壳现已设
 `Ray_CookieCheck__AutoCheckEnabled=false`,并把这种中途终止归类为 `guard-skipped` 而不是成功。
 
+## 已知上游问题
+
+| 现象 | 原因 | 我们的处理 |
+| --- | --- | --- |
+| `VipBigPoint` 领取失败 `6007000 请将客户端更新至最新版本` | 上游开放 issue [#1195](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1195),4.2.0 仍未修 | 当作已知问题容忍:它不会把整次运行翻成失败,消息里带上 issue 号 |
+| 「观看、分享视频」失败 `HttpClient.Timeout of 30 seconds`(分享的 5 点经验丢了) | 上游默认 `Security.IntervalSecondsBetweenRequestApi=20`,即**每个** GET/POST 前随机睡 10-20 秒,而这段睡眠计入 30 秒 HttpClient 超时;上游 issue [#1141](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1141) | 薄壳把间隔钉到 5 秒(`Ray_Security__IntervalSecondsBetweenRequestApi`),给 30 秒预算留 4 倍余量;实测到 `api.bilibili.com` 只有 0.12-0.16 秒,说明慢的是间隔而非网络 |
+
 ## 回滚
 
 从 `scripts/linux/compose.yaml` 删掉 `bilibili-run` 服务,删掉 `scripts/linux/run-all.sh` 里调用

@@ -131,6 +131,13 @@ files older than 30 days. When a task silently did nothing, read this log first:
 the thin shell now sets `Ray_CookieCheck__AutoCheckEnabled=false` and also classifies that abort as
 `guard-skipped` instead of success.
 
+## Known upstream issues
+
+| Symptom | Cause | Our handling |
+| --- | --- | --- |
+| `VipBigPoint` claim fails with `6007000 请将客户端更新至最新版本` | open upstream issue [#1195](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1195), not fixed as of 4.2.0 | tolerated as a known issue: it never flips the run to failed, and the message references the issue id |
+| The watch/share flow fails with `HttpClient.Timeout of 30 seconds` (share experience not earned) | the upstream default `Security.IntervalSecondsBetweenRequestApi=20` sleeps 10-20s before **every** GET/POST, and that delay counts against the 30s HttpClient timeout; reported upstream as [#1141](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1141) | the thin shell pins the interval to 5s (`Ray_Security__IntervalSecondsBetweenRequestApi`), leaving a 4x margin; measured latency to `api.bilibili.com` is 0.12-0.16s, so the delay was the problem, not the network |
+
 ## Rollback
 
 Remove the `bilibili-run` service from `scripts/linux/compose.yaml`, delete the `bilibili/run.sh`

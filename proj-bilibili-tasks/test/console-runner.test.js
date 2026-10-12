@@ -42,6 +42,8 @@ test('开关矩阵逐条正确(设计文档 §6.2/§6.3)', () => {
         Ray_DailyTaskConfig__NumberOfProtectedCoins: '20',
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',
+        // 上游默认间隔 20 秒会让请求前的随机睡眠(10-20 秒)计入 30 秒超时预算 → 分享流程超时
+        Ray_Security__IntervalSecondsBetweenRequestApi: '5',
         Ray_AutoRecoverConfig__IsEnable: 'false',
         // R1:上游 CookieTaskGuard 的 nav 15 秒超时会静默跳过整次任务且退出码仍为 0
         Ray_CookieCheck__AutoCheckEnabled: 'false'
