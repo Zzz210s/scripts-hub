@@ -8,13 +8,15 @@
 #      立刻 add 会把别人写了一半的文件提交进去
 #   3. push 前跑脱敏闸门(check-privacy --staged):仓库是 public,命中即撤回暂存并通知
 #   3b. push 前跑内容仓巡检(check_vault --fail-on):课件规范 / 断链 / 索引登记这类硬规则必须为 0,
-#      历史欠账(A3 孤篇 / A5A6 元数据 / A8 标签)留在报告里但不拦(2026-10-06 加)
+#      历史欠账(A3 孤篇 / A5A6 元数据 / A8 标签)留在报告里但不拦(2026-10-06 加);
+#      告警正文要带命中条目(2026-10-12 加 —— 原先只说「按报告改掉」,报告却不在通知里)
 #   4. push 失败重试 3 次(每次先 rebase);冲突/被拒 → 停下 + 企业微信通知,绝不 force
 #
 # 配置:~/.note-sync/config.env(机器私有,不入库)
 #   NOTE_DIR=/f/0-Note
 #   HAC_DIR=/c/Users/23652/home-automation-configs
-#   WECOM_WEBHOOK_FILE=~/.note-sync/wecom-server.txt   # 可选,失败时通知用(走"服务器"通道)
+#   WECOM_WEBHOOK_FILE=~/.note-sync/wecom-blog.txt   # 可选,失败时通知用(内容仓群;
+#                                                    #  2026-10-12 起不再走服务器告警群)
 set -uo pipefail
 
 CONFIG="${NOTE_SYNC_CONFIG:-$HOME/.note-sync/config.env}"
@@ -136,10 +138,13 @@ fi
 # ── 3. 脱敏闸门(仓库是 public)────────────────────────────────────
 if ! gate=$(node "$HAC_DIR/scripts/check-privacy.mjs" --staged 2>&1); then
     log "脱敏闸门拦下:$gate"
+    hits=$(printf '%s' "$gate" | head -3)
     git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径,别动别的会话已暂存的内容
     notify "内容仓 同步 · 需要你处理
 请你:看本机 $LOG 的最近几行,删掉凭据或把文件加进 .gitignore
 原因:push 前脱敏检查命中(个人标识或明文账号密码形状)
+命中:
+$hits
 不处理的后果:这次不会推送 —— 仓库是公开的,推上去等于永久公开"
     exit 1
 fi
@@ -152,12 +157,17 @@ if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
     if [ -z "$PY" ]; then
         log "跳过巡检闸门(没找到 python)"
     elif ! vault=$(cd "$NOTE_DIR" && PYTHONIOENCODING=utf-8 "$PY" -B \
-             "50-资源/工具/vault-check/check_vault.py" --quiet --fail-on "$VAULT_GATE_STAGES" 2>&1); then
-        log "巡检闸门拦下:$(printf '%s' "$vault" | tail -n 3 | tr '\n' ' ')"
+             "50-资源/工具/vault-check/check_vault.py" --fail-on "$VAULT_GATE_STAGES" 2>&1); then
+        # 不加 --quiet:告警正文要带命中条目(2026-10-12 用户要求 —— 原先只说「先按报告改掉」,
+        # 报告却不在通知里,收到告警的人得自己 ssh 进来翻)。只取「计入失败的阶段」的细目行。
+        log "巡检闸门拦下:$(printf '%s' "$vault" | grep -E '^\[A[0-9]' | grep -v '不计入失败' | grep -v ' 0 处' | head -4 | tr '\n' ' ')"
+        hits=$(printf '%s' "$vault" | awk '/^\[/{ok=($0 ~ /^\[A[0-9]/ && $0 !~ /不计入失败/ && $0 !~ / 0 处/)} ok && /^   /{print}' | head -6)
         git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
         notify "内容仓 同步 · 需要你处理
 请你:在 ${NOTE_LABEL} 里跑 python3 -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
 原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
+命中:
+$hits
 不处理的后果:这次不会推送 —— 先按报告改掉,或临时把该阶段从 VAULT_GATE_STAGES 里去掉"
         exit 1
     fi
