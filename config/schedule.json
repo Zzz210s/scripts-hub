@@ -36,6 +36,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": true,
+      "linuxEnabled": true,
       "actionVbs": "%REWARDS_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "weread-signin": {
@@ -49,6 +50,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": true,
+      "linuxEnabled": true,
       "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "epic-free-games": {
@@ -62,6 +64,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
       "actionVbs": "%EPIC_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "bilibili-tasks": {
@@ -75,6 +78,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
       "actionVbs": "%BILIBILI_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "baidu-tieba": {

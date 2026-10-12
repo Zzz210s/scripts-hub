@@ -1,4 +1,5 @@
-// Task 7:单实例锁与同伴互查。全部离线:exec 是桩、isAlive 是桩,不读真实进程表。
+// Task 7:单实例锁(取锁/释放锁)。同伴互查与锁状态三态在 peer-state.test.js —— 拆开是为了
+// 守住单文件 200 行上限(全局规则 A17)。全部离线:isAlive 是桩,不读真实进程表。
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,49 +8,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { peerBusy } from '../src/guards.js';
 import { acquireLock, defaultIsAlive, lockFile, readLock, releaseLock, writeLock } from '../src/lock.js';
 
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'tieba-lock-'));
-
-test('peerBusy:以同伴自己的 lock-status 为准,RUNNING 才让路', () => {
-  const dir = tmpDir();
-  const lock = path.join(dir, 'proj-peer', 'logs', 'run.lock');
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  // 同伴的 lock-status 入口存在,exec 才会被调用。
-  const script = path.join(dir, 'proj-peer', 'scripts', 'windows', 'run-state.js');
-  fs.mkdirSync(path.dirname(script), { recursive: true });
-  fs.writeFileSync(script, '', 'utf8');
-  fs.writeFileSync(lock, JSON.stringify({ pid: 1, startedAt: new Date(0).toISOString() }), 'utf8');
-
-  const exec = (verdict) => () => verdict;
-  assert.deepEqual(peerBusy([lock], { exec: exec('RUNNING') }), {
-    busy: true,
-    project: 'proj-peer',
-    detail: 'proj-peer 正在运行',
-  });
-  assert.equal(peerBusy([lock], { exec: exec('STALE') }).busy, false);
-  assert.equal(peerBusy([lock], { exec: exec('NONE') }).busy, false);
-  assert.equal(peerBusy([], { exec: exec('RUNNING') }).busy, false);
-  assert.equal(peerBusy([path.join(dir, 'absent.lock')], { exec: exec('RUNNING') }).busy, false);
-});
-
-test('peerBusy:查不通时只有 10 分钟内的新锁保守让路', () => {
-  const dir = tmpDir();
-  const lock = path.join(dir, 'proj-peer', 'logs', 'run.lock');
-  fs.mkdirSync(path.dirname(lock), { recursive: true });
-  fs.writeFileSync(lock, JSON.stringify({ pid: 1, startedAt: new Date(0).toISOString() }), 'utf8');
-
-  const boom = () => {
-    throw new Error('lock-status 查不通');
-  };
-  const fresh = peerBusy([lock], { exec: boom, nowMs: fs.statSync(lock).mtimeMs + 60000 });
-  assert.equal(fresh.busy, true);
-  assert.match(fresh.detail, /可能刚启动/);
-
-  const old = peerBusy([lock], { exec: boom, nowMs: fs.statSync(lock).mtimeMs + 3600000 });
-  assert.equal(old.busy, false);
-});
 
 test('defaultIsAlive:自己的进程活着,非法 pid 判死', () => {
   assert.equal(defaultIsAlive(process.pid), true);

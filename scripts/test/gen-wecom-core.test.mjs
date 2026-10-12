@@ -95,9 +95,9 @@ test('额外目标按扩展名归组,认不出就报错', () => {
     assert.throws(() => groupForFile('x/mystery.txt'), /无法判断/)
 })
 
-test('仓内 7 份实现与单一源一致(真实落点,兜住手改)', () => {
+test('仓内 8 份实现与单一源一致(真实落点,兜住手改)', () => {
     const result = run({ write: false })
     assert.equal(result.problems.length, 0)
     assert.deepEqual(result.changed.map(a => a.path), [], '有文件与 scripts/lib 的单一源不一致,跑 node scripts/gen-wecom-core.mjs 注入')
-    assert.equal(result.unchanged.length, 7)
+    assert.equal(result.unchanged.length, 8)
 })

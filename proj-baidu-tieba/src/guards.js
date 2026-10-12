@@ -132,6 +132,11 @@ export function peerBusy(lockFiles, { exec = execFileSync, timeoutMs = 60000, no
     }
     if (verdict === 'RUNNING') return { busy: true, project, detail: `${project} 正在运行` };
     if (verdict === 'STALE' || verdict === 'NONE') continue; // 残锁不挡路
+    // UNKNOWN(锁是别的容器/机器写的)与查不通(verdict 为空)一样:没法确认它不忙,
+    // 只能按锁文件年龄保守让路 —— 10 分钟内的新锁当作在跑。
+    if (verdict === 'UNKNOWN' && ageMinutes < 10) {
+      return { busy: true, project, detail: `${project} 锁状态未知 · 锁创建于 ${ageMinutes} 分钟前` };
+    }
     if (ageMinutes < 10) return { busy: true, project, detail: `${project} 可能刚启动 · 锁创建于 ${ageMinutes} 分钟前` };
   }
   return { busy: false };

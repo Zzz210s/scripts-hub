@@ -21,7 +21,8 @@
       "programs.<id>.logonRetryMinutes": "登录触发器的重复间隔(分钟)。",
       "programs.<id>.logonRetryWindowMinutes": "登录触发器的重复总时长(分钟)。",
       "programs.<id>.runScript": "历史字段:Linux 改单套件后不再逐程序用;套件 service 的 ExecStart 固定是 suiteDir/run-all.sh。保留只为兼容旧配置。",
-      "programs.<id>.enabled": "false 表示不注册它的触发(仍会列在报告里)。",
+      "programs.<id>.enabled": "Windows 侧:false 表示不注册它的计划任务(仍会列在报告里)。Linux 侧另看 linuxEnabled,缺省时回落到这个值。",
+      "programs.<id>.linuxEnabled": "Linux/容器套件(run-all.sh)是否调用它,缺省回落到 enabled。Epic 与 B站是「Windows 暂不注册、Linux 照跑」,所以显式写 true;百度贴吧只在真机验证后才打开。",
       "programs.<id>.actionVbs": "Windows 任务启动的 run-daily.vbs 路径;可用 %REWARDS_DIR% / %WEREAD_SIGNIN_DIR% / %EPIC_DIR% / %BILIBILI_DIR% 占位符(运行时从机器私有的 local-paths.env 展开)。百度贴吧只部署在服务器、没有 Windows 运行器,所以留空。",
       "linux.unit": "Linux 单套件 systemd unit 名(默认 automation-suite);权威实现在 scripts/linux/。",
       "linux.times": "Linux 套件触发时刻(HH:MM 数组),默认 [\"08:00\", \"12:00\"]。",
@@ -67,6 +68,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": true,
+      "linuxEnabled": true,
       "actionVbs": "%REWARDS_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "weread-signin": {
@@ -80,6 +82,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": true,
+      "linuxEnabled": true,
       "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "epic-free-games": {
@@ -93,6 +96,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
       "actionVbs": "%EPIC_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "bilibili-tasks": {
@@ -106,6 +110,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
       "actionVbs": "%BILIBILI_DIR%\\scripts\\windows\\run-daily.vbs"
     },
     "baidu-tieba": {

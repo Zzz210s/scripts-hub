@@ -14,6 +14,9 @@ export const DEFAULTS = {
   boundaryHour: 4,
   webhookFile: 'secrets/wecom-webhook.txt',
   stateDir: 'data',
+  // 单实例锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,同伴按这条路径能找到;
+  // 状态与历史仍留 data/。见 proj-weread-signin/src/peer.js 的约定说明。
+  lockDir: 'logs',
 };
 
 /** 读 .env 文本成对象:跳过注释与空行,剥掉成对的引号。 */
@@ -90,6 +93,7 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
   const fromFile = fsImpl.existsSync(file) ? parseEnv(fsImpl.readFileSync(file, 'utf8')) : {};
   const merged = { ...fromFile, ...(env ?? {}) };
   const stateDir = String(pick(merged, 'TIEBA_STATE_DIR', DEFAULTS.stateDir));
+  const lockDir = String(pick(merged, 'TIEBA_LOCK_DIR', DEFAULTS.lockDir));
   const webhookFile = String(pick(merged, 'TIEBA_WEBHOOK_FILE', DEFAULTS.webhookFile));
   return {
     cwd,
@@ -105,6 +109,7 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     minFreeMb: int(pick(merged, 'TIEBA_MIN_FREE_MB', null), DEFAULTS.minFreeMb),
     boundaryHour: int(pick(merged, 'TIEBA_DAY_BOUNDARY_HOUR', null), DEFAULTS.boundaryHour),
     stateDir: path.isAbsolute(stateDir) ? stateDir : path.join(cwd, stateDir),
+    lockDir: path.isAbsolute(lockDir) ? lockDir : path.join(cwd, lockDir),
     webhookFile: path.isAbsolute(webhookFile) ? webhookFile : path.join(cwd, webhookFile),
     busyPeers: String(pick(merged, 'BUSY_PEERS', '')).split(',').map((item) => item.trim()).filter(Boolean),
     dryRun: merged.TIEBA_DRY_RUN === '1',

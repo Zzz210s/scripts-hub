@@ -143,6 +143,8 @@ services:
     volumes:
       - ./tieba/.env:/opt/tieba/.env:ro
       - ./tieba/data:/opt/tieba/data
+      # 单实例锁写在 logs/run.lock(套件约定,同伴按这条路径来找),所以 logs 要挂出来
+      - ./tieba/logs:/opt/tieba/logs
       - ./tieba/secrets:/opt/tieba/secrets
       - ./rewards/logs:/peers/rewards:ro
       - ./tieba/deploy:/opt/deploy:ro

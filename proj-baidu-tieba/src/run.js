@@ -109,7 +109,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
 
   // 3. 单实例锁(宿主 run.sh 另有 flock,两层互补)。
   const acquire = deps.acquireLock ?? acquireLock;
-  const lock = acquire(config.stateDir, { now });
+  const lock = acquire(config.lockDir, { now });
   if (!lock.ok) return skip('peer-running', '已有一次运行在跑');
 
   try {
@@ -175,7 +175,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
   } finally {
     const release = deps.releaseLock ?? releaseLock;
     try {
-      release(config.stateDir);
+      release(config.lockDir);
     } catch {
       /* 解锁失败不覆盖真实结论 */
     }

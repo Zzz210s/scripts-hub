@@ -35,15 +35,29 @@ export const defaultIsAlive = (pid) => {
 };
 
 /**
- * 持有者是否还活着:先比 host。锁里 host 与当前 hostname 不同 = 别的容器
- * 或别的机器留下的残锁,pid 复用也不代表它还在跑;host 相同或缺失才回落到
- * isAlive(pid)。
+ * 锁的状态,三态。取锁方与同伴读锁方对「host 不同」要下相反的结论,不能共用一个布尔:
+ *
+ *   running —— host 相同(或缺失)且进程活着:持有者是本机上的活进程。
+ *   stale   —— 文件在但内容是空的/坏的,或 host 相同而进程已死:本机视角下可回收的残锁。
+ *   unknown —— host 与当前不同:锁是别的容器或别的机器写的。本机看不到那个 host 的进程表,
+ *              既不能证明它活着,也不能证明它是残锁(那次运行可能正在跑)。
+ *
+ * 取锁方把 unknown 按「残锁回收」(holderAlive 的语义,见下):这是为了修「旧容器的 pid 被
+ * 新容器复用 -> 残锁被判活 -> 每次触发静默跳过」。同伴读锁方**不能**照抄这条:别人写的锁一律
+ * unknown,它必须按锁文件年龄保守让路(见 src/guards.js 的 peerBusy),否则「他方查贴吧」永远
+ * 得不到 RUNNING,比查不通还差。两条语义在 2026-10-11 复核后拆开。
  */
-export const holderAlive = (holder, { isAlive = defaultIsAlive, hostname = os.hostname() } = {}) => {
-  if (!holder) return false;
-  if (typeof holder.host === 'string' && holder.host && holder.host !== hostname) return false;
-  return isAlive(holder.pid);
-};
+export function lockState(holder, { isAlive = defaultIsAlive, hostname = os.hostname() } = {}) {
+  if (!holder) return 'stale';
+  if (typeof holder.host === 'string' && holder.host && holder.host !== hostname) return 'unknown';
+  return isAlive(holder.pid) ? 'running' : 'stale';
+}
+
+/**
+ * (取锁方口径)持有者是否还活着:host 不同 = 别的容器/机器留下的残锁,pid 复用也不代表它还在跑,
+ * 一律当不活;host 相同或缺失才回落到 isAlive(pid)。同伴读锁请改用 lockState 并区分 unknown。
+ */
+export const holderAlive = (holder, options) => lockState(holder, options) === 'running';
 
 /** 独占创建锁文件(wx):文件已存在时抛 EEXIST,由 acquireLock 重读后裁决。 */
 export function writeLock(file, { now = new Date(), pid = process.pid, hostname = os.hostname() } = {}) {

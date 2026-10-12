@@ -12,6 +12,9 @@ sudo chown -R "$USER" /srv/apps/automation
 
 # 2. 部署文件(本目录内容)
 tar -C scripts/linux -cf - . | tar -C /srv/apps/automation -xf -
+# 2.5 调度闸门:run-all.sh 按这份配置的 linuxEnabled 决定调哪一步(缺省回落 enabled)。
+#     不铺也可以,但那样闸门失效会退回全跑 —— 贴吧在验证前不能真跑。
+cp config/schedule.json /srv/apps/automation/schedule.json
 chmod +x /srv/apps/automation/{run-all.sh,rewards/run.sh,weread/run.sh} \
          /srv/apps/automation/{rewards,weread}/deploy/run-once.sh
 
@@ -44,6 +47,7 @@ systemctl list-timers automation-suite.timer
 | 动作 | 命令 |
 | --- | --- |
 | 手动跑一整套 | `sudo systemctl start automation-suite.service` |
+| 看本次会跑哪几步 | `node /srv/apps/automation/program-enabled.mjs list /srv/apps/automation/schedule.json` |
 | 手动跑单个 | `/srv/apps/automation/rewards/run.sh` / `/srv/apps/automation/weread/run.sh` |
 | 看编排日志 | `tail -f /srv/apps/automation/logs/suite.log` |
 | 看守卫与跳过原因 | `tail -f /srv/apps/automation/rewards/logs/runner.log` |

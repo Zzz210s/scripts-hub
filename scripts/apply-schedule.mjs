@@ -64,7 +64,7 @@ if (only && !programs.length) {
 const userId = process.env.USERDOMAIN ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}` : process.env.USERNAME || '%USERNAME%'
 const files = new Map()
 const actions = {}
-const enabled = programs.filter((p) => p.enabled)
+const linuxPrograms = programs.filter((p) => p.linuxEnabled)
 console.log(`== 调度(${schedule.order.join(' -> ')})==`)
 
 if (emit !== 'systemd') {
@@ -81,11 +81,11 @@ if (emit !== 'systemd') {
 }
 
 if (emit !== 'windows') {
-    console.log(`-- Linux/容器:单套件 ${linux.unit}.timer 于 ${linux.times.join(' 与 ')} 触发(Persistent=${linux.persistent}),按 order 顺序跑 --`)
-    enabled.forEach((p, i) => console.log(`   ${i + 1}. ${p.id}`))
+    console.log(`-- Linux/容器:单套件 ${linux.unit}.timer 于 ${linux.times.join(' 与 ')} 触发(Persistent=${linux.persistent}),按 order 顺序跑启用项(run-all.sh 的 linuxEnabled 闸门,与实跑一致)--`)
+    linuxPrograms.forEach((p, i) => console.log(`   ${i + 1}. ${p.id}`))
     files.set(`systemd/${linux.unit}.timer`, suiteTimer(linux))
     files.set(`systemd/${linux.unit}.service`, suiteService(linux))
-    files.set('systemd/order.txt', suiteOrderText(enabled))
+    files.set('systemd/order.txt', suiteOrderText(linuxPrograms))
 }
 
 for (const [rel, body] of files) {

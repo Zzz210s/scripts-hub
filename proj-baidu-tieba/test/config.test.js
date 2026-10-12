@@ -42,6 +42,8 @@ test('loadConfig 读 <cwd>/.env,显式 env 覆盖文件里同名键', () => {
   assert.equal(config.accounts[0].cookie, 'BDUSS=FILE');
   assert.equal(config.intervalMs, 111);
   assert.equal(config.stateDir, path.join(dir, 'data'));
+  // 锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,状态仍留 data/。
+  assert.equal(config.lockDir, path.join(dir, 'logs'));
 });
 
 test('重名账号自动消歧且 id 唯一;maxAttempts 的 0 回落默认值', () => {
@@ -66,4 +68,9 @@ test('没有账号时 accounts 为空、filter 为 null、默认值可用', () =
   assert.equal(config.maxAttempts, 3);
   assert.equal(config.intervalMs, 2000);
   assert.deepEqual(config.busyPeers, []);
+});
+
+test('TIEBA_LOCK_DIR 可覆盖锁目录,相对路径按 cwd 展开', () => {
+  assert.equal(loadConfig('/srv/tieba', { env: { TIEBA_LOCK_DIR: '/var/lock/tieba' } }).lockDir, '/var/lock/tieba');
+  assert.equal(loadConfig('/srv/tieba', { env: { TIEBA_LOCK_DIR: 'locks' } }).lockDir, path.join('/srv/tieba', 'locks'));
 });

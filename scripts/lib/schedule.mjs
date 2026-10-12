@@ -156,6 +156,7 @@ export function normalize(raw) {
             runScript: String(p.runScript || ''),
             actionVbs: String(p.actionVbs || ''),
             enabled: p.enabled !== false,
+            linuxEnabled: p.linuxEnabled === undefined ? p.enabled !== false : p.linuxEnabled !== false,
             opportunities
         }
     }

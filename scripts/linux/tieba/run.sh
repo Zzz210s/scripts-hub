@@ -34,7 +34,7 @@ touch "$LOG"   # 先由宿主创建:容器以 root 追加写入,文件归属保�
 [ -f "$LOG" ] && mv -f "$LOG" "$ROOT/logs/previous-run.log"
 
 COMPOSE="$SUITE_DIR/compose.yaml"
-docker compose -f "$COMPOSE" run --rm -T tieba-run >> "$LOG" 2>&1 &
+docker compose -f "$COMPOSE" run --rm -T tieba-run >> "$LOG" 2>&1 9>&- &
 RUNPID=$!
 (
     exec 9>&-          # 别继承锁 fd:脚本退出后这个 sleep 还在,会一直占着锁
