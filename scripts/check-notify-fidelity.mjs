@@ -10,7 +10,7 @@
 // 又被转义固化进消息。当时没人能一眼看出是哪一层坏的,只能靠往真实群里发消息试。
 // 这个脚本把"试"变成"断言",并且不碰真实通道。
 //
-// 覆盖:本机 notify-wecom.sh、两个 Linux 侧 notify()、alert-fail.mjs、四个 proj 发送器。
+// 覆盖:本机 notify-wecom.sh、两个 Linux 侧 notify()、alert-fail.mjs、五个 proj 发送器。
 // pi-wecom-bot 不在范围内 —— 它的回复由自己的 test/e2e.test.ts 用假 ws 服务器端到端验证。
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -34,7 +34,8 @@ const NODE_SENDERS = [
     'proj-bilibili-tasks/src/notify.js',
     'proj-epic-free-games/src/notify.js',
     'proj-weread-signin/src/notify.js',
-    'proj-microsoft-rewards/wechat-bridge/lib/wecom.js'
+    'proj-microsoft-rewards/wechat-bridge/lib/wecom.js',
+    'proj-baidu-tieba/src/notify.js'
 ]
 
 const results = []
@@ -151,7 +152,7 @@ try {
         record('scripts/linux/alert-fail.mjs', false, `调用抛错:${error.message}`)
     }
 
-    // 4) 四个 proj 发送器:直接调 sendWecom,走真实 fetch 打本地端点。
+    // 4) 五个 proj 发送器:直接调 sendWecom,走真实 fetch 打本地端点。
     //    各实现的选项名不完全一致(microsoft-rewards 只让覆盖 url),所以按导出形状调用。
     for (const rel of NODE_SENDERS) {
         before = seen.length

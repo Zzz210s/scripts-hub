@@ -15,8 +15,9 @@
 | 微信读书签到 | `proj-weread-signin/src/notify.js`(策略在 `src/notify-policy.js`,发送时机在 `src/run-notice.js`、`src/run.js`) | `start` / `result` / `skip` / `action` | 每次运行 |
 | Epic 限免领取 | `proj-epic-free-games/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 探测到当期还有没领过的免费游戏时 |
 | B站任务 | `proj-bilibili-tasks/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 守卫通过后每次运行;`action` 只在 cookie 失效或扫码登录时发 |
+| 百度贴吧签到 | `proj-baidu-tieba/src/notify.js`(文案在 `src/messages.js`,发送时机在 `src/run.js`、`src/cli.js`) | `start` / `result` / `action` | 每次真跑;守卫跳过非静默原因时发 `action` |
 
-四份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
+五份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
 由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外层
 (消息排版、webhook 读取、返回形状,清单见 §9)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。
@@ -31,7 +32,7 @@ node scripts/gen-wecom-core.mjs --check    # 只检查(CI/提交前用)
 node scripts/gen-wecom-core.mjs --dry-run  # 看会改哪些文件
 ```
 
-为什么是「内嵌 + 生成」而不是共享包:这四份实现的宿主各自独立部署(容器构建上下文
+为什么是「内嵌 + 生成」而不是共享包:这些实现的宿主各自独立部署(容器构建上下文
 互不相通),两个快照项目的真源还在别的工作区里 —— 跨目录 import 会把「改一处」变成
 「改四处工作流」。历史上曾经抽过公共库 `wecom-notify/`(2026-10-04),随后被拆掉
 (`de2deb9`),只留这份规则文档,原因就是同一个。
@@ -151,7 +152,7 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
 共享块只统一「发送行为」,不统一公开 API。下面这些差异是**有意保留**的,改动外层时不要以
 「对齐」为名顺手改掉(真要统一就单独立项,它会连带改 4 个项目的调用点与测试):
 
-| 维度 | `proj-microsoft-rewards` | 其它三个项目 |
+| 维度 | `proj-microsoft-rewards` | 其它项目 |
 | --- | --- | --- |
 | 失败语义 | `sendWecom` **抛异常**;另有 `isConfigured()` / `webhookUrl()` | 返回 `{ ok:false, error }`,不抛;**没有**配置探测 |
 | 可注入的传输层 | 只允许覆盖 `url`;另有 `__deliverWecom` 测试钩子注入 fetch/sleep/重试 | 通过 `options` 传 `fetchImpl` / `sleep` / `retries` / `timeoutMs` / `onRetry` |
