@@ -5,7 +5,8 @@
     "microsoft-rewards",
     "weread-signin",
     "epic-free-games",
-    "bilibili-tasks"
+    "bilibili-tasks",
+    "baidu-tieba"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -75,6 +76,19 @@
       "runScript": "",
       "enabled": false,
       "actionVbs": "%BILIBILI_DIR%\\scripts\\windows\\run-daily.vbs"
+    },
+    "baidu-tieba": {
+      "taskName": "TiebaSignIn",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 2,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": false,
+      "actionVbs": ""
     }
   }
 }

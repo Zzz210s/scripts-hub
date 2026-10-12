@@ -7,7 +7,10 @@
 set -uo pipefail
 
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
-set -a; [ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"; set +a   # set -a:让参数也进入子进程(node 读的是环境变量)
+set -a
+# shellcheck source=/dev/null   # suite.env 在宿主机上,静态检查时不存在
+[ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"   # set -a:让参数也进入子进程(node 读的是环境变量)
+set +a
 LOG="$SUITE_DIR/logs/suite.log"
 mkdir -p "$SUITE_DIR/logs" "$SUITE_DIR/state"
 
@@ -19,7 +22,7 @@ if ! flock -n 7; then
     exit 0
 fi
 
-note "=== 编排开始(先微软积分,再微信读书,然后 Epic 限免,最后 B站任务)==="
+note "=== 编排开始(先微软积分,再微信读书,然后 Epic 限免、B站任务,最后百度贴吧)==="
 
 "$SUITE_DIR/rewards/run.sh" 7>&-
 RC_REWARDS=$?
@@ -37,8 +40,12 @@ note "Epic 限免退出码 $RC_EPIC"
 RC_BILIBILI=$?
 note "B站任务退出码 $RC_BILIBILI"
 
+"$SUITE_DIR/tieba/run.sh" 7>&-
+RC_TIEBA=$?
+note "百度贴吧退出码 $RC_TIEBA"
+
 note "=== 编排结束 ==="
-if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ]; then
+if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ]; then
     exit 0
 fi
 exit 1

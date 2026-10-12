@@ -129,3 +129,25 @@ services:
     security_opt:
       - no-new-privileges:true
     mem_limit: 1200m
+
+  # 百度贴吧多账号签到:纯 HTTP 的 Node 薄壳;没有浏览器,不需要 shm/init
+  tieba-run:
+    image: automation-tieba:local
+    container_name: tieba-run
+    restart: "no"
+    entrypoint: ["/bin/bash", "/opt/deploy/run-once.sh"]
+    environment:
+      TZ: Asia/Shanghai
+      # 同伴(另几个程序)的单实例锁:错峰判定要用
+      BUSY_PEERS: /peers/rewards/run.lock
+    volumes:
+      - ./tieba/.env:/opt/tieba/.env:ro
+      - ./tieba/data:/opt/tieba/data
+      - ./tieba/secrets:/opt/tieba/secrets
+      - ./rewards/logs:/peers/rewards:ro
+      - ./tieba/deploy:/opt/deploy:ro
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 400m
+    # 故意不设 hostname:固定后每次运行的 host 恒等、node 恒为 pid 1,上一次运行留下的
+    # 残锁会被判成「还活着」,于是每次触发都静默跳过、退出码 0(跨容器判活那次的实测故障)。
