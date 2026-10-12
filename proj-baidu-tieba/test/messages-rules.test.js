@@ -14,22 +14,50 @@ const hasParen = (text) => /[()\uFF08\uFF09]/.test(text);
 const hasEmoji = (text) => /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}]/u.test(text);
 
 /** 守卫给出的全部机器可读码(设计文档 + Task 7)。 */
-const CODES = ['paused', 'done-today', 'attempts-exhausted', 'peer-running', 'quiet-hours', 'before-shutdown', 'low-memory', 'no-credentials', 'credentials-invalid', 'list-failed'];
+/** 守卫给出的全部机器可读码(设计文档 + Task 7);`ok` 是守卫放行时的码,同样要有文案。 */
+const CODES = ['ok', 'paused', 'done-today', 'attempts-exhausted', 'peer-running', 'quiet-hours', 'before-shutdown', 'low-memory', 'no-credentials', 'credentials-invalid', 'list-failed'];
 
-test('四类消息都不能有圆括号,也不能有 emoji', () => {
+test('四类消息都不能有圆括号,也不能有 emoji —— 动态文本同样成立', () => {
+  // 脏输入:账号名 / 日期 / 上游 error / 吧名 / 原因码 都带上 emoji 与圆括号
+  const dirty = ctx({
+    date: '2026-10-11\u{1F600}',
+    accounts: [
+      account('alice\u{1F600}\u{2B50}', { signed: 1 }, { ok: false, error: 'HTTP 500 (nginx) \u{1F600}', reason: 'http' }),
+      account('bob', { failed: 1 }, { emptyForums: true }),
+    ],
+    reason: 'done-today\u{1F600}',
+    reconcile: reconcile({
+      ok: false,
+      reason: 'missing\u{1F600}',
+      reasons: ['missing\u{1F600}', 'truncated'],
+      truncated: true,
+      missingTotal: 1,
+      unresolvedAccounts: ['carol\u{2B50}'],
+      perAccount: [
+        entry('alice\u{1F600}\u{2B50}', { ok: false, reason: 'missing', reasons: ['missing'], missing: ['吧(外语)\u{1F600}'], blocked: ['屏蔽\u{2B50}'] }),
+        entry('bob', { ok: null, reason: 'list-failed\u{1F600}', reasons: ['list-failed\u{1F600}'] }),
+      ],
+    }),
+  });
   const samples = [
-    buildStart(ctx()),
-    buildResult(ctx()),
-    buildResult(ctx({ reconcile: reconcile({ ok: false, reasons: ['truncated', 'missing'] }), accounts: [account('甲')] })),
-    buildSkip(ctx({ reason: 'done-today' })),
-    buildAction(ctx({ reason: 'credentials-invalid' })),
-    buildSkip(ctx({ reason: 'wat-now' })),
-    buildAction(ctx({ reason: 'wat-now' })),
+    buildStart(dirty),
+    buildResult(dirty),
+    buildResult({ ...dirty, dryRun: true, reconcile: null }),
+    buildSkip(dirty),
+    buildAction(dirty),
+    buildSkip({ ...dirty, reason: 'wat-now\u{1F600}' }),
+    buildAction({ ...dirty, reason: 'wat-now\u{1F600}' }),
   ];
   for (const text of samples) {
     assert.equal(hasParen(text), false, text);
     assert.equal(hasEmoji(text), false, text);
   }
+  // 消毒不是把内容整段删掉:读得懂的正文必须还在
+  const result = buildResult(dirty);
+  assert.ok(result.includes('账号 alice'), result);
+  assert.ok(result.includes('未签:吧 外语'), result);
+  assert.ok(result.includes('2026-10-11'), result);
+  assert.ok(result.includes('HTTP 500 nginx'), result);
 });
 
 test('原因词表覆盖守卫全部取值,每个码都能渲染', () => {
@@ -51,6 +79,23 @@ test('未知原因码有显式兜底,不渲染 undefined 或空串', () => {
     assert.ok(!text.includes('undefined'));
     assert.ok(!/原因:[ \t]*$/m.test(text));
   }
+});
+
+test('守卫放行码 ok 有自己的文案,不被当成未知码', () => {
+  assert.ok(Object.keys(REASONS).includes('ok'), 'REASONS 应有 ok 键');
+  const text = buildSkip(ctx({ reason: 'ok' }));
+  assert.ok(text.includes('原因:当前状态正常'), text);
+  assert.ok(!text.includes('未识别'), text);
+  assert.ok(!text.includes('undefined'));
+});
+
+test('账号级失败的原因码用自己的文案,不复用「跳过原因」措辞', () => {
+  const text = buildResult(ctx({ accounts: [account('alice', {}, { ok: false, error: null, reason: 'auth' })] }));
+  assert.ok(text.includes('原因:服务器判定登录状态已失效'), text);
+  assert.ok(!text.includes('未识别的跳过原因'), text);
+  // 没收录的码也要诚实兜底,不渲染 undefined 或空串
+  const unknown = buildResult(ctx({ accounts: [account('bob', {}, { ok: false, error: '', reason: 'wat' })] }));
+  assert.ok(unknown.includes('账号级失败,机器码 wat'), unknown);
 });
 
 test('动态文本里的圆括号被消毒,不破坏硬规则', () => {
@@ -89,4 +134,13 @@ test('长度护栏:超长输入也压在 2048 字节内且保留标题与对账�
   // start 也在护栏内:单个超长账号名不许突破上限
   const longStart = buildStart({ date: '2026-10-11', accounts: [{ name: 'x'.repeat(5000) }] });
   assert.ok(bytes(longStart) <= LIMIT, `实际 ${bytes(longStart)} 字节`);
+  assert.ok(longStart.includes('...'), '超长标题要有省略标记');
+});
+
+test('长度护栏:超长标题被截断且补省略标记,不伪装成完整名字', () => {
+  const text = buildResult(ctx({ accounts: [account(`${'x'.repeat(3000)}\u{1F600}`, { signed: 1 })] }));
+  assert.ok(bytes(text) <= LIMIT, `实际 ${bytes(text)} 字节`);
+  assert.ok(text.startsWith('百度贴吧签到 · '), text.slice(0, 40));
+  assert.ok(text.includes('...'), text.slice(-80));
+  assert.ok(text.includes('对账:通过'), `结论行不许先掉:${text.slice(-80)}`);
 });

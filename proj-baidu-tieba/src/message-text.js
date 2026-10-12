@@ -5,14 +5,19 @@
 export const SEP = ' · ';
 const UNKNOWN = '未识别';
 
-/** 原因码的显示形式:空值也不能渲染成空串或 undefined。 */
-const codeOf = (reason) => (reason === undefined || reason === null || reason === '') ? '无' : String(reason);
+/** 原因码的显示形式:空值也不能渲染成空串或 undefined;码本身也走消毒,免得带 emoji 的脏码漏出去。 */
+const codeOf = (reason) => {
+  if (reason === undefined || reason === null || reason === '') return '无';
+  return safeText(String(reason)) || '无';
+};
 
 /**
  * 跳过 / 人工处理原因词表 —— 必须覆盖守卫的全部机器可读码(见 Task 7)。
  * action 只给「不处理就会一直不跑」的那几个码;其余码走通用兜底(诚实说明)。
  */
 export const REASONS = {
+  // 守卫放行时给的就是这个码,它不是「跳过」—— 但同样要有文案,否则误路由到 skip 会写成未知码。
+  ok: { text: '当前状态正常,没有需要跳过的', followUp: '按计划继续跑' },
   paused: { text: '程序已被手动暂停', followUp: '恢复运行前不会自动跑' },
   'done-today': { text: '今天已经签完了', followUp: '明天重新开始' },
   'attempts-exhausted': { text: '今天可用的尝试次数已用尽', followUp: '明天重新开始' },
@@ -49,6 +54,20 @@ export const REASONS = {
 export const reasonText = (reason) => REASONS[reason]?.text ?? `${UNKNOWN}的跳过原因:${codeOf(reason)}`;
 export const followUpText = (reason) => REASONS[reason]?.followUp ?? '下一次触发会再看';
 
+/**
+ * 账号级失败的原因码(来自 client / http),与「跳过原因」不是一回事:
+ * 复用 reasonText 会渲染成「未识别的跳过原因:auth」,措辞串了。这里单独一套文案。
+ */
+const ACCOUNT_FAIL_TEXT = {
+  'no-cookie': '账号凭据里没有 BDUSS,连请求都没发',
+  auth: '服务器判定登录状态已失效',
+  parse: '接口返回无法解析',
+  http: '接口返回了错误状态',
+  network: '网络请求没有送达'
+};
+
+export const accountFailText = (reason) => ACCOUNT_FAIL_TEXT[reason] ?? `账号级失败,机器码 ${codeOf(reason)}`;
+
 /** 人工处理文案。表里没写 action 的码也能渲染成一条诚实的提示,不留空白。 */
 export function actionText(reason) {
   const known = REASONS[reason];
@@ -72,12 +91,16 @@ const RECONCILE_TEXT = {
 
 export const reconcileText = (reason) => RECONCILE_TEXT[reason] ?? `${UNKNOWN}的对账原因:${codeOf(reason)}`;
 
+/** emoji / 符号区段:吧名与账号名是百度侧的真实输入,带 emoji 是常态,硬规则不许它进消息。 */
+const EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]/gu;
+
 /**
- * 自由文本消毒:吧名 / 账号名 / 上游错误串都可能自带圆括号,
- * 而硬规则要求消息里不出现圆括号 —— 这里把它们换成空格并收敛空白与分隔符。
+ * 自由文本消毒:吧名 / 账号名 / 上游错误串都可能自带圆括号与 emoji,
+ * 而硬规则要求消息里两者都不出现 —— 括号换空格、emoji 直接删掉,再收敛空白与分隔符。
  */
 export const safeText = (value = '') => String(value ?? '')
   .replace(/[()（）]/g, ' ')
+  .replace(EMOJI, '')
   .replace(/\s+/g, ' ')
   .replace(/(?:\s*·\s*)+/g, ' · ')
   .replace(/^\s*·\s*|\s*·\s*$/g, '')

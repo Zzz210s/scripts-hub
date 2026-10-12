@@ -2,15 +2,16 @@
 // 硬规则:不用圆括号(全角半角都不行)、不用 emoji,补充说明一律 ` · ` 分隔,
 // 标题四段式 `<程序名> · <账号或账号数> · <日期> · <动作>`。
 // 数字一律来自入参的接口数据,本文件不估算、不聚合、不补零。
-// 长度护栏:企业微信文本上限 2048 字节(UTF-8),超出按整行截断并保留结论行。
+// 长度护栏:企业微信文本上限 2048 字节(UTF-8),标题与正文都可能超长,
+// 超出按整行截断、标题补省略标记并保留结论行。
 
 export const PROGRAM = '百度贴吧签到';
 export const LIMIT_BYTES = 2048;
 
-import { REASONS, SEP, actionText, followUpText, reasonText, reconcileText, safeText } from './message-text.js';
+import { REASONS, SEP, accountFailText, actionText, followUpText, reasonText, reconcileText, safeText } from './message-text.js';
 
 // 词表在 message-text.js;这里原样转出,调用方与测试只需认 messages.js 一个入口。
-export { REASONS, actionText, followUpText, reasonText } from './message-text.js';
+export { REASONS, accountFailText, actionText, followUpText, reasonText } from './message-text.js';
 
 /** UTF-8 字节数;企业微信的限制按字节算,不是字符数。 */
 export const byteLength = (text) => Buffer.byteLength(text, 'utf8');
@@ -24,6 +25,13 @@ function clipTo(text, budget) {
     out += char;
   }
   return out;
+}
+
+/** 超长动态标题截断并补省略标记 —— 截断处不能看起来像完整的账号名。 */
+function clipHead(head, budget) {
+  if (byteLength(head) <= budget) return head;
+  const marker = budget > 4 ? '...' : '';
+  return clipTo(head, budget - byteLength(marker)) + marker;
 }
 
 /** 只认有限数字;null / undefined / '' / NaN 一律当「没取到」,不编 0。 */
@@ -69,7 +77,7 @@ function accountLines(accounts, reconcile) {
     lines.push(`账号 ${name}${parts.length ? SEP + parts.join(SEP) : ''}`);
     if (item?.emptyForums) lines.push('  关注列表为空,本次没有可签的吧');
     if (item?.incompleteForums) lines.push('  关注列表被截断,可能还有没签的吧');
-    if (item?.ok === false) lines.push(`  原因:${safeText(item?.error) || reasonText(item?.reason)}`);
+    if (item?.ok === false) lines.push(`  原因:${safeText(item?.error) || accountFailText(item?.reason)}`);
     const missing = nameList(verified?.missing);
     if (missing.length) lines.push(`  未签:${missing.join(SEP)}`);
     const blocked = nameList(verified?.blocked);
@@ -105,25 +113,30 @@ function reconcileLines(reconcile) {
 
 /** 按 UTF-8 字节预算拼装:超限时整行丢弃正文并加省略标记,结论行始终保留。 */
 function assemble(head, body, foot) {
-  const join = (lines) => [head, '', ...lines].join('\n');
-  if (byteLength(join([...body, ...foot])) <= LIMIT_BYTES) return join([...body, ...foot]);
+  const join = (title, lines) => [title, '', ...lines].join('\n');
+  // 标题里也有动态文本(账号名 / 日期)—— 先截断它,并给结论行留出位置,
+  // 否则超长标题会把「结论永不先掉」的保证挤爆。
+  const footText = foot.join('\n');
+  const footReserve = Math.min(byteLength(footText), LIMIT_BYTES - 64);
+  head = clipHead(head, LIMIT_BYTES - 2 - footReserve);
+  if (byteLength(join(head, [...body, ...foot])) <= LIMIT_BYTES) return join(head, [...body, ...foot]);
   const kept = [];
   for (const line of body) {
     const marker = `...已省略 ${body.length - kept.length - 1} 行`;
-    if (byteLength(join([...kept, line, marker, ...foot])) > LIMIT_BYTES) break;
+    if (byteLength(join(head, [...kept, line, marker, ...foot])) > LIMIT_BYTES) break;
     kept.push(line);
   }
   const dropped = body.length - kept.length;
   const lines = dropped > 0 ? [...kept, `...已省略 ${dropped} 行`] : kept;
   lines.push(...foot);
-  const out = join(lines);
+  const out = join(head, lines);
   if (byteLength(out) <= LIMIT_BYTES) return out;
   // 极端:结论行本身就超限 —— 保标题,其余按字符截断。
-  return `${head}\n\n${clipTo(foot.join('\n'), Math.max(0, LIMIT_BYTES - byteLength(head) - 2))}`;
+  return `${head}\n\n${clipTo(footText, Math.max(0, LIMIT_BYTES - byteLength(head) - 2))}`;
 }
 
 export function buildStart({ date, accounts } = {}) {
-  return clipTo(headline(accounts, date, '开始运行'), LIMIT_BYTES);
+  return clipHead(headline(accounts, date, '开始运行'), LIMIT_BYTES);
 }
 
 export function buildResult({ date, accounts, reconcile, exitCode, dryRun } = {}) {
