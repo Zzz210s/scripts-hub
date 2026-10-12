@@ -37,7 +37,7 @@ node scripts/gen-wecom-core.mjs --dry-run  # 看会改哪些文件
 「改多处工作流」。历史上曾经抽过公共库 `wecom-notify/`(2026-10-04),随后被拆掉
 (`de2deb9`),只留这份规则文档,原因就是同一个。
 
-shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不是项目运行结果):
+shell 侧另有几个通知实现(不在上表:它们发的是运维告警,不是项目运行结果):
 
 | 触发者 | 实现文件 | 发什么 |
 | --- | --- | --- |
@@ -46,8 +46,10 @@ shell 侧另有三个通知实现(不在上表:它们发的是运维告警,不�
 | 服务器内存守卫 | `scripts/linux/mem-guard/mem-guard.sh` 内的 `notify()` | swap/load 告警 |
 | 程序失败兜底 | `scripts/linux/alert-fail.mjs` | 「程序 · 日期 · 需要你处理」 |
 
-这三个 `notify()` 里的 python 发送块也**逐字节一致**(`wecom-notify` 组,同样由
-`scripts/check-wecom-drift.mjs` 校验)。正文一律走 `argv` 传递:用 `python - <<'PY'` 会让 heredoc
+前三行 `notify()` 里的 python 发送块也**逐字节一致**(`wecom-notify` 组,只有这三份,同样由
+`scripts/check-wecom-drift.mjs` 校验)。第四行 `alert-fail.mjs` 是独立的 Node 兜底,用最简 `fetch`
+发送,不共享这块 —— 它只在程序"一条消息都没发出去"时跑,不需要重试与 `errcode` 处理。
+python 发送块的正文一律走 `argv` 传递:用 `python - <<'PY'` 会让 heredoc
 占用 stdin,而 Windows 上 python 的 stdin 默认是 cp936 —— 两者叠在一起会把中文读成乱码
 (2026-10-11 的乱码事故就是这么来的)。
 
