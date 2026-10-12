@@ -45,7 +45,7 @@ test('跳过文案回答"为什么跳过/会自动重试吗/我需要做什么",
     assert.doesNotMatch(mem, /[()]/)
 })
 
-test('开始提示只有一行,不再带目标、分段、挑战与福利', () => {
+test('开始提示只有一句话,不再带目标、分段、挑战与福利', () => {
     const challenge = { ok: true, list: [{ isPaid: true, totalDays: 30, readSeconds: 9720, readDays: 2, targetDays: 29, targetSeconds: 108000, remainDays: 28, canMiss: 1 }] }
     const text = buildStartMessage({
         plan: { todayMinutes: 135, targetMinutes: 5, minutesSoFar: 300, remainingDays: 29, failableDays: 1, sections: [{ minutes: 3 }, { minutes: 2 }] },

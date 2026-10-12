@@ -1,4 +1,4 @@
-// 运行流程两类通知的接线:开始提醒只有一行(不再联网预览);
+// 运行流程两类通知的接线:开始提醒只一句话(不再联网预览);
 // 跳过提醒里正常跳过只记日志,有风险的才受"每天一条"额度限制。
 import assert from 'node:assert/strict'
 import os from 'node:os'
@@ -12,7 +12,7 @@ const CWD = path.join(os.tmpdir(), 'weread-notice')
 const CONFIG = { curlFile: 'secrets/read-request.curl', webhookFile: 'secrets/webhook.txt' }
 const PLAN = { todayMinutes: 135, targetMinutes: 5, minutesSoFar: 300, remainingDays: 29, failableDays: 1, sections: [{ minutes: 3 }, { minutes: 2 }] }
 
-test('sendStartNotice:简述开始跑,发到 webhook', async () => {
+test('sendStartNotice:一句话说明开始跑,发到 webhook', async () => {
     const sent = []
     const res = await sendStartNotice({
         cwd: CWD, config: CONFIG, plan: PLAN, date: '2026-10-02', accountName: 'TestReader',

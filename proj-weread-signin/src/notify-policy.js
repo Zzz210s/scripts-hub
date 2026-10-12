@@ -92,7 +92,7 @@ export function buildSkipMessage({ reason, detail, plan, config, date, accountNa
     return lines.join('\n')
 }
 
-/** 运行开始提示:说明哪个程序开始跑;目标、分段、挑战与福利都交给结果消息与运行日志。 */
+/** 运行开始提示:一句话说明哪个程序开始跑;目标、分段、挑战与福利都交给结果消息与运行日志。 */
 export function buildStartMessage({ date, accountName }) {
     return `微信读书签到 · ${accountName ?? '微信读书'} · ${date} · 开始自动阅读`
 }
