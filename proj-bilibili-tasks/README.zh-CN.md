@@ -122,7 +122,7 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 
 | 现象 | 原因 | 我们的处理 |
 | --- | --- | --- |
-| `VipBigPoint` 领取失败 `6007000 请将客户端更新至最新版本` | 上游开放 issue [#1195](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1195),4.2.0 仍未修 | 当作已知问题容忍:它不会把整次运行翻成失败,消息里带上 issue 号 |
+| `VipBigPoint` 领取失败 `6007000 请将客户端更新至最新版本` | 接口 `pgc/activity/score/task/receive/v2` 现在要 App 侧设备身份(设备字段 + 有效 `x-bili-ticket`);只用网页 cookie 时接口返回 `code=0` 但**毫无效果**(任务状态与积分不变)。上游 issue [#1195](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1195) 仍开放 | 容忍:不翻转运行结论,消息带 issue 号。有 App 凭据时可放到 `secrets/bilibili-app.json`(`{"accessKey": "...", "deviceTicket": "..."}`,权限 600),薄壳每次运行后会尝试补领,并且**只报状态差异证明的结果**(`大积分:补领 1/1 项 · 积分 +40`,或 `补领 N 项无效果`) |
 | 「观看、分享视频」失败 `HttpClient.Timeout of 30 seconds`(分享的 5 点经验丢了) | 上游默认 `Security.IntervalSecondsBetweenRequestApi=20`,即**每个** GET/POST 前随机睡 10-20 秒,而这段睡眠计入 30 秒 HttpClient 超时;上游 issue [#1141](https://github.com/RayWangQvQ/BiliBiliToolPro/issues/1141) | 薄壳把间隔钉到 5 秒(`Ray_Security__IntervalSecondsBetweenRequestApi`),给 30 秒预算留 4 倍余量;实测到 `api.bilibili.com` 只有 0.12-0.16 秒,说明慢的是间隔而非网络 |
 
 ## 回滚

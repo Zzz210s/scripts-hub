@@ -77,7 +77,16 @@ export const renderMangaBenefitLine = (benefit) => {
 }
 export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务' : '')
 
-export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, mangaBenefit, bigPoint, failures = [], ok = true }) {
+// 大积分「补领」:只有真的领到了才报数;接口返回成功但状态没变时如实写成「无效果」
+// (2026-10-12 实测:照 App 抓包形状请求会返回 code=0,但 state/积分不变)。
+export const renderBigPointClaimLine = (claim) => {
+    if (!claim || !claim.attempted) return ''
+    if (claim.changed.length === 0) return `大积分:补领 ${claim.attempted} 项无效果${SEP}缺 App 设备凭据`
+    const gained = claim.gained > 0 ? `${SEP}积分 +${claim.gained}` : ''
+    return `大积分:补领 ${claim.changed.length}/${claim.attempted} 项${gained}`
+}
+
+export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, mangaBenefit, bigPoint, bigPointClaim, failures = [], ok = true }) {
     const lines = [renderExpLine(exp)]
     for (const failure of failures) lines.push(`  原因:${failure.note}`)
     lines.push(renderDonateLine(donate))
@@ -87,6 +96,8 @@ export function buildResultMessage({ date, account = '', exp, donate, voucher, m
     if (benefitLine) lines.push(benefitLine)
     const bigPointLine = renderBigPointLine(bigPoint)
     if (bigPointLine) lines.push(bigPointLine)
+    const claimLine = renderBigPointClaimLine(bigPointClaim)
+    if (claimLine) lines.push(claimLine)
     return `${headline(account, date, ok ? '运行成功' : '运行有失败')}\n\n${lines.join('\n')}`
 }
 

@@ -7,6 +7,7 @@ import { coinTarget } from './donate.js'
 import { dayKey, dateText } from './clock.js'
 import { shouldSkipLocally } from './guards.js'
 import { buildActionMessage, buildResultMessage, buildStartMessage } from './messages.js'
+import { claimBigPoint } from './bigpoint.js'
 import { memberFromNav } from './member.js'
 import { handleVoucher } from './voucher-flow.js'
 import { acquireLock, clearLock } from './lock.js'
@@ -122,6 +123,16 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         const run = await deps.runConsole(RUN_TASKS, env, { config, now, onLine: (line) => log(`  ${line}`) })
         const classify = classifyRun({ exitCode: run.code, stdout: run.stdout, timedOut: run.timedOut })
 
+        // 大积分补领:没有 App 凭据文件时 claimBigPoint 返回 null,连请求都不发。
+        const bigPointClaim = await claimBigPoint({
+            config,
+            cookie: credential.cookie,
+            deps: { fetchImpl: deps.fetchImpl }
+        }).catch((error) => {
+            log(`大积分补领失败:${String(error)}`)
+            return null
+        })
+
         // 每日任务经验:接口真值优先,取不到才回落估算口径(消息里会标注)
         const reward = typeof deps.fetchExpReward === 'function' ? await deps.fetchExpReward(credential.cookie) : { ok: false }
         const truth = reward?.ok ? expFromReward(reward.data?.data) : null
@@ -157,6 +168,7 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             manga: classify.guardSkipped ? { skipped: true } : readMangaFacts(run.stdout),
             mangaBenefit: classify.guardSkipped ? null : readMangaFacts(run.stdout).benefit,
             bigPoint: classify.bigPointFlaky ? 'failed' : null,
+            bigPointClaim,
             failures,
             ok: completed
         })

@@ -33,6 +33,8 @@ export function loadConfig(env = process.env) {
         maxAttempts: int(env.BILIBILI_MAX_ATTEMPTS, 2),
         dayBoundaryHour: nonNeg(env.BILIBILI_DAY_BOUNDARY_HOUR, 4),
         minFreeMb: int(env.BILIBILI_FREE_MEM_MB, 800),
+        // App 侧凭据(大积分「补领」用)。没有这个文件就完全不尝试,消息也不变。
+        appCredentialsFile: env.BILIBILI_APP_CREDENTIALS_FILE || path.join(root, 'secrets', 'bilibili-app.json'),
         quietStart: env.BILIBILI_QUIET_START || '20:00',
         quietEnd: env.BILIBILI_QUIET_END || '23:00',
         shutdownTime: env.BILIBILI_SHUTDOWN_TIME || '02:00',
