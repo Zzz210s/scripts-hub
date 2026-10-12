@@ -6,7 +6,7 @@
 
 | 项目 | 地址 | 固定版本 | 许可 |
 | --- | --- | --- | --- |
-| BiliBiliToolPro | https://github.com/RayWangQvQ/BiliBiliToolPro | commit `2db0fc613f` 2026-10-08T14:37:35Z | GPL-3.0 |
+| BiliBiliToolPro | https://github.com/RayWangQvQ/BiliBiliToolPro | commit `925d4d000183`（tag `4.2.0`）2026-10-11T06:46:03Z | GPL-3.0 |
 
 我们做了什么:不修改上游任何代码,以「进程 + HTTP」边界调用它的 Console 程序
 (`dotnet Ray.BiliBiliTool.Console.dll`,任务清单由 `Ray_RunTasks` 环境变量给出)。

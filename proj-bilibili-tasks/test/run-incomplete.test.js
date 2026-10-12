@@ -68,6 +68,35 @@ test('R6 大积分失败不算整体失败,文案指向上游已知问题', asyn
     const line = '[12:30:26 INF] 领取任务失败：{"Code":6007000,"Message":"请将客户端更新至最新版本"}'
     const deps = makeDeps({ runConsole: async () => ({ code: 0, stdout: line, stderr: '', timedOut: false }) })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('大积分:日常领取失败 · 上游已知问题 · 不影响其它任务'), result.messages[1])
+    assert.ok(result.messages[1].includes('大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务'), result.messages[1])
     assert.ok(result.messages[1].includes(' · 运行成功'), result.messages[1])
+})
+
+// 2026-10-12 实跑:排行榜 -352(投币选视频时的风控)被误当成漫画失败。漫画行必须来自漫画流程自己。
+test('与漫画无关的 352 不再把漫画报成失败', async () => {
+    const { config } = setup()
+    const stdout = [
+        '  [12:04:16 WRN] 异常：Ray.BiliBiliTool.Domain.Exceptions.BiliBusinessException: 获取排行榜失败：-352(-352)',
+        '  [12:07:35 INF] 投币成功，经验+10 √',
+        '  [12:14:14 INF] ---开始 漫画签到 ---',
+        '  [12:14:27 INF] 【签到结果】成功',
+        '  [12:14:27 INF] ---开始 漫画阅读 ---',
+        '  [12:14:43 INF] 【漫画阅读】成功'
+    ].join('\n')
+    const deps = makeDeps({ runConsole: async () => ({ code: 0, stdout, stderr: '', timedOut: false }) })
+    const result = await runOnce({ config, deps, now: NOW })
+    assert.ok(result.messages[1].includes('漫画:签到成功 · 阅读成功'), result.messages[1])
+    assert.doesNotMatch(result.messages[1], /漫画:签到失败/)
+})
+
+test('漫画权益失败但原因为 null 时不进消息', async () => {
+    const { config } = setup()
+    const stdout = [
+        '  [12:15:13 INF] ---开始 领取大会员漫画权益 ---',
+        '  [12:15:13 INF] 【领取结果】失败',
+        '  [12:15:13 INF] 【原因】null'
+    ].join('\n')
+    const deps = makeDeps({ runConsole: async () => ({ code: 0, stdout, stderr: '', timedOut: false }) })
+    const result = await runOnce({ config, deps, now: NOW })
+    assert.doesNotMatch(result.messages[1], /漫画权益/)
 })

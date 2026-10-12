@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine, renderMangaLine, renderBigPointLine, renderExpLine } from '../src/messages.js'
+import { PROGRAM, buildStartMessage, buildResultMessage, buildSkipMessage, buildActionMessage, renderDonateLine, renderVoucherLine, renderMangaLine, renderMangaBenefitLine, renderBigPointLine, renderExpLine } from '../src/messages.js'
 
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/u
 const EXP = { login: '已得 5', watch: '已得 5', share: '未完成', coins: '已得 50', total: 60 }
@@ -66,7 +66,7 @@ test('投币行取不到后值 -> 回落为明确标注的目标值', () => {
 
 // R6:大积分是上游已知问题,文案要诚实
 test('大积分行指向已知问题,不写成我们坏了', () => {
-    assert.equal(renderBigPointLine('failed'), '大积分:日常领取失败 · 上游已知问题 · 不影响其它任务')
+    assert.equal(renderBigPointLine('failed'), '大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务')
     assert.equal(renderBigPointLine(null), '')
 })
 
@@ -78,9 +78,19 @@ test('会员券行带余额与有效期', () => {
     assert.equal(renderVoucherLine({ action: 'unknown' }), '会员券:状态未知 · 跳过 B币券')
 })
 
-test('漫画行只说可核实的', () => {
-    assert.equal(renderMangaLine('ok'), '漫画:已执行')
-    assert.equal(renderMangaLine('failed'), '漫画:签到失败')
+test('漫画行只说流程自己报的结果', () => {
+    assert.equal(renderMangaLine({ sign: 'ok', read: 'ok' }), '漫画:签到成功 · 阅读成功')
+    assert.equal(renderMangaLine({ sign: 'failed', read: 'ok' }), '漫画:签到失败 · 阅读成功')
+    assert.equal(renderMangaLine({ sign: 'ok', read: 'failed' }), '漫画:签到成功 · 阅读失败')
+    assert.equal(renderMangaLine({ sign: 'unknown', read: 'unknown' }), '漫画:签到结果未知')
+    assert.equal(renderMangaLine({ skipped: true }), '')
+})
+
+test('漫画权益只在有真原因时单独报一行', () => {
+    assert.equal(renderMangaBenefitLine(null), '')
+    assert.equal(renderMangaBenefitLine({ status: 'ok', reason: null }), '')
+    assert.equal(renderMangaBenefitLine({ status: 'failed', reason: null }), '')
+    assert.equal(renderMangaBenefitLine({ status: 'failed', reason: '接口返回 500' }), '漫画权益:领取失败 · 接口返回 500')
 })
 
 test('每日任务行:真值与估算回落', () => {
@@ -102,10 +112,8 @@ test('余额为 null 时不渲染余额,不冒充 0.0', () => {
     assert.equal(renderDonateLine({ target: 5, actual: 0, balance: 0 }), '投币:0 枚 · 未投出 · 余额 0.0')
 })
 
-test('被上游整次跳过时不渲染「漫画:已执行」', () => {
-    assert.equal(renderMangaLine('skipped'), '')
-    assert.equal(renderMangaLine('ok'), '漫画:已执行')
-    assert.equal(renderMangaLine('failed'), '漫画:签到失败')
-    const text = buildResultMessage({ date: '2026-10-12', exp: { login: '未完成', watch: '未完成', share: '未完成', coins: '未完成', total: 0 }, donate: { target: 5, actual: null, balance: null }, voucher: { action: 'unknown' }, manga: 'skipped', failures: [], ok: false })
+test('被上游整次跳过时不渲染漫画行', () => {
+    assert.equal(renderMangaLine({ skipped: true }), '')
+    const text = buildResultMessage({ date: '2026-10-12', exp: { login: '未完成', watch: '未完成', share: '未完成', coins: '未完成', total: 0 }, donate: { target: 5, actual: null, balance: null }, voucher: { action: 'unknown' }, manga: { skipped: true }, failures: [], ok: false })
     assert.doesNotMatch(text, /漫画/)
 })

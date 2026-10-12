@@ -42,6 +42,65 @@ export function sanitizeDetail(line = '') {
     return text.length > DETAIL_LIMIT ? text.slice(0, DETAIL_LIMIT).trim() : text
 }
 
+/** 在 stdout 里定位 `start` 之后、该段结束之前的 `marker` 行,返回 marker 之后的值。
+ *  段的边界靠日志里的 `-------结束-------` 与下一个 `---开始 X ---` 夹住 —— 不夹的话,
+ *  后面别的任务里的 `【原因】` 会被误当成这一段的(2026-10-12 实测踩到)。 */
+function readResultAfter(stdout, start, marker) {
+    const lines = String(stdout ?? '').split(/\r?\n/)
+    const at = lines.findIndex((line) => line.includes(start))
+    if (at === -1) return null
+    for (const line of lines.slice(at + 1)) {
+        if (line.includes('结束') || line.includes('---开始')) break
+        const index = line.indexOf(marker)
+        if (index === -1) continue
+        const value = line.slice(index + marker.length).trim()
+        return value || null
+    }
+    return null
+}
+
+const verdict = (value) => {
+    if (value === null) return 'unknown'
+    if (/成功|√|\bok\b/i.test(value)) return 'ok'
+    if (/失败|×|\berror\b/i.test(value)) return 'failed'
+    return 'unknown'
+}
+
+const NO_REASON = /^(null|undefined|空|无|nil|-|—)$/i
+
+/** 取「结果行紧跟着的那一行」里的【原因】—— 上游格式是两行相邻;
+ *  隔了别的行就不认,避免把后面别段的原因拿过来。 */
+function readReasonAfterResult(stdout, start, resultMarker) {
+    const lines = String(stdout ?? '').split(/\r?\n/)
+    const at = lines.findIndex((line) => line.includes(start))
+    if (at === -1) return null
+    for (let i = at + 1; i < lines.length - 1; i++) {
+        if (!lines[i].includes(resultMarker)) continue
+        const next = lines[i + 1]
+        const index = next.indexOf('【原因】')
+        if (index === -1) return null
+        const value = next.slice(index + '【原因】'.length).trim()
+        return value && !NO_REASON.test(value) ? value : null
+    }
+    return null
+}
+
+/**
+ * 漫画相关的三个事实,各自读自己那段流程的结果行。
+ * 2026-10-12 修正:旧实现把 manga 系在与漫画无关的 task352 上(投币选视频时排行榜风控),
+ * 于是日志里「漫画签到 成功」被报成「漫画:签到失败」—— 消息必须来自该流程自己的输出。
+ */
+export function readMangaFacts(stdout = '') {
+    const sign = verdict(readResultAfter(stdout, '开始 漫画签到', '【签到结果】'))
+    const read = verdict(readResultAfter(stdout, '开始 漫画阅读', '【漫画阅读】'))
+    const result = readResultAfter(stdout, '开始 领取大会员漫画权益', '【领取结果】')
+    let benefit = null
+    if (result !== null) {
+        benefit = { status: verdict(result), reason: readReasonAfterResult(stdout, '开始 领取大会员漫画权益', '【领取结果】') }
+    }
+    return { sign, read, benefit }
+}
+
 export function detectFeatures(stdout = '') {
     const hit = {}
     for (const line of String(stdout).split(/\r?\n/)) {

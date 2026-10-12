@@ -4,7 +4,7 @@
 # 构建(在服务器应用目录 /srv/apps/automation/bilibili,里面要有 src/ deploy/ Dockerfile):
 #   docker build -f Dockerfile -t automation-bilibili:local .
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG UPSTREAM_SHA=2db0fc613f
+ARG UPSTREAM_SHA=925d4d000183
 # apt 走腾讯云 Debian 镜像(构建期;deb.debian.org 慢)。不同基底镜像的源文件位置可能不同,先判存在。
 RUN if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
         sed -i "s|deb.debian.org|mirrors.cloud.tencent.com|g" /etc/apt/sources.list.d/debian.sources; \

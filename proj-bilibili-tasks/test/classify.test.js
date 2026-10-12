@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { classifyRun, detectFeatures, computeExp, sanitizeDetail } from '../src/classify.js'
+import { classifyRun, detectFeatures, computeExp, sanitizeDetail, readMangaFacts } from '../src/classify.js'
 
 test('-403 需要同行关键词;裸 -403 不命中', () => {
     assert.equal(classifyRun({ exitCode: 0, stdout: '投币失败 -403 账号异常' }).risk403, true)
@@ -115,4 +115,50 @@ test('detectFeatures 存的是净化后的 detail', () => {
     const big = detectFeatures('[12:30:26 INF] 领取任务失败：{"Code":6007000,"Message":"请将客户端更新至最新版本"}')
     assert.ok(!big.bigPointFlaky.includes('INF'))
     assert.ok(big.bigPointFlaky.includes('6007000'))
+})
+
+// 2026-10-12 实跑:通知说「漫画:签到失败」,而日志里漫画签到是成功的 —— 旧实现把 manga 系在
+// 与漫画无关的 task352(投币选视频时排行榜风控)上。改为读漫画流程自己的结果行。
+const MANGA_OK = [
+    '  [12:14:14 INF] ---开始 漫画签到 ---',
+    '  [12:14:27 INF] 【签到结果】成功',
+    '  [12:14:27 INF] -------结束-------',
+    '  [12:14:27 INF] ---开始 漫画阅读 ---',
+    '  [12:14:43 INF] 【漫画阅读】成功',
+    '  [12:14:43 INF] FlowCompleted 漫画任务'
+].join('\n')
+
+test('漫画:各自读自己流程的结果行', () => {
+    assert.deepEqual(readMangaFacts(MANGA_OK), { sign: 'ok', read: 'ok', benefit: null })
+})
+
+test('漫画签到失败如实报告', () => {
+    const out = ['  [1 INF] ---开始 漫画签到 ---', '  [2 ERR] 【签到结果】失败', '  [2 ERR] 【原因】接口 500'].join('\n')
+    assert.equal(readMangaFacts(out).sign, 'failed')
+})
+
+test('没有漫画段时是 unknown,不冒充成功', () => {
+    assert.deepEqual(readMangaFacts('  [1 INF] 别的日志'), { sign: 'unknown', read: 'unknown', benefit: null })
+})
+
+test('漫画权益:原因 null 归一为没有原因', () => {
+    const out = ['  [1 INF] ---开始 领取大会员漫画权益 ---', '  [2 INF] 【领取结果】失败', '  [3 INF] 【原因】null'].join('\n')
+    assert.deepEqual(readMangaFacts(out).benefit, { status: 'failed', reason: null })
+})
+
+test('漫画权益:有真原因时带上,成功时也如实记录', () => {
+    const bad = ['  [1 INF] ---开始 领取大会员漫画权益 ---', '  [2 INF] 【领取结果】失败', '  [3 INF] 【原因】接口返回 500'].join('\n')
+    assert.deepEqual(readMangaFacts(bad).benefit, { status: 'failed', reason: '接口返回 500' })
+    const good = ['  [1 INF] ---开始 领取大会员漫画权益 ---', '  [2 INF] 【领取结果】成功'].join('\n')
+    assert.deepEqual(readMangaFacts(good).benefit, { status: 'ok', reason: null })
+})
+
+test('权益的原因只认自己那一段,不串到后面的日志', () => {
+    const out = [
+        '  [1 INF] ---开始 领取大会员漫画权益 ---',
+        '  [2 INF] 【领取结果】失败',
+        '  [2 INF] FlowCompleted 漫画权益任务',
+        '  [9 INF] 【原因】这是别的任务的'
+    ].join('\n')
+    assert.equal(readMangaFacts(out).benefit.reason, null)
 })

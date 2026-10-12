@@ -1,7 +1,7 @@
 // 一次运行的编排:no-credentials -> 守卫 -> 单实例锁 -> 会员判定 -> start -> 券 -> 硬币/关注
 // -> Console -> 归类 -> result -> 落状态。外部动作全部从 deps 注入,整条链路可离线测试。
 import { buildConsoleEnv, RUN_TASKS } from './console-runner.js'
-import { classifyRun, computeExp } from './classify.js'
+import { classifyRun, computeExp, readMangaFacts } from './classify.js'
 import { expFromReward, incompleteTasks } from './exp.js'
 import { coinTarget } from './donate.js'
 import { dayKey, dateText } from './clock.js'
@@ -145,7 +145,9 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             exp,
             donate: donate.result,
             voucher: voucher.result,
-            manga: classify.guardSkipped ? 'skipped' : (classify.task352 ? 'failed' : 'ok'),
+            // 漫画事实来自漫画流程自己的结果行(不借 task352:2026-10-12 那次它来自投币选视频)
+            manga: classify.guardSkipped ? { skipped: true } : readMangaFacts(run.stdout),
+            mangaBenefit: classify.guardSkipped ? null : readMangaFacts(run.stdout).benefit,
             bigPoint: classify.bigPointFlaky ? 'failed' : null,
             failures,
             ok: completed

@@ -61,20 +61,30 @@ export function renderVoucherLine(voucher = {}) {
     return '会员券:普通会员 · 跳过 B币券'
 }
 
-// 上游把整次任务跳过时什么都没执行 —— 这时说 “漫画:已执行” 是在编造(2026-10-11 实测)
+// 漫画行只说各流程自己报的结果。旧实现把 manga 系在与漫画无关的 task352 上,
+// 2026-10-12 因此把「签到成功」报成「签到失败」—— 不再猜,只转述。
 export const renderMangaLine = (manga) => {
-    if (manga === 'failed') return '漫画:签到失败'
-    if (manga === 'skipped') return ''
-    return '漫画:已执行'
+    if (!manga || manga.skipped) return ''
+    const sign = manga.sign === 'failed' ? '签到失败' : manga.sign === 'ok' ? '签到成功' : '签到结果未知'
+    const read = manga.read === 'failed' ? `${SEP}阅读失败` : manga.read === 'ok' ? `${SEP}阅读成功` : ''
+    return `漫画:${sign}${read}`
 }
-export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游已知问题 · 不影响其它任务' : '')
 
-export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, bigPoint, failures = [], ok = true }) {
+// 权益是每月一次的低价值项。失败但上游没给原因(通常是本月已领过)时不进消息,免得变成噪音。
+export const renderMangaBenefitLine = (benefit) => {
+    if (!benefit || benefit.status !== 'failed' || !benefit.reason) return ''
+    return `漫画权益:领取失败${SEP}${benefit.reason}`
+}
+export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务' : '')
+
+export function buildResultMessage({ date, account = '', exp, donate, voucher, manga, mangaBenefit, bigPoint, failures = [], ok = true }) {
     const lines = [renderExpLine(exp)]
     for (const failure of failures) lines.push(`  原因:${failure.note}`)
     lines.push(renderDonateLine(donate))
     lines.push(renderVoucherLine(voucher))
     if (manga) lines.push(renderMangaLine(manga))
+    const benefitLine = renderMangaBenefitLine(mangaBenefit)
+    if (benefitLine) lines.push(benefitLine)
     const bigPointLine = renderBigPointLine(bigPoint)
     if (bigPointLine) lines.push(bigPointLine)
     return `${headline(account, date, ok ? '运行成功' : '运行有失败')}\n\n${lines.join('\n')}`

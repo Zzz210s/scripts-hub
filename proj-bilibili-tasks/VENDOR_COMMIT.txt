@@ -1,4 +1,7 @@
-RayWangQvQ/BiliBiliToolPro 2db0fc613f6fab92ad0a6ea1babe0b32c9d67392
-日期: 2026-10-08T14:37:35Z
+RayWangQvQ/BiliBiliToolPro 925d4d0001830385d8f51e12d004d56d351705f2
+日期: 2026-10-11T06:46:03Z
 说明: 上游源码不在本仓库,vendor 只在构建镜像时按这个 commit 取用。
       scripts/linux/bilibili/Dockerfile 的 ARG UPSTREAM_SHA 必须与这里的短 sha 一致。
+      版本: 4.2.0(tag 4.2.0)。升级原因: 2026-10-12 那次每日分享失败、
+      投币选视频时排行榜风控 -352;4.2.0 里的 #1214(上报设备指纹修分享 -403)
+      与 #1215(风控拒绝时跳过前置探测)正对此。
