@@ -6,7 +6,7 @@
 
 ---
 
-## 0. 一句话结论
+## 0. 结论
 
 **不可行(对周免 BASE_GAME)。** Epic 对「周免基础游戏」的领取在服务端强制走 web checkout 流程:
 最终 `confirm-order` 需要一个由 **hCaptcha Enterprise(经 Talon 反欺诈服务)** 签发的 `captchaToken`,
