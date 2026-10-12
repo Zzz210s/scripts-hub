@@ -65,9 +65,9 @@ export function renderVoucherLine(voucher = {}) {
 // 2026-10-12 因此把「签到成功」报成「签到失败」—— 不再猜,只转述。
 export const renderMangaLine = (manga) => {
     if (!manga || manga.skipped) return ''
-    const sign = manga.sign === 'failed' ? '签到失败' : manga.sign === 'ok' ? '签到成功' : '签到结果未知'
-    const read = manga.read === 'failed' ? `${SEP}阅读失败` : manga.read === 'ok' ? `${SEP}阅读成功` : ''
-    return `漫画:${sign}${read}`
+    const signText = { ok: '签到成功', already: '今日已签到', failed: '签到失败', unknown: '签到结果未知' }
+    const readText = { ok: `${SEP}阅读成功`, already: `${SEP}阅读已完成`, failed: `${SEP}阅读失败`, unknown: '' }
+    return `漫画:${signText[manga.sign] ?? '签到结果未知'}${readText[manga.read] ?? ''}`
 }
 
 // 权益是每月一次的低价值项。失败但上游没给原因(通常是本月已领过)时不进消息,免得变成噪音。

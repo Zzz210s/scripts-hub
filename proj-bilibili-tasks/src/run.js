@@ -56,6 +56,8 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
     }
 
     // 2. 本地守卫
+    // limits 必须传:不传的话守卫回落到 DEFAULT_LIMITS(静默 20:00-23:00、维护 02:00、留空内存),
+    // BILIBILI_QUIET_START/END 这类配置就成了摆设 —— 2026-10-12 由 cli 的 dry-run 用例暴露。
     const skip = shouldSkipLocally({
         now,
         paused: state.paused,
@@ -65,7 +67,13 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         maxAttempts: config.maxAttempts,
         peerRunning: (await deps.peerRunning?.()) ?? false,
         freeMb: deps.freeMb?.() ?? Infinity,
-        boundaryHour: config.dayBoundaryHour
+        boundaryHour: config.dayBoundaryHour,
+        limits: {
+            quietStart: config.quietStart,
+            quietEnd: config.quietEnd,
+            shutdownTime: config.shutdownTime,
+            minFreeMb: config.minFreeMb
+        }
     })
     if (skip.skip) {
         log(`[跳过] ${skip.reason}${skip.detail ? ` · ${skip.detail}` : ''}`)

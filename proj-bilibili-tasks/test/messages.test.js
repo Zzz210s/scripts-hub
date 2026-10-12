@@ -78,6 +78,12 @@ test('会员券行带余额与有效期', () => {
     assert.equal(renderVoucherLine({ action: 'unknown' }), '会员券:状态未知 · 跳过 B币券')
 })
 
+test('漫画已签到不写成失败', () => {
+    assert.equal(renderMangaLine({ sign: 'already', read: 'already' }), '漫画:今日已签到 · 阅读已完成')
+    assert.equal(renderMangaLine({ sign: 'already', read: 'ok' }), '漫画:今日已签到 · 阅读成功')
+    assert.equal(renderMangaLine({ sign: 'failed', read: 'unknown' }), '漫画:签到失败')
+})
+
 test('漫画行只说流程自己报的结果', () => {
     assert.equal(renderMangaLine({ sign: 'ok', read: 'ok' }), '漫画:签到成功 · 阅读成功')
     assert.equal(renderMangaLine({ sign: 'failed', read: 'ok' }), '漫画:签到失败 · 阅读成功')

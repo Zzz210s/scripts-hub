@@ -162,3 +162,36 @@ test('权益的原因只认自己那一段,不串到后面的日志', () => {
     ].join('\n')
     assert.equal(readMangaFacts(out).benefit.reason, null)
 })
+
+// 2026-10-12 第二次跑时实测:漫画签到返回 {"code":1,"msg":"不能重复签到~"} 被上游记成失败,
+// 于是消息里出现「漫画:签到失败」—— 与实际相反(今天早就签过了)。
+const MANGA_DUP = [
+    '  [18:52:46 INF] ---开始 漫画签到 ---',
+    '  [18:52:46 DBG] 发起请求：[POST] "https://manga.bilibili.com/twirp/..."',
+    '  [18:52:48 DBG] 返回Content：{"code":1, "msg":"不能重复签到~"}',
+    '  [18:52:48 INF] 【签到结果】失败',
+    '  [18:52:48 INF] -------结束-------'
+].join('\n')
+
+test('「不能重复签到」识别为今日已签到,而不是失败', () => {
+    assert.equal(readMangaFacts(MANGA_DUP).sign, 'already')
+})
+
+test('只有实打实的失败才算失败', () => {
+    const hard = [
+        '  [1 INF] ---开始 漫画签到 ---',
+        '  [2 INF] 【签到结果】失败',
+        '  [3 INF] 接口炸了'
+    ].join('\n')
+    assert.equal(readMangaFacts(hard).sign, 'failed')
+})
+
+test('权益已领取也识别为 already', () => {
+    const out = [
+        '  [1 INF] ---开始 领取大会员漫画权益 ---',
+        '  [2 INF] 【领取结果】失败',
+        '  [3 INF] 【原因】null',
+        '  [4 WRN] 本月已领取过'
+    ].join('\n')
+    assert.equal(readMangaFacts(out).benefit.status, 'already')
+})

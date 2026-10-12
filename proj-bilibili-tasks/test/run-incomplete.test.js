@@ -100,3 +100,16 @@ test('漫画权益失败但原因为 null 时不进消息', async () => {
     const result = await runOnce({ config, deps, now: NOW })
     assert.doesNotMatch(result.messages[1], /漫画权益/)
 })
+
+// 2026-10-12:配置里的静默时段原来根本传不到守卫(守卫回落 DEFAULT_LIMITS),这里锁住它。
+test('配置的静默时段/维护时间真的传给了守卫', async () => {
+    const { config } = setup({ BILIBILI_QUIET_START: '20:00', BILIBILI_QUIET_END: '23:00' })
+    const night = new Date('2026-10-11T20:30:00')
+    const deps = makeDeps()
+    const skipped = await runOnce({ config, deps, now: night })
+    assert.equal(skipped.reason, 'quiet-hours')
+
+    const { config: open } = setup({ BILIBILI_QUIET_START: '00:00', BILIBILI_QUIET_END: '00:00' })
+    const ran = await runOnce({ config: open, deps: makeDeps(), now: night })
+    assert.notEqual(ran.reason, 'quiet-hours')
+})

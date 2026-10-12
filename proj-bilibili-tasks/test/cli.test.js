@@ -9,9 +9,17 @@ import { loadState } from '../src/state.js'
 const freshDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'bili-cli-'))
 const capture = () => ({ lines: [], log(line) { this.lines.push(line) }, text() { return this.lines.join('\n') } })
 
+/** 夹具环境。静默时段默认 20:00-23:00,不钉住的话这些 case 晚上必失败(2026-10-12 实测)。 */
+const baseEnv = (dir) => ({
+    BILIBILI_DIR: dir,
+    BILIBILI_COOKIES_FILE: path.join(dir, 'secrets', 'cookies.json'),
+    BILIBILI_QUIET_START: '00:00',
+    BILIBILI_QUIET_END: '00:00'
+})
+
 test('run --dry-run 零 fetch 零 spawn 不写状态', async () => {
     const dir = freshDir()
-    const env = { BILIBILI_DIR: dir, BILIBILI_COOKIES_FILE: path.join(dir, 'secrets', 'cookies.json') }
+    const env = baseEnv(dir)
     const spy = { fetch: 0, spawn: 0 }
     const out = capture()
     const code = await main(['run', '--dry-run'], {
@@ -34,7 +42,7 @@ test('run --dry-run 零 fetch 零 spawn 不写状态', async () => {
 
 test('pause / resume 改状态位', async () => {
     const dir = freshDir()
-    const env = { BILIBILI_DIR: dir, BILIBILI_COOKIES_FILE: path.join(dir, 'secrets', 'cookies.json') }
+    const env = baseEnv(dir)
     const out = capture()
     assert.equal(await main(['pause'], { env, log: out.log.bind(out) }), 0)
     assert.equal(loadState(path.join(dir, 'data', 'state.json')).state.paused, true)

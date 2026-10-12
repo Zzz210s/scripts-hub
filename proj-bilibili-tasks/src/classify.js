@@ -45,18 +45,16 @@ export function sanitizeDetail(line = '') {
 /** 在 stdout 里定位 `start` 之后、该段结束之前的 `marker` 行,返回 marker 之后的值。
  *  段的边界靠日志里的 `-------结束-------` 与下一个 `---开始 X ---` 夹住 —— 不夹的话,
  *  后面别的任务里的 `【原因】` 会被误当成这一段的(2026-10-12 实测踩到)。 */
-function readResultAfter(stdout, start, marker) {
+function segment(stdout, start) {
     const lines = String(stdout ?? '').split(/\r?\n/)
     const at = lines.findIndex((line) => line.includes(start))
     if (at === -1) return null
+    const body = []
     for (const line of lines.slice(at + 1)) {
         if (line.includes('结束') || line.includes('---开始')) break
-        const index = line.indexOf(marker)
-        if (index === -1) continue
-        const value = line.slice(index + marker.length).trim()
-        return value || null
+        body.push(line)
     }
-    return null
+    return body.join('\n')
 }
 
 const verdict = (value) => {
@@ -67,19 +65,30 @@ const verdict = (value) => {
 }
 
 const NO_REASON = /^(null|undefined|空|无|nil|-|—)$/i
+// 上游把这些当「失败」报(响应码非 0),对用户来说却是「今天/这个月已经做过了」。
+// 2026-10-12 实测:第二次跑时漫画签到返回 `{"code":1,"msg":"不能重复签到~"}` 而被记为失败,
+// 结果消息里写成「漫画:签到失败」—— 与事实不符,必须识别为 already。
+const ALREADY = /不能重复签到|重复签到|已经签到|已签到|今日已签|重复领取|已经领取|已领取|已完成|已参与/
 
-/** 取「结果行紧跟着的那一行」里的【原因】—— 上游格式是两行相邻;
- *  隔了别的行就不认,避免把后面别段的原因拿过来。 */
-function readReasonAfterResult(stdout, start, resultMarker) {
-    const lines = String(stdout ?? '').split(/\r?\n/)
-    const at = lines.findIndex((line) => line.includes(start))
-    if (at === -1) return null
-    for (let i = at + 1; i < lines.length - 1; i++) {
+/** 在切好的段里找 marker 行并取其后值。 */
+function readResultAfterIn(text, marker) {
+    for (const line of String(text ?? '').split(/\r?\n/)) {
+        const index = line.indexOf(marker)
+        if (index === -1) continue
+        const value = line.slice(index + marker.length).trim()
+        return value || null
+    }
+    return null
+}
+
+/** 在一段文本里取结果行紧跟着的【原因】(两行相邻才认)。 */
+function readReasonAfterResultIn(text, resultMarker) {
+    const lines = String(text ?? '').split(/\r?\n/)
+    for (let i = 0; i < lines.length - 1; i++) {
         if (!lines[i].includes(resultMarker)) continue
-        const next = lines[i + 1]
-        const index = next.indexOf('【原因】')
+        const index = lines[i + 1].indexOf('【原因】')
         if (index === -1) return null
-        const value = next.slice(index + '【原因】'.length).trim()
+        const value = lines[i + 1].slice(index + '【原因】'.length).trim()
         return value && !NO_REASON.test(value) ? value : null
     }
     return null
@@ -91,14 +100,27 @@ function readReasonAfterResult(stdout, start, resultMarker) {
  * 于是日志里「漫画签到 成功」被报成「漫画:签到失败」—— 消息必须来自该流程自己的输出。
  */
 export function readMangaFacts(stdout = '') {
-    const sign = verdict(readResultAfter(stdout, '开始 漫画签到', '【签到结果】'))
-    const read = verdict(readResultAfter(stdout, '开始 漫画阅读', '【漫画阅读】'))
-    const result = readResultAfter(stdout, '开始 领取大会员漫画权益', '【领取结果】')
-    let benefit = null
-    if (result !== null) {
-        benefit = { status: verdict(result), reason: readReasonAfterResult(stdout, '开始 领取大会员漫画权益', '【领取结果】') }
+    const signText = segment(stdout, '开始 漫画签到')
+    const readText = segment(stdout, '开始 漫画阅读')
+    const benefitText = segment(stdout, '开始 领取大会员漫画权益')
+
+    // 段内出现「不能重复签到」这类字样时,即使响应码非 0 也当「已经做过」
+    const judge = (text, marker) => {
+        if (text === null) return 'unknown'
+        const result = verdict(readResultAfterIn(text, marker))
+        if (result !== 'unknown' && ALREADY.test(text)) return 'already'
+        return result
     }
-    return { sign, read, benefit }
+
+    let benefit = null
+    if (benefitText !== null) {
+        const result = verdict(readResultAfterIn(benefitText, '【领取结果】'))
+        benefit = {
+            status: result === 'failed' && ALREADY.test(benefitText) ? 'already' : result,
+            reason: readReasonAfterResultIn(benefitText, '【领取结果】')
+        }
+    }
+    return { sign: judge(signText, '【签到结果】'), read: judge(readText, '【漫画阅读】'), benefit }
 }
 
 export function detectFeatures(stdout = '') {
