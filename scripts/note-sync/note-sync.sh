@@ -151,20 +151,31 @@ fi
 
 # ── 3b. 巡检闸门(内容仓自己的规则:课件规范 / 断链 / 索引登记)────
 # 只拦「必须为 0」的阶段;A3/A5/A6/A8 是历史欠账,留在报告里但不拦。整轮检查约 2 秒。
+#
+# 脚本路径要容两个名字:库里 2026-10-13 把目录去掉了数字前缀(`50-资源` → `资源`)。
+# 写死旧路径时的后果是**闸门静默失效** —— `[ -f … ]` 不成立就直接跳过,没日志没告警,
+# 推送前巡检等于没跑(当天实测)。所以两个名字都试,都找不到才记一条日志说明。
 VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A22,A23}"
-if [ -f "$NOTE_DIR/50-资源/工具/vault-check/check_vault.py" ]; then
+VAULT_CHECK=""
+for rel in "资源/工具/vault-check/check_vault.py" "50-资源/工具/vault-check/check_vault.py"; do
+    if [ -f "$NOTE_DIR/$rel" ]; then VAULT_CHECK="$rel"; break; fi
+done
+if [ -z "$VAULT_CHECK" ]; then
+    log "跳过巡检闸门(两个候选路径都没找到 check_vault.py)"
+fi
+if [ -n "$VAULT_CHECK" ]; then
     PY="$(command -v python3 || command -v python || true)"
     if [ -z "$PY" ]; then
         log "跳过巡检闸门(没找到 python)"
     elif ! vault=$(cd "$NOTE_DIR" && PYTHONIOENCODING=utf-8 "$PY" -B \
-             "50-资源/工具/vault-check/check_vault.py" --fail-on "$VAULT_GATE_STAGES" 2>&1); then
+             "$VAULT_CHECK" --fail-on "$VAULT_GATE_STAGES" 2>&1); then
         # 不加 --quiet:告警正文要带命中条目(2026-10-12 用户要求 —— 原先只说「先按报告改掉」,
         # 报告却不在通知里,收到告警的人得自己 ssh 进来翻)。只取「计入失败的阶段」的细目行。
         log "巡检闸门拦下:$(printf '%s' "$vault" | grep -E '^\[A[0-9]' | grep -v '不计入失败' | grep -v ' 0 处' | head -4 | tr '\n' ' ')"
         hits=$(printf '%s' "$vault" | awk '/^\[/{ok=($0 ~ /^\[A[0-9]/ && $0 !~ /不计入失败/ && $0 !~ / 0 处/)} ok && /^   /{print}' | head -6)
         git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
         notify "内容仓 同步 · 需要你处理
-请你:在 ${NOTE_LABEL} 里跑 python3 -B 50-资源/工具/vault-check/check_vault.py --fail-on $VAULT_GATE_STAGES
+请你:在 ${NOTE_LABEL} 里跑 python3 -B $VAULT_CHECK --fail-on $VAULT_GATE_STAGES
 原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
 命中:
 $hits
