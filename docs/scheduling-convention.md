@@ -23,7 +23,7 @@ Windows 侧(`programs.*`,每个程序一个计划任务):
 
 | 字段 | 含义 | 默认值 |
 | --- | --- | --- |
-| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` -> `bilibili-tasks` -> `baidu-tieba` |
+| `order` | 错峰顺序:谁先跑 | `microsoft-rewards` -> `weread-signin` -> `epic-free-games` -> `bilibili-tasks` -> `baidu-tieba` -> `netease-cloud` |
 | `stagger.baseStartTime` / `slotMinutes` | 第一个程序的每日起始时间 / 相邻程序的间隔 | `08:00` / `30` |
 | `stagger.logonBaseMinutes` / `logonStepMinutes` | 登录后延迟的起点 / 步进 | `3` / `7` |
 | `programs.<id>.startTime` | 每日起始时间 `HH:MM`;`auto` = 按 order+stagger 推导 | `auto` |
@@ -93,9 +93,10 @@ Windows 侧,下表是 `config/schedule.json` 的默认值;真实时刻以配置�
 | Epic 限免领取 | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 09:00 起每 240 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,人工登录一次后在配置里打开** | `data\state.json` 的已领记录与当日尝试次数 |
 | B站任务 | 登录后 24 分钟 · 1 小时内每 10 分钟重试,+ 09:30 起每 120 分钟一次,窗口 14 小时,一天最多真跑 2 次;**默认 `enabled: false`,扫码登录后在配置里打开** | `data/state.json` 的 `lastRunDay` 与当日尝试次数 |
 | 百度贴吧签到 | 登录后 31 分钟 · 1 小时内每 10 分钟重试,+ 10:00 起每 120 分钟一次,窗口 14 小时;**默认 `enabled: false`,真机验证后在配置里打开**,Windows 仅备用 | `data/state.json` 的逐日 `ok` 与尝试次数 · 对账明细在 `data/history.jsonl` |
+| 网易云音乐签到 | 登录后 38 分钟 · 1 小时内每 10 分钟重试,+ 10:30 起每 120 分钟一次,窗口 14 小时;**默认 `enabled: false`,真机验证后在配置里打开** | `data/state.json` 的逐日 `ok`、尝试次数与熔断标记 · 明细在 `data/history.jsonl` |
 
-- 每个程序占一个 **30 分钟槽位**,新程序顺延 · 08:00 微软 -> 08:30 微信读书 -> 09:00 Epic -> 09:30 B站 -> 10:00 贴吧。
-- 登录延迟按 **7 分钟步进**错开 · 3 -> 10 -> 17 -> 24 -> 31,因为开机瞬间网络与系统未必就绪。
+- 每个程序占一个 **30 分钟槽位**,新程序顺延 · 08:00 微软 -> 08:30 微信读书 -> 09:00 Epic -> 09:30 B站 -> 10:00 贴吧 -> 10:30 网易云。
+- 登录延迟按 **7 分钟步进**错开 · 3 -> 10 -> 17 -> 24 -> 31 -> 38,因为开机瞬间网络与系统未必就绪。
 - 白天用「14 小时时间窗 + 周期重复」给多次机会;错过的靠窗口内下一次补。
 
 Linux 侧**不需要错峰时刻**:套件按 `run-all.sh` 里的固定顺序串行执行,顺序与 `config/schedule.json`
@@ -155,6 +156,7 @@ Linux 云主机 7×24 在线,触发一定到,所以重点是**幂等**而不是�
 | Epic 限免领取 | 引擎 30 分钟(`EPIC_ENGINE_TIMEOUT_MINUTES`) | 超时就强杀引擎进程树并推失败通知;探测那一步是 20 秒超时 |
 | B站任务 | 宿主看门狗 `BILIBILI_RUN_TIMEOUT_MIN` 默认 30 分钟 | 超时 `docker rm -f` 掉一次性容器并记为失败;当天剩余触发重试 |
 | 百度贴吧签到 | 宿主看门狗 `TIEBA_RUN_TIMEOUT_MIN` 默认 20 分钟 | 纯 HTTP、账号串行,一次几分钟就结束;超时删容器并记为失败 |
+| 网易云音乐签到 | 宿主看门狗 `NETEASE_RUN_TIMEOUT_MIN` 默认 20 分钟 | 同上:单账号串行、请求间隔 ≥3 秒,一次几分钟;超时删容器并记为失败 |
 
 配套余量:微软积分最近一次实测 44.3 分钟(5 个账号),150 分钟的超时线留得很足。云主机上套件
 service 的 `TimeoutStartSec=infinity`(不掐断编排),超时交给各自的看门狗。

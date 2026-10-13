@@ -16,8 +16,8 @@ tar -C scripts/linux -cf - . | tar -C /srv/apps/automation -xf -
 #     不铺也可以,但那样闸门失效是 fail-closed:退回固定四程序清单
 #     微软积分、微信读书、Epic 限免、B站任务;百度贴吧不跑并记一条告警。
 cp config/schedule.json /srv/apps/automation/schedule.json
-chmod +x /srv/apps/automation/{run-all.sh,rewards/run.sh,weread/run.sh,epic/run.sh,bilibili/run.sh,tieba/run.sh} \
-         /srv/apps/automation/{rewards,weread,epic,bilibili,tieba}/deploy/run-once.sh
+chmod +x /srv/apps/automation/{run-all.sh,rewards/run.sh,weread/run.sh,epic/run.sh,bilibili/run.sh,tieba/run.sh,netease/run.sh} \
+         /srv/apps/automation/{rewards,weread,epic,bilibili,tieba,netease}/deploy/run-once.sh
 
 # 3. 程序本体与凭据(从本机搬;不进仓库,权限 600)
 #    rewards/: src/(上游源码+补丁)、deploy/、config/config.json、sessions/、
@@ -29,8 +29,11 @@ chmod +x /srv/apps/automation/{run-all.sh,rewards/run.sh,weread/run.sh,epic/run.
 #               secrets/ 里放 cookies.json 与 wecom-webhook.txt
 #    tieba/  : src/、scripts/、package.json、Dockerfile、deploy/、data/、logs/、
 #               .env、secrets/wecom-webhook.txt
+#    netease/: src/、scripts/、package.json、Dockerfile、deploy/、data/、logs/、
+#               .env、secrets/wecom-webhook.txt
 #    凭据照各程序自己的 README 铺:.env 放账号或开关,secrets/ 放 webhook 与登录产物,
 #    权限一律 600。tieba 的 .env 写 ACCOUNT_n_BDUSS 与可选的 ACCOUNT_n_NAME;
+#    netease 的 .env 写 ACCOUNT_n_MUSIC_U 与可选的 ACCOUNT_n_NAME;
 #    secrets/wecom-webhook.txt 写它自己那条群机器人地址 · 每个程序用独立群与 key。
 #    见 docs/docker-deployment.md 第 6 节的凭据清单
 

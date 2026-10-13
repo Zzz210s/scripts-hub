@@ -51,7 +51,8 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 
 | 项 | 处理 |
 | --- | --- |
-| 所有「正常跳过」原因 | **只写运行日志,不推送**(微软 `memory` / `handled` / `exhausted`;微信读书 `done`、`peer-running`、`quiet-hours`、`low-memory`、`attempts-exhausted`、`before-shutdown`、`paused`;Epic 同类的都算) |
+| 真正不用跑的跳过 | **只写运行日志,不推送**(微软 `memory` / `handled` / `exhausted`;微信读书 `done`、`peer-running`、`quiet-hours`、`low-memory`、`paused`;Epic 同类的都算) |
+| 「今天可能跑不成」的跳过 | **推一条 `action`** —— `attempts-exhausted` 与 `before-shutdown`。它们意味着当天可能真的没跑成,那正是用户要知道的事,不能静默。 |
 | 「需要你处理」 | 照旧推送,不受频率限制(微软 `nocreds`;微信读书 `credential-invalid`、`stats-unavailable`;Epic `captcha` / `login` / `blocked`) |
 
 - 静音不等于消失:文案照旧整条写进运行日志(微软 `logs/runner.log` 与 `logs/last-run.log`,
@@ -87,6 +88,11 @@ API Key 或接口有问题,不处理就永远不跑,所以按 `action` 每次都
 - Epic 限免领取:`nothing-new` 当期免费项都领过了(静音)、`already-attempted` 今天的尝试次数用尽(静音)、
   `peer-running` 同伴在跑(静音)、`quiet-hours` 安静时段(静音)、`shutdown-soon` 临近关机(静音)、
   `low-memory` 内存不足、`probe-failed` 读免费清单失败、`paused` 已手动暂停。
+- 百度贴吧签到与网易云音乐签到(两者同一套口径):`done-today` 今天已完成(静音)、`peer-running` 同伴在跑(静音)、
+  `quiet-hours` 安静时段(静音)、`paused` 已手动暂停(静音)、`low-memory` 内存不足(静音);
+  而 `attempts-exhausted` 尝试用尽、`before-shutdown` 临近关机、`credentials-invalid` 凭据失效、
+  `no-credentials` 未配置账号、`list-failed` 读不到列表或接口 —— 这五类要推 `action`,因为当天可能真的没跑成。
+  实现:`proj-baidu-tieba/src/run-support.js` 与 `proj-netease-cloud/src/run-support.js` 的 `SILENT_SKIP`。
 
 ## 2. 开始消息模板(`start`)
 

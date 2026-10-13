@@ -24,7 +24,7 @@
 | 智慧树刷课配置 | `proj-autovisor/configs.ini` |
 | 上游补丁与贡献状态 | `patches/` |
 
-## 1. 六个程序各一行
+## 1. 七个程序各一行
 
 | 程序 | 干什么 | 代码来源 / 仓库 | 本地路径 | 跑在哪台机器 | 什么时候跑 | 运行时 | 凭据从哪来 | 通知怎么发 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -34,6 +34,7 @@
 | **Epic 限免领取** | 每周四探测 Epic 免费清单,只有存在没领过的项才用 Playwright 引擎自动领取;被 hCaptcha 挡住时推预置结账链接 | 上游 `vogler/free-games-claimer` 的 `epic-games.js` + `src/`(AGPL-3.0)逐字节收编在 `proj-epic-free-games/vendor/`,commit 记在 `VENDOR_COMMIT.txt`;探测/状态/登录/通知薄壳自研,同在本仓库 | `proj-epic-free-games/`(就在仓库里,无需另建工作区) | 本机 Windows | 登录后 17 分钟(1 小时内每 10 分钟重试)+ 每天 09:00 起每 240 分钟一次,14 小时窗口,一天最多真跑 2 次;**默认不注册,跑一次 `node src/cli.js login` 后在配置里打开** | Node.js >= 20.11 + patchright 驱动的持久化浏览器 | 不存密码:设备授权 token 在 `secrets/epic-tokens.json`(每次运行自动续期),登录态注入 `data/browser/`;`secrets/wecom-webhook.txt` 只是通知地址;调研见 `proj-epic-free-games/docs/auth.md` | 企业微信群机器人;`secrets/wecom-webhook.txt`,发送层 `src/notify.js` |
 | **B站任务** | 跑 B站每日经验任务(登录 / 观看 / 分享 / 投币 5 枚),由薄壳判断会员状态并领年度大会员的 B币券,再做纯获取型的漫画签到与大积分 | 自研薄壳(零依赖 Node)+ 上游 `RayWangQvQ/BiliBiliToolPro`(GPL-3.0)的 Console,固定 commit `925d4d000183`（tag `4.2.0`）,只在构建镜像时取用、不进仓库,来源与复核记在 `proj-bilibili-tasks/NOTICE` | `proj-bilibili-tasks/`(就在仓库里,无需另建工作区) | 云主机容器(或本机 Windows,备用入口) | 登录后 24 分钟 + 每天套件 08:00 / 12:00 两次触发,一天最多真跑 2 次;**默认不注册,扫码登录后在配置里打开**;Linux 侧由 `run-all.sh` 顺序调到,程序自己用守卫与 `no-credentials` 早退 | .NET 10 runtime(上游 Console)+ Node.js >= 20.11(薄壳) | 不存密码:扫码登录产物 `secrets/cookies.json`,失效时推一条「需要你处理」 | 企业微信群机器人;`secrets/wecom-webhook.txt`,发送层 `src/notify.js`;上游 13 个通知 sink 全关 |
 | **百度贴吧签到** | 把每个账号已关注的吧逐个签到,再把关注列表读回来核对今天是否真的签上;只读与签到,不做任何其它写操作 | 全部自研 · 纯 HTTP 的零依赖 Node 薄壳,没有第三方代码;所依据的协议事实与出处记在 `proj-baidu-tieba/NOTICE` | `proj-baidu-tieba/` · 就在仓库里,无需另建工作区 | 云主机容器 · 本机 Windows 为备用入口 | 登录后 31 分钟 + 每天套件 08:00 / 12:00 两次触发,Linux 侧由 `run-all.sh` 按 `order` 顺序调到,程序自己用守卫早退;一天最多真跑 `TIEBA_MAX_ATTEMPTS` 次 · 默认 3 · 程序内开关,而 `config/schedule.json` 的 `maxAttemptsPerDay: 2` 只是登记值;**默认不注册,真机验证后在配置里打开** | Node.js >= 20.11 · 零 npm 依赖 | 只存登录 cookie:`ACCOUNT_n_BDUSS` 写在 `tieba/.env`,可选 `ACCOUNT_n_STOKEN`;不存密码 | 企业微信群机器人 · 用独立的 webhook,与其它程序分开的群与 key;`secrets/wecom-webhook.txt`,发送层 `src/notify.js` |
+| **网易云音乐签到** | 跑 VIP 乐签两条请求并**读回业务结果**确认真的签上,再只读云贝余额;只做读与签到,不做听歌打卡 / 评论 / 分享 / 音乐人与云豆任务 | 全部自研 · 自研 weapi/eapi 加密层,零依赖 Node 薄壳,没有第三方代码;协议事实与**仍需真机核对的字段**记在 `proj-netease-cloud/NOTICE` | `proj-netease-cloud/` · 就在仓库里,无需另建工作区 | 云主机容器 | 登录后 38 分钟 + 每天套件 08:00 / 12:00 两次触发,Linux 侧由 `run-all.sh` 按 `order` 顺序调到;一天最多真跑 `NETEASE_MAX_ATTEMPTS` 次 · 默认 3;**默认不注册,真机验证后在配置里打开** | Node.js >= 20.11 · 零 npm 依赖 | 只存登录 cookie:`ACCOUNT_n_MUSIC_U` 写在 `netease/.env`;**不实现任何登录流程** | 企业微信群机器人 · 独立 webhook;`secrets/wecom-webhook.txt`,发送层 `src/notify.js` |
 
 表里的「什么时候跑」是默认值,真实时刻由 [`../config/schedule.json`](../config/schedule.json) 决定
 (见 [`scheduling-convention.md`](scheduling-convention.md) 第 0 节):改完跑 `node scripts/apply-schedule.mjs --apply --yes`。

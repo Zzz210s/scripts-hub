@@ -6,8 +6,13 @@
 import { peerBusy } from './guards.js'
 import { buildAction } from './messages.js'
 
-/** 正常跳过、只写日志不推送的原因。其余守卫原因都要推一条 action(见 routeSkip)。 */
-export const SILENT_SKIP = new Set(['done-today', 'peer-running', 'quiet-hours'])
+/**
+ * 正常跳过、只写日志不推送的原因。
+ * 除了「本来就不用跑」的三条,`paused` 是人自己按的、`low-memory` 是瞬时压力且当天还会再试,
+ * 都属「不需要人现在动手」;`attempts-exhausted` 与 `before-shutdown` 不放进来 ——
+ * 它们意味着**今天可能跑不成**,那正是用户要知道的事。
+ */
+export const SILENT_SKIP = new Set(['done-today', 'peer-running', 'quiet-hours', 'paused', 'low-memory'])
 
 /** 账号视图:消息层只需要名字与错误细节;绝不把 cookie 带进渲染。 */
 export const view = (accounts) =>

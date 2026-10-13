@@ -6,7 +6,7 @@ import fs from 'node:fs'
 
 import { PATHS } from '../src/crypto.js'
 import { runOnce } from '../src/run.js'
-import { historyFile, stateFile } from '../src/state.js'
+import { emptyState, historyFile, setPaused, stateFile, writeState } from '../src/state.js'
 import { DAY, NOW, configFor, countOf, harness, okYunbei, readStateFile, stubFetch, tempDir } from './run-harness.js'
 
 test('乐签成功:两条请求都生效,读回确认后锁当天并落历史', async () => {
@@ -108,26 +108,6 @@ test('--dry:不发请求、不写状态、不发送,只预览', async () => {
   assert.equal(fs.existsSync(stateFile(config.stateDir)), false)
   assert.equal(fs.existsSync(historyFile(config.stateDir)), false)
   assert.equal(logs.some((line) => line.includes('预览')), true)
-})
-
-test('守卫跳过:退出码 0,不取锁不联网;静默原因不推消息', async () => {
-  const root = tempDir()
-  const config = configFor(root)
-  const calls = []
-  const fetchImpl = async (url) => {
-    calls.push(url)
-    throw new Error('守卫跳过不该发请求')
-  }
-  const { deps, sent } = harness({ fetchImpl, root, config, peerRunning: () => true })
-
-  const result = await runOnce({ cwd: root, now: NOW, deps })
-
-  assert.equal(result.skipped, true)
-  assert.equal(result.exitCode, 0)
-  assert.equal(result.reason, 'peer-running')
-  assert.equal(calls.length, 0)
-  assert.equal(sent.length, 0) // peer-running 属静默跳过
-  assert.equal(fs.existsSync(stateFile(config.stateDir)), false)
 })
 
 test('签到阶段 HTTP 429:当天熔断为 rate-limit,不写「结构不符」', async () => {

@@ -61,24 +61,24 @@ test('全部凭据失效 → 推 action 且带逐账号错误细节', async () =
   assert.match(sent[0], /未登录或凭据已失效/);
 });
 
-test('手动暂停 → 推 action', async () => {
+test('手动暂停 → 静默跳过,不推送', async () => {
   const dir = tmp();
   const stub = tiebaStub();
   const state = emptyState(NOW);
   setPaused(state, true);
-  const { result, sent } = await run({ dir, stub, state });
+  const { result, sent, logs } = await run({ dir, stub, state });
   assert.equal(result.reason, 'paused');
-  assert.equal(sent.length, 1);
-  assert.match(sent[0], /程序已被手动暂停/);
+  assert.equal(sent.length, 0);
+  assert.ok(logs.some((line) => line.includes('正常跳过')));
 });
 
-test('可用内存不足 → 推 action', async () => {
+test('可用内存不足 → 静默跳过,不推送', async () => {
   const dir = tmp();
   const stub = tiebaStub();
-  const { result, sent } = await run({ dir, stub, freeMb: () => 10 });
+  const { result, sent, logs } = await run({ dir, stub, freeMb: () => 10 });
   assert.equal(result.reason, 'low-memory');
-  assert.equal(sent.length, 1);
-  assert.match(sent[0], /可用内存不足/);
+  assert.equal(sent.length, 0);
+  assert.ok(logs.some((line) => line.includes('正常跳过')));
 });
 
 test('临近关机时刻 → 推 action', async () => {
