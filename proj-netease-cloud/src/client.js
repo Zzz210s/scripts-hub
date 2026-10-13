@@ -9,9 +9,17 @@
 //   'http'       非 2xx,或业务 code 非 200 且不属于凭据问题
 //   'network'    连接失败或超时(可重试)
 //   'parse'      响应不是 JSON,或 URL 不合法
-//   'no-cookie'  cookie 里没有 MUSIC_U,连请求都没发
+//   'no-cookie'  cookie 里没有 MUSIC_U 或值为空,连请求都没发
+//
+// 契约钉死:本项目 reason 只有以上 6 个取值,调用方只在这个集合上分支,不要再猜。
+// 风控类拒绝(如 code 447)目前归 'http' 并靠 code 区分;若 T6 的风控矩阵确需独立类别,
+// 先在 T6 里把 'rejected' 加进这里并同步 client.test.js,不要在调用方凭空新增取值。
 // 只发 MUSIC_U(cookie 值原样透传);不伪造设备指纹、不复用反作弊 token。
-// 协议事实(UA、主机、表单形状)见同目录 NOTICE 与调研文档;T3 探针实测后只改这里的常量。
+// eapi 的设备字段 os/deviceId/osver/appver/versioncode 当前一个都没发,已列入 NOTICE 的
+// T3 待校正清单 —— 探针实测若要求,由 T6 在表头或表单里补,不在本层猜。
+// 协议事实(UA、主机、Referer、表单形状)见同目录 NOTICE 与调研文档;T3 探针实测后只改这里的常量。
+// 待 T3 校正的常量(连同 UA/HOSTS 一起记在 NOTICE):UA.weapi、UA.eapi、HOSTS 三项、
+// Referer 'https://music.163.com/' 是否仍被接受。
 
 import { eapiParams, weapiParams } from './crypto.js'
 
@@ -39,10 +47,10 @@ export const HOSTS = Object.freeze({
 /** 表示「凭据失效」的业务 code;其余非 200 一律按接口失败处理。 */
 const AUTH_CODES = Object.freeze([301, 302, 8810, -462, -460])
 
-/** 从 cookie 串里取一个字段,取不到返回 null。 */
+/** 从 cookie 串里取一个字段;取不到或值为空都返回 null(空 MUSIC_U 不算凭据)。 */
 export function cookieValue(cookie, name) {
   const found = new RegExp(`(?:^|;\\s*)${name}=([^;]*)`).exec(cookie ?? '')
-  return found ? found[1] : null
+  return found && found[1] !== '' ? found[1] : null
 }
 
 /** 从 URL 推断加密层:路径含 /eapi/ -> eapi,/weapi/ -> weapi,其余 none。 */
@@ -54,6 +62,13 @@ export function cryptoFromUrl(url) {
 }
 
 const snippet = (text) => String(text ?? '').replace(/\s+/g, ' ').slice(0, 120)
+
+/** 业务 code 只认有限数;缺失、空串、非数字一律按「未解析」返回 null。 */
+const parseCode = (value) => {
+  if (value === undefined || value === null || value === '') return null
+  const code = Number(value)
+  return Number.isFinite(code) ? code : null
+}
 
 const fail = (error, reason, extra = {}) => ({
   ok: false,
@@ -71,6 +86,13 @@ function resolve(url, mode) {
   return new URL(url, HOSTS[mode] ?? HOSTS.none)
 }
 
+/**
+ * eapi 的摘要与明文都用逻辑路径 /api/...:参考实现先拿 /api/... 算摘要,再把 URL 重写成
+ * /eapi/... 发请求;这里发送用的是 /eapi/... 形态,故算摘要前反向归一。不改 PATHS,是因为
+ * 前缀同时被 cryptoFromUrl 与主机选择依赖。
+ */
+const logicalPath = (pathname) => pathname.replace(/^\/eapi\//, '/api/')
+
 /** 组装请求体:weapi 双层加密 + RSA,eapi AES-ECB,none 走 JSON。 */
 function buildBody(target, data, mode) {
   const payload = data ?? {}
@@ -79,7 +101,7 @@ function buildBody(target, data, mode) {
     return new URLSearchParams({ params, encSecKey }).toString()
   }
   if (mode === 'eapi') {
-    const { params } = eapiParams(target.pathname, payload)
+    const { params } = eapiParams(logicalPath(target.pathname), payload)
     return new URLSearchParams({ params }).toString()
   }
   return JSON.stringify(payload)
@@ -117,7 +139,7 @@ async function attemptOnce({ fetchImpl, target, verb, headers, body, timeoutMs }
   } catch {
     return fail(`响应不是 JSON · ${snippet(text)}`, 'parse', { raw: text })
   }
-  const code = parsed && typeof parsed === 'object' && parsed.code !== undefined ? Number(parsed.code) : null
+  const code = parseCode(parsed && typeof parsed === 'object' ? parsed.code : undefined)
   if (code === null || code === 200) {
     return { ok: true, code, body: parsed, raw: text, error: null, reason: 'ok' }
   }

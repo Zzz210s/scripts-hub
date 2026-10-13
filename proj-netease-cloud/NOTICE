@@ -24,12 +24,24 @@ AES-ECB + MD5、以及 RSA 原文加密。复核只用假数据与公开公钥,�
 
 ## 待 T3 探针实测校正
 
-常量已集中,校正时只改 `src/crypto.js` 一处:
+校正点分两处,改完同步跑 `npm test`:
+
+`src/crypto.js`:
 
 - RSA 公钥与 `-36cd479b6b5-` 分隔符是否仍是服务端当前使用的那一组;
 - weapi 的预设密钥与双层顺序、eapi 摘要串格式;
 - `PATHS` 里每条路径的加密层前缀 `/weapi` 或 `/eapi`,以及是否需要 query 形态;
-- weapi 是否还要求 `csrf_token` / `e_r` 一类附加表单字段,由 T2 拼装。
+- eapi 的摘要与明文用**逻辑路径** `/api/...`(client 发送前把 `/eapi/` 归一),探针确认真机是否同此。
+
+`src/client.js`:
+
+- `UA.weapi`(Chrome 桌面)与 `UA.eapi`(NeteaseMusic iPhone)是否仍是服务端接受的形态;
+- `HOSTS.weapi` / `HOSTS.eapi` / `HOSTS.none` 三个默认主机;
+- `Referer` 固定值 `https://music.163.com/` 是否仍被接受,以及 eapi 是否需要 Referer;
+- **eapi 设备字段 `os` / `deviceId` / `osver` / `appver` / `versioncode` 当前一个都没发**:
+  调研称由客户端本地生成或从 cookie 派生(`util/request.js` 的 `processCookieObject`),
+  探针实测若服务端要求,由 T6 在 eapi 请求里补 —— 本层不伪造指纹;
+- weapi 是否还要求 `csrf_token` / `e_r` 一类附加表单字段,由 T2/T6 拼装。
 
 ## 风险声明
 

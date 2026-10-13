@@ -107,6 +107,15 @@ test('常量与路径集中导出且不可变', () => {
   )
 })
 
+test('入参 undefined 或 null 当空对象:导出函数直调也不抛', () => {
+  assert.deepEqual(
+    weapiParams(undefined, { secretKey: SK_A }),
+    weapiParams({}, { secretKey: SK_A }),
+  )
+  assert.deepEqual(eapiParams('/api/point/dailyTask'), eapiParams('/api/point/dailyTask', {}))
+  assert.deepEqual(eapiParams('/api/point/dailyTask', null), eapiParams('/api/point/dailyTask', {}))
+})
+
 test('入参对象不被修改', () => {
   const body = { signDayTime: 1, type: 1 }
   eapiParams('/api/point/dailyTask', body)

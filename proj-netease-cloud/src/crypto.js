@@ -37,7 +37,8 @@ export const PATHS = Object.freeze({
   yunbeiTodayGet: '/weapi/point/today/get',
 })
 
-const asText = (value) => (typeof value === 'string' ? value : JSON.stringify(value))
+/** 序列化入参;undefined/null 一律当空对象,保证导出函数被直调也不抛。 */
+const asText = (value) => (typeof value === 'string' ? value : JSON.stringify(value ?? {}))
 
 /** AES-128-CBC + PKCS7,输出 base64。 */
 const aesCbc = (text, key, iv) => {
