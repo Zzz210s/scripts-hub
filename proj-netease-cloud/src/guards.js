@@ -17,6 +17,9 @@ export const DEFAULT_LIMITS = {
   shutdownTime: '02:00',
   shutdownMarginMinutes: 30,
   minFreeMb: 800,
+  // attempts-exhausted 的阈值也是守卫阈值,和上面几个共用同一份字面量:config.js 展开本对象
+  // 即得到默认值,checkLocalGuards 的默认参数也从这里取 —— 全项目只有这一处写 3。
+  maxAttempts: 3,
 }
 
 /** 'HH:MM' -> 当天分钟数;格式不对给 null。 */
@@ -56,7 +59,7 @@ export function checkLocalGuards({
   doneToday = false,
   circuitBroken = false,
   attempts = 0,
-  maxAttempts = 3,
+  maxAttempts = DEFAULT_LIMITS.maxAttempts,
   peerRunning = false,
   peerDetail = '',
   freeMb = Infinity,

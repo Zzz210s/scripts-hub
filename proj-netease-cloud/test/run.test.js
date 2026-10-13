@@ -150,6 +150,31 @@ test('签到阶段 HTTP 429:当天熔断为 rate-limit,不写「结构不符」'
   assert.equal(text.includes('429'), true)
 })
 
+test('体检阶段限流:HTTP 200 + code 429 归 rate-limit,当天熔断', async () => {
+  const root = tempDir()
+  // 网易 weapi 最常见的限流形状就是 HTTP 200 + body code 429;只带 httpStatus 会掉进 shape。
+  const config = {
+    ...configFor(root),
+    accounts: [
+      { id: 'acct-1', name: '账号 1', cookie: 'MUSIC_U=SAMPLE_A' },
+      { id: 'acct-2', name: '账号 2', cookie: 'MUSIC_U=SAMPLE_B' },
+    ],
+  }
+  const { calls, fetchImpl } = stubFetch({ [PATHS.yunbeiSignedGet]: { status: 200, body: { code: 429 } } })
+  const { deps, sent } = harness({ fetchImpl, root, config })
+
+  const result = await runOnce({ cwd: root, now: NOW, deps })
+
+  assert.equal(result.skipped, true)
+  assert.equal(result.reason, 'rate-limit')
+  assert.equal(result.exitCode, 0)
+  assert.equal(calls.length, 2) // 两个账号各一次体检,失败即停,不发第二条
+  assert.equal(readStateFile(config).days[DAY].circuitKind, 'rate-limit')
+  const text = sent.join('\n')
+  assert.equal(text.includes('过于频繁'), true) // 走 rate-limit 文案
+  assert.equal(text.includes('结构与预期不符'), false) // 不是 shape
+})
+
 test('首次运行读不到云贝余额:不落基线,下次还能再采', async () => {
   const root = tempDir()
   const config = configFor(root)

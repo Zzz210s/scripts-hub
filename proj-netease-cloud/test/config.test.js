@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 
 import { accountsFrom, DEFAULTS, loadConfig, parseEnv } from '../src/config.js'
-import { DEFAULT_LIMITS } from '../src/guards.js'
+import { DEFAULT_LIMITS, checkLocalGuards } from '../src/guards.js'
 
 test('parseEnv:跳过注释与空行,剥成对引号', () => {
   const env = parseEnv('# 注释\n\nACCOUNT_1_MUSIC_U=SAMPLE\nA="quoted"\nB=\'single\'\nBAD\n')
@@ -61,9 +61,19 @@ test('loadConfig:没有 .env 也能跑,给默认值', () => {
 })
 
 test('守卫阈值只有一份真源:config 的默认值与 guards.DEFAULT_LIMITS 同值', () => {
-  for (const key of ['quietStart', 'quietEnd', 'shutdownTime', 'shutdownMarginMinutes', 'minFreeMb']) {
+  for (const key of [
+    'quietStart',
+    'quietEnd',
+    'shutdownTime',
+    'shutdownMarginMinutes',
+    'minFreeMb',
+    'maxAttempts',
+  ]) {
     assert.equal(DEFAULTS[key], DEFAULT_LIMITS[key], key)
   }
-  // maxAttempts 不在 DEFAULT_LIMITS 里,它是 checkLocalGuards 的默认参数,同样钉死为 3。
-  assert.equal(DEFAULTS.maxAttempts, 3)
+  // maxAttempts 同时是 checkLocalGuards 的默认参数:只断言两边字段相等抓不住「守卫那份没跟着改」。
+  // 这条走行为:不显式传 maxAttempts,DEFAULTS.maxAttempts 次尝试必须恰好被拦下。
+  const morning = new Date('2026-10-11T09:00:00')
+  assert.equal(checkLocalGuards({ now: morning, attempts: DEFAULTS.maxAttempts }).reason, 'attempts-exhausted')
+  assert.equal(checkLocalGuards({ now: morning, attempts: DEFAULTS.maxAttempts - 1 }).reason, 'ok')
 })

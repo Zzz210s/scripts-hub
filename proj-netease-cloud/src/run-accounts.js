@@ -25,7 +25,9 @@ export function kindOfVip(vip) {
 export function onlineSkipReason(online, credentials) {
   if (credentials.length === 0) return online.reason
   const kinds = new Set(
-    credentials.map((item) => classifyError({ reason: item.reason, httpStatus: item.httpStatus, error: item.error })),
+    credentials.map((item) =>
+      classifyError({ reason: item.reason, code: item.code, httpStatus: item.httpStatus, error: item.error }),
+    ),
   )
   if (kinds.size === 1) {
     const only = [...kinds][0]
@@ -48,7 +50,8 @@ export const failedOutcome = (account, error, reason) => ({
 /**
  * 逐账号只读凭据体检:云贝查询既当体检,也复用为结果里的云贝一行。
  * 账号之间补一次 3 秒间隔(硬约束:串行、间隔 >=3 秒)。
- * httpStatus 一并带出,否则 HTTP 429 这类失败在汇总时会掉进 shape 而不是 rate-limit。
+ * code 与 httpStatus 一并带出,否则限流在汇总时会掉进 shape 而不是 rate-limit ——
+ * 网易 weapi 最常见的限流形状正是 HTTP 200 + body code 429,只带 httpStatus 抓不到它。
  */
 export async function probeAll(accounts, deps) {
   const credentials = []
@@ -56,16 +59,21 @@ export async function probeAll(accounts, deps) {
     if (index > 0) await pace(deps)
     const yunbei = await queryYunbei({ cookie: account.cookie, deps })
     const signed = yunbei.raw?.signed ?? null
+    const signal = {
+      reason: signed?.reason,
+      code: signed?.code,
+      httpStatus: signed?.httpStatus,
+      error: signed?.error,
+    }
     credentials.push({
       id: account.id,
       name: account.name,
       ok: yunbei.ok === true,
       error: signed?.error ?? null,
       reason: signed?.reason ?? null,
+      code: signed?.code ?? null,
       httpStatus: signed?.httpStatus ?? null,
-      kind: yunbei.ok === true
-        ? null
-        : classifyError({ reason: signed?.reason, httpStatus: signed?.httpStatus, error: signed?.error }),
+      kind: yunbei.ok === true ? null : classifyError(signal),
       yunbei,
     })
   }

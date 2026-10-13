@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import { logicalDay } from '../src/clock.js'
+import { DEFAULTS } from '../src/config.js'
 import { PATHS } from '../src/crypto.js'
 import { stateFile } from '../src/state.js'
 
@@ -15,22 +16,17 @@ export const ACCOUNT = { id: 'acct-1', name: '账号 1', cookie: 'MUSIC_U=SAMPLE
 
 export const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'netease-run-'))
 
+// 可调阈值全部从 src/config.js 的 DEFAULTS 展开,夹具不另抄一份 —— 守卫阈值改真源时,
+// 夹具跟着变;抄成字面量的话夹具漂移不会被任何测试抓住(评审轮次 2)。
+// 下面只覆盖与临时目录相关的路径,以及账号列表。
 export const configFor = (root) => ({
+  ...DEFAULTS,
   cwd: root,
   accounts: [ACCOUNT],
-  timeoutMs: 10000,
-  requestIntervalMs: 3000,
-  boundaryHour: 4,
   stateDir: path.join(root, 'data'),
   lockDir: path.join(root, 'logs'),
   webhookFile: path.join(root, 'secrets', 'wecom-webhook.txt'),
   busyPeers: [],
-  maxAttempts: 3,
-  quietStart: '20:00',
-  quietEnd: '23:00',
-  shutdownTime: '02:00',
-  shutdownMarginMinutes: 30,
-  minFreeMb: 800,
   dryRun: false,
 })
 
