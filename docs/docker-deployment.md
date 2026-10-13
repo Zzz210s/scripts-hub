@@ -46,6 +46,20 @@
 │   ├── data/ logs/         状态与日志
 │   ├── .env config.yaml    守卫参数与底座配置
 │   └── run.sh              宿主侧运行器
+├── tieba/
+│   ├── src/ scripts/       零依赖 Node 薄壳 + 同伴查询入口(run-state.js)
+│   ├── deploy/ Dockerfile  run-once.sh 与镜像定义
+│   ├── secrets/            企业微信 webhook(贴吧那个群)
+│   ├── data/ logs/         状态、历史与单实例锁(logs/run.lock)
+│   ├── .env                ACCOUNT_n_BDUSS 与开关
+│   └── run.sh              宿主侧运行器
+├── netease/
+│   ├── src/ scripts/       自研 weapi/eapi 加密层 + 薄壳 + 同伴查询入口
+│   ├── deploy/ Dockerfile  同上
+│   ├── secrets/            企业微信 webhook(网易云那个群)
+│   ├── data/ logs/         同上
+│   ├── .env                ACCOUNT_n_MUSIC_U 与开关
+│   └── run.sh              宿主侧运行器
 ├── state/                  flock 锁与套件级状态
 └── logs/suite.log          编排日志
 ```
@@ -118,6 +132,12 @@
 | `weread/secrets/read-request.curl` | 本机 `%WEREAD_DIR%\secrets\` | `wr_skey` 约 1.5 小时,程序自动续期;超 360 天或别处退出登录才需重抓 |
 | `weread/secrets/weread-api-key.txt` | 同上 | 换新的后跑一次只读校验 |
 | `weread/secrets/app-*.json` | 同上 | App token 过期时重新扫码(`app-login.js qr` + `wait`) |
+| `tieba/.env` | 浏览器里 `tieba.baidu.com` 的 `BDUSS` | 每个账号一行 `ACCOUNT_n_BDUSS`;失效时程序推一条「需要你处理」,重新抓一份写进去即可 |
+| `tieba/secrets/wecom-webhook.txt` | 贴吧那个群的群机器人地址 | 机器人被移出群就重新复制 |
+| `netease/.env` | 浏览器里 `music.163.com` 的 `MUSIC_U` | 同上;程序**不做登录**,失效只能人工换 |
+| `netease/secrets/wecom-webhook.txt` | 网易云那个群的群机器人地址 | 同上 |
+
+**两个程序各自一个群机器人**,与其它程序分开的群与 key —— 消息按程序分开,出问题时不互相淹没。
 
 所有凭据只在宿主目录里(600 权限),不进镜像、不进仓库。**同一账号不要两边同时跑**:
 微软的登录态与微信读书的 cookie 都会被对方顶掉,所以迁到云主机后本机计划任务要停掉
@@ -161,6 +181,7 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T --entrypoint nod
 | 看门狗超时后容器还在跑 | `docker rm -f rewards-run` 删不掉 `compose run` 的一次性容器(真名是 `automation-rewards-run-run-<hash>`) | 按标签删:`docker ps -aq --filter "label=com.docker.compose.service=rewards-run" \| xargs -r docker rm -f` |
 | 底座报「缺少依赖: PyYAML, requests, httpx」 | venv 用 `ln -s /opt/venv/bin/python /usr/local/bin/python` 暴露:符号链让 Python 把 `sys.executable` 解析成 `/usr/bin/python3`,找不到 `pyvenv.cfg` → 看不到 venv 的 site-packages | 改用 `ENV PATH="/opt/venv/bin:$PATH"`(并加 `/etc/profile.d/venv.sh` 兜住登录 shell) |
 | 子命令(status/plan/auth)跑了却像在跑 `run` | 服务的 entrypoint 是 `run-once.sh`,后面跟的命令被忽略 | 显式 `--entrypoint node` |
+| **容器里 `check` 报 `EISDIR: illegal operation on a directory, read`** | compose 把 `./<程序>/.env` 以**文件**挂进去,而宿主上这个文件不存在时,Docker 会自动建一个**同名目录**(2026-10-14 实测:贴吧与网易云首次部署各撞一次) | 先建 `.env` 再起容器(部署步骤里那步别跳);两个程序已让「读不动就当空配置」,现在报的是「没有配置任何账号」 |
 | **当天第一次真跑,退出码 1,企业微信里一条消息都没有** | `config.yaml` 以**文件**形式 bind mount 到容器里,而程序改配置的写法是「写 .tmp 再 rename 覆盖」—— rename 覆盖一个挂载点必然 EBUSY(2026-10-05 实测:1 秒内退出,`执行失败:EBUSY: resource busy or locked, rename '/opt/weread/config.yaml.tmp' -> '/opt/weread/config.yaml'`) | 挂成模板:`./weread/config.yaml:/opt/weread/config.template.yaml:ro`,由 `run-once.sh` 复制到容器可写层再用(补丁只影响本次运行,不需要落回宿主) |
 | 崩溃时完全静默(只能靠"今天没消息"发现) | 程序死在发消息之前,result 消息根本没机会生成 | 两个运行器都加兜底:`alert-fail.mjs` —— 退出码非 0 **且**日志里从未出现「企业微信」时,补一条「需要你处理」提醒(出现过说明程序至少试过发送,不重复打扰) |
 
