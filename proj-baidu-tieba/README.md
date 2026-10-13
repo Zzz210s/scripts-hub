@@ -147,7 +147,7 @@ node src/cli.js report --dry   # re-renders today's last result
 `run --dry` and `TIEBA_DRY_RUN=1` do not go online and write no state; they still read `.env` and `data/state.json`.
 
 From the repository root, `node scripts/check-wecom-drift.mjs` verifies the notification core is
-byte-identical to the other four copies.
+byte-identical to the other five copies.
 
 ## Logs and state
 

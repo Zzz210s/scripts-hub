@@ -16,8 +16,9 @@
 | Epic 限免领取 | `proj-epic-free-games/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 探测到当期还有没领过的免费游戏时 |
 | B站任务 | `proj-bilibili-tasks/src/notify.js`(策略在 `src/policy.js`,文案在 `src/messages.js`,发送时机在 `src/run.js`) | `start` / `result` / `skip` / `action` | 守卫通过后每次运行;`action` 只在 cookie 失效或扫码登录时发 |
 | 百度贴吧签到 | `proj-baidu-tieba/src/notify.js`(文案在 `src/messages.js`,发送时机在 `src/run.js`、`src/cli.js`) | `start` / `result` / `action` | 每次真跑;守卫跳过非静默原因时发 `action` |
+| 网易云音乐签到 | `proj-netease-cloud/src/notify.js`(文案在 `src/messages.js`,发送时机在 `src/run.js`、`src/cli.js`) | `start` / `result` / `action` | 每次真跑;守卫跳过非静默原因时发 `action` |
 
-五份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
+六份实现各自内嵌**同一块** `wecom-core`(字节截断、超时、重试、`errcode` 处理),
 由 `scripts/check-wecom-drift.mjs` 锁住逐字节一致。差异只允许出现在外层
 (消息排版、webhook 读取、返回形状,清单见 §9)。消息类型、文案与频率的表见
 [notification-convention.md](notification-convention.md)。

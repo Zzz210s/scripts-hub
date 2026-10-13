@@ -136,7 +136,7 @@ node src/cli.js report --dry   # 把当天最后一条结果重渲染出来
 有账号取不到 `tbs` 或关注列表时 `check` 退出码为 1,部署侧可以据此做巡检。
 `run --dry` 与 `TIEBA_DRY_RUN=1` 都不联网、不写状态;仍会读 `.env` 与 `data/state.json`。
 
-在仓库根,`node scripts/check-wecom-drift.mjs` 校验通知核心与另外四份逐字节一致。
+在仓库根,`node scripts/check-wecom-drift.mjs` 校验通知核心与另外五份逐字节一致。
 
 ## 日志与状态
 

@@ -27,7 +27,8 @@ const GROUPS = [
             'proj-weread-signin/src/notify.js',
             'proj-epic-free-games/src/notify.js',
             'proj-bilibili-tasks/src/notify.js',
-            'proj-baidu-tieba/src/notify.js'
+            'proj-baidu-tieba/src/notify.js',
+            'proj-netease-cloud/src/notify.js'
         ]
     },
     {

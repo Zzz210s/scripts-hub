@@ -7,7 +7,7 @@
 //
 // 为什么放在 scripts/windows/:同伴互查的口径固定是「读同伴的锁文件,再调同伴自己的
 // <项目根>/scripts/windows/run-state.js lock-status」(见 src/guards.js 的 peerBusy),
-// 仓库里五个程序共用这一条路径。本文件与平台无关,在 Linux 容器里照样能跑 ——
+// 仓库里各程序共用这一条路径。本文件与平台无关,在 Linux 容器里照样能跑 ——
 // 目录名是历史约定,不代表它只在 Windows 上用,别按它改名。
 //
 // 判定口径必须是 src/lock.js 的 lockState。三条结论各管一段:

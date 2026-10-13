@@ -115,7 +115,7 @@ node src/cli.js cookies        # account ids only, never the cookie value
 
 From the repository root: `bash scripts/setup-bilibili-tasks.sh` runs the offline self-check, and
 `node scripts/check-wecom-drift.mjs` verifies the notification core is byte-identical to the other
-four copies.
+five copies.
 
 ## Diagnostics
 

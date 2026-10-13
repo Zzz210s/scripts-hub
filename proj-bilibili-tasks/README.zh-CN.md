@@ -104,7 +104,7 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 ```
 
 在仓库根还有:`bash scripts/setup-bilibili-tasks.sh` 跑离线自检;
-`node scripts/check-wecom-drift.mjs` 校验通知核心与另外四份逐字节一致。
+`node scripts/check-wecom-drift.mjs` 校验通知核心与另外五份逐字节一致。
 
 ## 诊断日志
 

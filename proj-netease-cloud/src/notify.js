@@ -1,0 +1,143 @@
+// 企业微信群机器人推送:发送核心由 scripts/gen-wecom-core.mjs 从单一源注入,块内不要手改。
+// 规则见 docs/wecom-rules.md;要改共享行为先改 scripts/lib/wecom-core.js 再重新注入,
+// 最后跑 node scripts/gen-wecom-core.mjs --check 与 node scripts/check-wecom-drift.mjs。
+import fs from 'node:fs'
+
+// >>> wecom-core begin —— 企业微信发送实现的共同核心,改一处必须同步其余各处
+// 本块由生成器从单一源注入到各实现的发送层,逐字节一致,由漂移检测脚本校验;
+// 共享规则见 docs/wecom-rules.md。不写具体实现名,免得新增实现后这行先过期。
+const WECOM_TEXT_MAX_BYTES = 2048
+const WECOM_MARKDOWN_MAX_BYTES = 4096
+const WECOM_TIMEOUT_MS = 10000
+// 只有限流(45009)值得退避重试;其余 errcode 是服务端拒绝,重试没有意义。
+const WECOM_RETRYABLE_ERRCODES = new Set([45009])
+
+/** 企业微信返回的 errcode 错误;errcode 供调用方区分限流与配置类失败。 */
+class WecomError extends Error {
+    constructor(message, errcode) {
+        super(message)
+        this.name = 'WecomError'
+        this.errcode = errcode
+    }
+}
+
+/** 掩码 webhook key:重试回调、日志与错误信息都不许出现密钥原文。 */
+function maskWecomKey(text) {
+    return String(text).replace(/(key=)[A-Za-z0-9-]{6,}/g, '$1****')
+}
+
+/** 重试回调只该看到掩码后的信息(错误原文可能带密钥),errcode 原样保留给调用方。 */
+function maskWecomError(error) {
+    const masked = new Error(maskWecomKey(error?.message ?? error))
+    masked.name = error?.name ?? 'Error'
+    if (error?.errcode !== undefined) masked.errcode = error.errcode
+    return masked
+}
+
+/** 按 UTF-8 字节截断,多字节字符不会被截半;超长时以 ... 结尾。 */
+function clampText(content, maxBytes = WECOM_TEXT_MAX_BYTES) {
+    const buffer = Buffer.from(content, 'utf8')
+    if (buffer.byteLength <= maxBytes) return content
+    // 截断点可能落在多字节字符中间,toString 会用 U+FFFD 占位;去掉末尾占位符才不超上限
+    const head = buffer.subarray(0, Math.max(0, maxBytes - 3)).toString('utf8').replace(/\uFFFD+$/, '')
+    return `${head}...`
+}
+
+async function postOnce(url, body, fetchImpl, timeoutMs) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+    try {
+        const res = await fetchImpl(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal
+        })
+        const raw = await res.text()
+
+        let parsed = null
+        try {
+            parsed = JSON.parse(raw)
+        } catch {
+            parsed = null
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${raw.slice(0, 120)}`)
+        // 成功 = HTTP 200 且 errcode 为 0;网关塞回 HTML 或 JSON 里缺 errcode 都算失败。
+        if (parsed === null) throw new Error(`响应不是 JSON:${raw.slice(0, 120)}`)
+        if (parsed.errcode !== 0) {
+            const code = parsed.errcode === undefined ? '缺失' : parsed.errcode
+            throw new WecomError(`企业微信返回 errcode=${code} errmsg=${parsed.errmsg ?? ''}`, parsed.errcode)
+        }
+        return parsed
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+/** 截断 + 组包 + 发送:网络失败与限流按指数退避重试,其余 errcode 拒绝立即失败。 */
+async function postWecom({ url, text, msgtype = 'text', retries = 2, timeoutMs = WECOM_TIMEOUT_MS, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), onRetry }) {
+    const maxBytes = msgtype === 'markdown' ? WECOM_MARKDOWN_MAX_BYTES : WECOM_TEXT_MAX_BYTES
+    const content = clampText(text, maxBytes)
+    const body = msgtype === 'markdown'
+        ? { msgtype: 'markdown', markdown: { content } }
+        : { msgtype: 'text', text: { content } }
+
+    let lastError
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            return await postOnce(url, body, fetchImpl, timeoutMs)
+        } catch (error) {
+            lastError = error
+            if ((error instanceof WecomError && !WECOM_RETRYABLE_ERRCODES.has(error.errcode)) || attempt === retries) break
+            onRetry?.(maskWecomError(error), attempt + 1)
+            await sleep(1000 * 2 ** attempt)
+        }
+    }
+    throw lastError
+}
+// <<< wecom-core end
+
+/** 掩码 webhook key 一类密钥:任何日志与错误信息里都不许出现原文。 */
+export function maskSecret(text) {
+  return String(text)
+    .replace(/(key=)[A-Za-z0-9-]{6,}/g, '$1****')
+    .replace(/(EG_PASSWORD=)[^\s'"]+/gi, '$1****')
+    .replace(/(password["']?\s*[:=]\s*["']?)[^"'\s]+/gi, '$1****')
+}
+
+/** 按 UTF-8 字节截断,默认 text 上限 2048;多字节字符不会被截半。 */
+export const truncateText = (text, limitBytes = 2048) => clampText(text, limitBytes)
+
+/** 读 webhook 文件;缺失、路径是目录或读不动一律返回空串,视为未配置。值只走文件,不进命令行与日志。 */
+export function loadWebhook(file) {
+  if (!file || !fs.existsSync(file)) return ''
+  try {
+    return fs.readFileSync(file, 'utf8').trim()
+  } catch {
+    return ''
+  }
+}
+
+/** 发一条文本;失败一律返回 { ok:false, error },不抛穿,由调用方决定怎么记。 */
+export async function sendWecom(text, options = {}) {
+  const webhook = options.webhook ?? loadWebhook(options.webhookFile)
+  if (options.dryRun) return { ok: true, note: 'dry-run 未发送' }
+  if (!webhook) return { ok: false, error: '未配置企业微信 webhook' }
+  try {
+    await postWecom({
+      url: webhook,
+      text: maskSecret(text),
+      fetchImpl: options.fetchImpl,
+      sleep: options.sleep,
+      retries: options.retries,
+      timeoutMs: options.timeoutMs,
+      onRetry: options.onRetry,
+    })
+    return { ok: true }
+  } catch (error) {
+    // 网络层错误可能把带 key 的 URL 带进 message,回传前再掩一次。
+    return { ok: false, error: maskSecret(error?.message ?? String(error)), errcode: error?.errcode }
+  }
+}
