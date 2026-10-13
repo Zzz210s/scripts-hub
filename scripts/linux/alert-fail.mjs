@@ -20,6 +20,7 @@ const webhookFiles = {
     'Epic 限免': '/srv/apps/automation/epic/secrets/wecom-webhook.txt',
     'B站任务': '/srv/apps/automation/bilibili/secrets/wecom-webhook.txt',
     百度贴吧: '/srv/apps/automation/tieba/secrets/wecom-webhook.txt',
+    网易云: '/srv/apps/automation/netease/secrets/wecom-webhook.txt',
     服务器: '/srv/apps/automation/secrets/wecom-server.txt'
 }
 // NOTIFY_WEBHOOK_URL 既可以是 URL 也可以是文件路径(本机自测/演练用,不碰真实群)。

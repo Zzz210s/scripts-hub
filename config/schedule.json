@@ -6,7 +6,8 @@
     "weread-signin",
     "epic-free-games",
     "bilibili-tasks",
-    "baidu-tieba"
+    "baidu-tieba",
+    "netease-cloud"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -83,6 +84,19 @@
     },
     "baidu-tieba": {
       "taskName": "TiebaSignIn",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 2,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": false,
+      "actionVbs": ""
+    },
+    "netease-cloud": {
+      "taskName": "NeteaseCloudSignIn",
       "startTime": "auto",
       "intervalMinutes": 120,
       "windowHours": 14,

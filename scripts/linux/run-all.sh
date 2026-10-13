@@ -20,8 +20,8 @@ note() { echo "[$(date -Is)] $*" >> "$LOG"; }
 # 真源是仓库的 config/schedule.json(linuxEnabled,缺省回落 enabled)。服务器上按顺序找:
 # SUITE_SCHEDULE 显式指定 -> 部署根下的副本 -> 套件机器上的仓库克隆 -> 仓库相对路径。
 # 只认闸门退出码:0 启用 · 1 明确关闭 · >=2 读不到(文件不存在、坏 JSON、取值非布尔)。
-# 配置读不到时 **fail-closed**:退回下面这份固定四程序清单,百度贴吧不跑,并记一条告警 ——
-# 一次坏 JSON 既不能让五个程序被静默跳过,也不能把还没真机验证的贴吧带跑。
+# 配置读不到时 **fail-closed**:退回下面这份固定四程序清单,百度贴吧与网易云不跑,并记一条告警 ——
+# 一次坏 JSON 既不能让程序被静默跳过,也不能把还没真机验证的两个带跑。
 FALLBACK_PROGRAMS="microsoft-rewards weread-signin epic-free-games bilibili-tasks"
 SCHEDULE=""
 [ -n "${SUITE_SCHEDULE:-}" ] && [ -f "$SUITE_SCHEDULE" ] && SCHEDULE="$SUITE_SCHEDULE"
@@ -64,8 +64,8 @@ fi
 if [ "$GATE_MODE" = "ok" ]; then
     note "=== 编排开始(schedule.json=$SCHEDULE;按 order 串行)==="
 else
-    note "[警告] 调度闸门不可用,退回固定四程序清单,百度贴吧不跑:$GATE_ERROR"
-    note "=== 编排开始(闸门失效:微软积分、微信读书、Epic 限免、B站任务照跑;百度贴吧不跑)==="
+    note "[警告] 调度闸门不可用,退回固定四程序清单,百度贴吧与网易云不跑:$GATE_ERROR"
+    note "=== 编排开始(闸门失效:微软积分、微信读书、Epic 限免、B站任务照跑;百度贴吧与网易云不跑)==="
 fi
 
 if enabled_in_schedule microsoft-rewards; then
@@ -117,8 +117,21 @@ else
     fi
 fi
 
+if enabled_in_schedule netease-cloud; then
+    "$SUITE_DIR/netease/run.sh" 7>&-
+    RC_NETEASE=$?
+    note "网易云退出码 $RC_NETEASE"
+else
+    RC_NETEASE=0
+    if [ "$GATE_MODE" = "ok" ]; then
+        note "网易云已关闭(schedule.json),跳过"
+    else
+        note "网易云不在固定四程序清单里,跳过"
+    fi
+fi
+
 note "=== 编排结束 ==="
-if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ]; then
+if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ]; then
     exit 0
 fi
 exit 1
