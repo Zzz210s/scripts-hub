@@ -4,7 +4,7 @@
   "private": true,
   "description": "Minimal self-hosted NetEase Cloud Music check-in for multiple accounts, read-only plus VIP sign-in, with WeCom notifications.",
   "type": "module",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "author": "Zzz210s",
   "repository": {
     "type": "git",
