@@ -6,11 +6,12 @@
 // 路径只从 crypto.js 的 PATHS 取;待 T3 探针校正的字段见报告与 NOTICE。
 import { call } from './client.js'
 import { PATHS } from './crypto.js'
+import { SIGN_FIELDS } from './fields.js'
 import { pace } from './pacing.js'
 
-// 候选字段名来自调研文档对 api-enhanced 的读取(module/yunbei.js、yunbei_today.js、
-// yunbei_info.js),尚未带凭据实测 —— T3 探针跑通后收敛成实测字段。
-const SIGN_FIELDS = ['sign', 'signed', 'signedToday', 'todaySigned', 'hasSigned']
+// 签到状态的候选字段名与 VIP 乐签共用 src/fields.js(真源只有一份);余额候选来自
+// api-enhanced 的 module/yunbei.js、yunbei_today.js、yunbei_info.js 读取,
+// 尚未带凭据实测 —— T3 探针跑通后收敛成实测字段。
 const BALANCE_FIELDS = ['yunbeiNum', 'balance', 'point', 'yunbei', 'total', 'amount', 'accountBalance']
 
 const dataOf = (payload) => {

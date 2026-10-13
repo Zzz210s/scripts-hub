@@ -6,11 +6,11 @@
 // 路径只从 crypto.js 的 PATHS 取,不在这里另写一份。
 import { call } from './client.js'
 import { PATHS } from './crypto.js'
+import { SIGN_FIELDS } from './fields.js'
 import { pace } from './pacing.js'
 
-// 读回判定的候选字段路径。名字来自调研文档对 api-enhanced 的读取(data.sign,见 issue #197/#234),
-// 尚未带凭据实测 —— T3 探针跑通后收敛成实测字段,并同步 vip-checkin-ok.json 夹具。
-const SIGN_FIELDS = ['sign', 'signed', 'signedToday', 'todaySigned', 'hasSigned']
+// 读回判定的候选字段路径与云贝查询共用 src/fields.js 的一份真源;`sign` 是否等于
+// 「今日已签」的待确认假设与 T3 待校正项也写在那个文件顶部。
 
 /**
  * 纯函数:从一条响应体里读「是否已签」。只认明确布尔或 1/0;

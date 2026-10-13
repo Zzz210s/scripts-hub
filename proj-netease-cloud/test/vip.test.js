@@ -1,6 +1,8 @@
 // T4:VIP 乐签两条请求 + 读回判定的离线单测。fetchImpl 全是桩,没有真实网络请求。
 // 夹具 test/fixtures/vip-*.json 目前是「按调研文档推断的形状」的脱敏占位样本
 // (字段名来自 api-enhanced issue #197/#234 的 data.sign),待 T3 探针跑通后用真实响应替换。
+// vip-sign-ok.json 是「签到动作」的响应:此时仍为未签(sign:false),真正的「已签」由读回段证明 ——
+// 旧夹具在这里写成 sign:true 与「签到前未签」自相矛盾,已按语义改顺。
 // 待 T3 校正的字段清单见 .superpowers/.../task-4-6-report.md 与 NOTICE。
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -51,7 +53,7 @@ test('两条请求都成功且业务字段显示已签:businessOk=true、step=do
   assert.equal(result.ok, true)
   assert.equal(result.step, 'done')
   assert.equal(result.businessOk, true)
-  assert.equal(result.before, true)
+  assert.equal(result.before, false)
   assert.equal(result.after, true)
   assert.equal(calls.length, 2)
   assert.equal(calls[0].url, `https://music.163.com${PATHS.vipSign}`)
@@ -76,7 +78,7 @@ test('HTTP 200 但业务字段显示未签:businessOk=false、不重试、不算
   assert.equal(result.businessOk, false)
   assert.equal(result.ok, false)
   assert.equal(result.step, 'checkin')
-  assert.equal(result.before, true)
+  assert.equal(result.before, false)
   assert.equal(result.after, false)
   // 读回发过,但没有第三次请求(设计文档:失败就是失败,不做接口级重试)。
   assert.equal(calls.length, 2)
@@ -114,6 +116,15 @@ test('凭据失效:不再发读回,只发一次请求', async () => {
   assert.equal(result.step, 'sign')
   assert.equal(result.businessOk, null)
   assert.equal(result.raw.checkin, undefined)
+})
+
+test('风控/鉴权码 447:不再发读回,只发一次请求(回归:与 AUTH_CODES 同源)', async () => {
+  const { calls, fetchImpl, sleep } = scripted([{ body: { code: 447 } }])
+  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+  assert.equal(calls.length, 1)
+  assert.equal(result.step, 'sign')
+  assert.equal(result.businessOk, null)
+  assert.equal(result.raw.sign.reason, 'auth')
 })
 
 test('签到请求业务失败但读回显示已签:判为已签过,ok=true', async () => {

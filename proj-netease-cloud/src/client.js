@@ -5,15 +5,15 @@
 //
 // 失败一律附机器可读的 reason(与 ok/code 正交),取值:
 //   'ok'         传输与协议都成功(code 200,或响应没有 code 字段)
-//   'auth'       服务器明确说凭据失效(code 301/302/8810/-462/-460);换 cookie 才能解决
+//   'auth'       服务器要求重新登录/凭据失效(code 301/302/8810/-462/-460/447,见 AUTH_CODES)
 //   'http'       非 2xx,或业务 code 非 200 且不属于凭据问题
 //   'network'    连接失败或超时(可重试)
 //   'parse'      响应不是 JSON,或 URL 不合法
 //   'no-cookie'  cookie 里没有 MUSIC_U 或值为空,连请求都没发
 //
 // 契约钉死:本项目 reason 只有以上 6 个取值,调用方只在这个集合上分支,不要再猜。
-// 风控类拒绝(如 code 447)目前归 'http' 并靠 code 区分;若 T6 的风控矩阵确需独立类别,
-// 先在 T6 里把 'rejected' 加进这里并同步 client.test.js,不要在调用方凭空新增取值。
+// AUTH_CODES 是全项目唯一一份凭据类码表:verify.js 的分类矩阵直接复用它,新增码只改这里。
+// 447 是「需重新登录/风控」态,归 auth —— 归 http 会让调用方继续发后续请求(评审已抓到)。
 // 只发 MUSIC_U(cookie 值原样透传);不伪造设备指纹、不复用反作弊 token。
 // eapi 的设备字段 os/deviceId/osver/appver/versioncode 当前一个都没发,已列入 NOTICE 的
 // T3 待校正清单 —— 探针实测若要求,由 T6 在表头或表单里补,不在本层猜。
@@ -24,6 +24,9 @@
 import { eapiParams, weapiParams } from './crypto.js'
 
 const DEFAULT_TIMEOUT_MS = 10000
+// 退避下限属传输层策略;本项目「同账号间隔 >=3 秒」的下限由 pacing.js 拥有,更宽。
+// 调用方默认保持 retries=0(本项目全是单次请求);确要开启重试时,退避应与 pacing 的
+// 3000ms 对齐后再决定是否放行,1500ms 单独看低于本项目下限。
 const DEFAULT_RETRY_DELAY_MS = 1500
 const FORM = 'application/x-www-form-urlencoded'
 
@@ -44,8 +47,8 @@ export const HOSTS = Object.freeze({
   none: 'https://music.163.com',
 })
 
-/** 表示「凭据失效」的业务 code;其余非 200 一律按接口失败处理。 */
-const AUTH_CODES = Object.freeze([301, 302, 8810, -462, -460])
+/** 凭据类业务 code(含需重新登录的 447);全项目唯一真源,verify.js 复用这一份。 */
+export const AUTH_CODES = Object.freeze([301, 302, 8810, -462, -460, 447])
 
 /** 从 cookie 串里取一个字段;取不到或值为空都返回 null(空 MUSIC_U 不算凭据)。 */
 export function cookieValue(cookie, name) {

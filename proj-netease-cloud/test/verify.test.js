@@ -4,6 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  AUTH_CODES,
   BASELINE_KEYS,
   assessGrowth,
   businessAction,
@@ -12,6 +13,7 @@ import {
   deltaFromBaseline,
   nextAction,
 } from '../src/verify.js'
+import { AUTH_CODES as CLIENT_AUTH_CODES } from '../src/client.js'
 
 test('处理矩阵 · 登录失效类(301/302/8810/-462/-460/447/401/403 + client reason)→ auth', () => {
   for (const code of [301, 302, 8810, -462, -460, 447]) {
@@ -66,6 +68,16 @@ test('nextAction · 网络异常只重试一次,之后放弃', () => {
 test('nextAction · 结构变了直接失败;ok 不需要动作', () => {
   assert.equal(nextAction('shape', 0), 'fail')
   assert.equal(nextAction('ok', 0), null)
+})
+
+test('nextAction · 未识别的 kind 一律 fail,不静默当成功', () => {
+  assert.equal(nextAction('bogus', 0), 'fail')
+  assert.equal(nextAction(undefined, 0), 'fail')
+})
+
+test('AUTH_CODES 只有一份真源:verify 复用的就是 client 的同一数组', () => {
+  assert.equal(AUTH_CODES, CLIENT_AUTH_CODES)
+  assert.ok(AUTH_CODES.includes(447))
 })
 
 test('处理矩阵 · HTTP 200 但业务未成功:判失败且不重试', () => {

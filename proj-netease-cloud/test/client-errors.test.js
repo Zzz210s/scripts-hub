@@ -61,12 +61,12 @@ test('业务 code 301 归一为 reason=auth,并带出 code', async () => {
   assert.match(result.error, /301/)
 })
 
-test('业务 code 447/500 归一为 reason=http', async () => {
-  for (const code of [447, 500]) {
+test('业务 code 447 归一为 reason=auth(风控/鉴权态),500 归一为 reason=http', async () => {
+  for (const [code, reason] of [[447, 'auth'], [500, 'http']]) {
     const { fetchImpl } = stub(json({ code }))
     const result = await run({ fetchImpl })
     assert.equal(result.ok, false)
-    assert.equal(result.reason, 'http')
+    assert.equal(result.reason, reason)
     assert.equal(result.code, code)
   }
 })

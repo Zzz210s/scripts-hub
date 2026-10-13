@@ -4,8 +4,13 @@
 //   网络异常 / 超时                                 → network    → 退避后重试一次,仅一次
 //   HTTP 200 但业务字段未成功                        → businessAction → 判失败、不重试
 //   接口返回结构变了                                 → shape      → 记录原始响应、推 action
+import { AUTH_CODES } from './client.js'
+
+// 凭据类码表全项目只有一份真源:client.js 的 AUTH_CODES(它按响应 code 归一 reason)。
+// 这里只复用不另存 —— 曾经两份并漂移(447 只在本地),导致 447 时 signVip 多打一条请求。
+export { AUTH_CODES }
+
 // 纯函数:无 IO、无网络、不抛。判定只依据传入的描述对象。
-export const AUTH_CODES = Object.freeze([301, 302, 8810, -462, -460, 447])
 export const RATE_LIMIT_PATTERN = /过于频繁|限流|频繁|rate.?limit|too many/i
 export const AUTH_PATTERN = /未登录|凭据|登录失效|鉴权|失效/i
 export const NETWORK_PATTERN = /超时|网络|timeout|abort|ECONN|ENOTFOUND|EAI_AGAIN|fetch failed|socket/i
@@ -39,12 +44,13 @@ export function classifyError(signal = {}) {
 /**
  * 纯函数:给定分类与已重试次数,返回下一步动作。
  * 返回 'retry-once' | 'circuit-break-and-notify' | 'fail';'ok' 不需要动作,返回 null。
+ * 未识别的 kind(新增类别或拼写错误)一律 'fail' —— default 不能是 null,否则静默当成功。
  */
 export function nextAction(kind, attempt = 0) {
+  if (kind === 'ok') return null
   if (kind === 'auth' || kind === 'rate-limit') return 'circuit-break-and-notify'
   if (kind === 'network') return attempt >= 1 ? 'fail' : 'retry-once'
-  if (kind === 'shape') return 'fail'
-  return null
+  return 'fail'
 }
 
 /**
