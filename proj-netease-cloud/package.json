@@ -1,0 +1,20 @@
+{
+  "name": "netease-cloud-signin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal self-hosted NetEase Cloud Music check-in for multiple accounts, read-only plus VIP sign-in, with WeCom notifications.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Zzz210s",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zzz210s/scripts-hub.git",
+    "directory": "proj-netease-cloud"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

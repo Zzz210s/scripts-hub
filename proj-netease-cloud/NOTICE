@@ -1,0 +1,37 @@
+# 来源与许可
+
+本目录实现网易云音乐多账号签到,只做读与 VIP 乐签。加密层自研,零运行时依赖。
+
+## 加密算法与常量的出处
+
+| 内容 | 出处 | 许可 |
+| --- | --- | --- |
+| weapi 双层 AES-128-CBC + RSA 原文加密,eapi AES-128-ECB + MD5 摘要 | NeteaseCloudMusicApiEnhanced/api-enhanced 的 `util/crypto.js` | MIT |
+| 常量 weapi presetKey `0CoJUm6Qyw8W8jud`、iv `0102030405060708`、eapi 的 AES 密钥 `e82ckenh8dichen8`(代码里导出为 `CRYPTO.eapiAesKey`)、eapi 分隔符 `-36cd479b6b5-` | 同上 | MIT |
+| 1024 位 RSA 公钥(PEM 形式,公开常量) | 同上 | MIT |
+| 接口路径与各自的加密层归属 | 本机调研文档 `2026-10-11-网易云接口加密层核实.md`,来源是源码读取,未带凭据实测 | 本项目文档 |
+
+核对基线:api-enhanced master `90de6414`(2026-10-05)。
+
+我们没有引入、复制或修改该库的代码;`src/crypto.js` 是按上述公开算法用 Node 内置
+`node:crypto` 重写的实现。全部常量与路径集中在该文件的 `CRYPTO` 与 `PATHS` 导出里。
+
+## 固定样例向量的生成方式
+
+`test/crypto.test.js` 的固定向量由参考实现(crypto-js 4.2.0 + node-forge 1.3.1)
+以固定 secretKey 生成,并用 OpenSSL 3.5.5 独立复核过同一算法:AES-CBC 双层链、
+AES-ECB + MD5、以及 RSA 原文加密。复核只用假数据与公开公钥,不含任何真实凭据。
+
+## 待 T3 探针实测校正
+
+常量已集中,校正时只改 `src/crypto.js` 一处:
+
+- RSA 公钥与 `-36cd479b6b5-` 分隔符是否仍是服务端当前使用的那一组;
+- weapi 的预设密钥与双层顺序、eapi 摘要串格式;
+- `PATHS` 里每条路径的加密层前缀 `/weapi` 或 `/eapi`,以及是否需要 query 形态;
+- weapi 是否还要求 `csrf_token` / `e_r` 一类附加表单字段,由 T2 拼装。
+
+## 风险声明
+
+网易云音乐官方条款禁止第三方客户端与逆向。本目录只做读与签到,不实现任何写操作。
+风险与降风险约束见设计文档,使用后果自负。代码授权以仓库根 LICENSE 为准。
