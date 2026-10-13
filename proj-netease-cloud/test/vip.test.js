@@ -127,6 +127,27 @@ test('风控/鉴权码 447:不再发读回,只发一次请求(回归:与 AUTH_CO
   assert.equal(result.raw.sign.reason, 'auth')
 })
 
+test('业务 code 429 限流:不再发读回,只发一次请求(回归:限流不重试)', async () => {
+  // scripted 只有一条回复:若还发第二条,它会回空对象 —— calls 断言把它抓住。
+  const { calls, fetchImpl, sleep } = scripted([{ body: { code: 429 } }])
+  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+  assert.equal(calls.length, 1)
+  assert.equal(result.step, 'sign')
+  assert.equal(result.businessOk, null)
+  assert.equal(result.raw.checkin, undefined)
+  assert.equal(result.raw.sign.code, 429)
+  assert.equal(result.raw.sign.reason, 'http')
+})
+
+test('HTTP 429 限流:同样不发读回(回归:httpStatus 必须传进分类矩阵)', async () => {
+  const { calls, fetchImpl, sleep } = scripted([{ status: 429, body: { code: 429 } }])
+  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+  assert.equal(calls.length, 1)
+  assert.equal(result.step, 'sign')
+  assert.equal(result.businessOk, null)
+  assert.equal(result.raw.sign.httpStatus, 429)
+})
+
 test('签到请求业务失败但读回显示已签:判为已签过,ok=true', async () => {
   const { calls, fetchImpl, sleep } = scripted([
     { body: { code: 250, msg: 'SAMPLE_ALREADY_SIGNED' } },

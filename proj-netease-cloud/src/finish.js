@@ -22,9 +22,10 @@ const failedReason = (outcomes) => outcomes.find((one) => one.reason && one.reas
  */
 export async function finishRun({ config, state, outcomes, date, day, now, deliver, log, deliveries, messages, deps }) {
   // 成长基线:首次运行采一次,之后只用「相对基线变化」,没有基线就不写这一行。
+  // 读不到余额时**不落基线** —— 写一个 {yunbei:null} 会让这一行永远消失,以后也再采不到。
   const previous = state.baseline
   const balance = numOrNull(outcomes.find((one) => one.yunbei?.ok === true)?.yunbei?.balance)
-  if (!state.baseline) state.baseline = day0Baseline(state, { yunbei: balance, growthPoint: null })
+  if (!state.baseline && balance !== null) state.baseline = day0Baseline(state, { yunbei: balance, growthPoint: null })
 
   const ok = overallOk(outcomes)
   const exitCode = ok ? 0 : 1

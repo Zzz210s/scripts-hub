@@ -8,6 +8,7 @@ import { call } from './client.js'
 import { PATHS } from './crypto.js'
 import { SIGN_FIELDS } from './fields.js'
 import { pace } from './pacing.js'
+import { classifyError } from './verify.js'
 
 // 读回判定的候选字段路径与云贝查询共用 src/fields.js 的一份真源;`sign` 是否等于
 // 「今日已签」的待确认假设与 T3 待校正项也写在那个文件顶部。
@@ -36,8 +37,24 @@ export function judgeVipSign(before, after) {
   return typeof after === 'boolean' ? after : null
 }
 
-/** 再读回也没有意义的失败类别:凭据类与网络类(网络类由 client 的重试负责)。 */
-const FATAL_REASONS = new Set(['auth', 'no-cookie', 'network'])
+/** 签到动作失败后不再发读回请求的类别:凭据失效、限流与网络(网络类由 client 的重试负责)。 */
+const FATAL_KINDS = new Set(['auth', 'rate-limit', 'network'])
+
+/**
+ * 纯函数:签到动作失败后还要不要发读回那条请求。
+ * 分类走 verify.js 的唯一矩阵 —— HTTP 429 与业务 code 429 都归 rate-limit;漏传 httpStatus
+ * 会把 HTTP 429 误判成 shape,白白多发一条读回请求(评审已抓到)。
+ */
+const stopAfterSign = (result) =>
+  result.ok === false &&
+  FATAL_KINDS.has(
+    classifyError({
+      reason: result.reason,
+      code: result.code,
+      httpStatus: result.httpStatus,
+      error: result.error,
+    }),
+  )
 
 /**
  * VIP 乐签。返回 { ok, step, businessOk, before, after, raw },永不抛。
@@ -50,7 +67,7 @@ const FATAL_REASONS = new Set(['auth', 'no-cookie', 'network'])
 export async function signVip({ cookie, deps } = {}) {
   const sign = await call({ url: PATHS.vipSign, crypto: 'weapi', data: {}, cookie, deps })
   const before = readSignState(sign.body)
-  if (!sign.ok && FATAL_REASONS.has(sign.reason)) {
+  if (stopAfterSign(sign)) {
     return { ok: false, step: 'sign', businessOk: null, before, after: null, raw: { sign } }
   }
   await pace(deps)

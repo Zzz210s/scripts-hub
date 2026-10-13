@@ -129,3 +129,41 @@ test('守卫跳过:退出码 0,不取锁不联网;静默原因不推消息', asy
   assert.equal(sent.length, 0) // peer-running 属静默跳过
   assert.equal(fs.existsSync(stateFile(config.stateDir)), false)
 })
+
+test('签到阶段 HTTP 429:当天熔断为 rate-limit,不写「结构不符」', async () => {
+  const root = tempDir()
+  const config = configFor(root)
+  const { calls, fetchImpl } = stubFetch({
+    ...okYunbei(),
+    [PATHS.vipSign]: { status: 429, body: { code: 429 } },
+  })
+  const { deps, sent } = harness({ fetchImpl, root, config })
+
+  const result = await runOnce({ cwd: root, now: NOW, deps })
+
+  assert.equal(result.exitCode, 1)
+  assert.equal(countOf(calls, PATHS.vipSign), 1) // 限流不重试
+  assert.equal(countOf(calls, PATHS.vipCheckinDetail), 0) // 也不发读回那条 eapi
+  assert.equal(readStateFile(config).days[DAY].circuitKind, 'rate-limit') // 当天熔断
+  const text = sent.join('\n')
+  assert.equal(text.includes('结构不符'), false)
+  assert.equal(text.includes('429'), true)
+})
+
+test('首次运行读不到云贝余额:不落基线,下次还能再采', async () => {
+  const root = tempDir()
+  const config = configFor(root)
+  const { fetchImpl } = stubFetch({
+    [PATHS.yunbeiSignedGet]: { body: { code: 200, data: { sign: true } } },
+    [PATHS.yunbeiTodayGet]: { body: { code: 200, data: {} } },
+    [PATHS.vipSign]: { body: { code: 200, data: { sign: true } } },
+    [PATHS.vipCheckinDetail]: { body: { code: 200, data: { sign: true } } },
+  })
+  const { deps } = harness({ fetchImpl, root, config })
+
+  const result = await runOnce({ cwd: root, now: NOW, deps })
+
+  assert.equal(result.ok, true)
+  // 落一个 {yunbei:null} 会让「相对基线」永远消失;没有数字就什么都不写。
+  assert.equal(readStateFile(config).baseline, null)
+})

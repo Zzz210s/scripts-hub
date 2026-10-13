@@ -123,14 +123,17 @@ function assemble(head, body, foot) {
   const footReserve = Math.min(byteLength(footText), LIMIT_BYTES - 64)
   head = clipHead(head, LIMIT_BYTES - 2 - footReserve)
   if (byteLength(join(head, [...body, ...foot])) <= LIMIT_BYTES) return join(head, [...body, ...foot])
+  // 省略标记的文案只在 omitLine 一处生成:循环内预估与循环外实写不会漂移。
+  const omitLine = (count) => `...已省略 ${count} 行`
   const kept = []
   for (const line of body) {
-    const marker = `...已省略 ${body.length - kept.length - 1} 行`
+    // 试算「收下这一行后还要省略几行」:此刻 kept 还没 push,故比实写时多减 1。
+    const marker = omitLine(body.length - kept.length - 1)
     if (byteLength(join(head, [...kept, line, marker, ...foot])) > LIMIT_BYTES) break
     kept.push(line)
   }
   const dropped = body.length - kept.length
-  const lines = dropped > 0 ? [...kept, `...已省略 ${dropped} 行`] : kept
+  const lines = dropped > 0 ? [...kept, omitLine(dropped)] : kept
   lines.push(...foot)
   const out = join(head, lines)
   if (byteLength(out) <= LIMIT_BYTES) return out

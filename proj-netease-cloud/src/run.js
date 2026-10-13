@@ -8,17 +8,8 @@ import { finishRun } from './finish.js'
 import { checkLocalGuards, checkOnlineGuards } from './guards.js'
 import { acquireLock, releaseLock } from './lock.js'
 import { buildResult, buildSkip, buildStart } from './messages.js'
-import {
-  kindOfVip,
-  makeDeliver,
-  onlineSkipReason,
-  peerOf,
-  probeAll,
-  routeSkip,
-  signAll,
-  view,
-  warnFailedDeliveries,
-} from './run-support.js'
+import { kindOfVip, onlineSkipReason, probeAll, signAll } from './run-accounts.js'
+import { makeDeliver, peerOf, routeSkip, view, warnFailedDeliveries } from './run-support.js'
 import {
   attemptsOn,
   breakCircuit,
@@ -29,6 +20,12 @@ import {
   writeState,
 } from './state.js'
 
+/**
+ * 跑一次完整流程。deps 全部可注入,便于离线集成测试。
+ * - freeMb: () => number,返回可用内存 MB。**不注入时低内存守卫整段跳过并记一条日志** ——
+ *   不是「内存充足」,是「测不到」;不把它当 Infinity 静默放行。
+ * - fetchImpl / send / sleep / peerRunning / acquireLock / releaseLock / config 等见调用点。
+ */
 export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = false, deps = {} } = {}) {
   const log = deps.log ?? (() => {})
   const config = deps.config ?? loadConfig(cwd, { env: deps.env, fsImpl: deps.fsImpl })
@@ -81,6 +78,9 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
 
   // 1. 本地守卫:不联网、秒级返回。dry 也走这一段,因为它决定会推送什么。
   const peer = peerOf(runDeps, config, now)
+  // 内存探测没注入就显式跳过该守卫并记一条日志,不让「没注入」看起来像「内存充足」。
+  const freeMb = typeof deps.freeMb === 'function' ? deps.freeMb() : null
+  if (freeMb === null) log('[警告] 未注入内存探测,低内存守卫已跳过')
   const local = checkLocalGuards({
     now,
     paused: state.paused === true,
@@ -90,7 +90,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
     maxAttempts: config.maxAttempts,
     peerRunning: peer.busy === true,
     peerDetail: peer.detail ?? '',
-    freeMb: typeof deps.freeMb === 'function' ? deps.freeMb() : Infinity,
+    freeMb: freeMb ?? Infinity,
     limits: {
       quietStart: config.quietStart,
       quietEnd: config.quietEnd,

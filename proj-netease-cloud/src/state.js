@@ -98,7 +98,6 @@ export const isDayDone = doneToday
 
 /** 当天是否已熔断(鉴权/限流)。跨天自动失效。 */
 export const isCircuitBroken = (state, day = logicalDay()) => dayRecord(state, day)?.circuitBroken === true
-export const circuitKindOn = (state, day = logicalDay()) => dayRecord(state, day)?.circuitKind ?? null
 
 const entryFor = (state, day) => (state.days[day] ??= newDayEntry())
 

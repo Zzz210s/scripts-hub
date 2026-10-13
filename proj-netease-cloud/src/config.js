@@ -3,6 +3,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { DEFAULT_LIMITS } from './guards.js'
+
 export const DEFAULTS = {
   // 设计硬约束:请求间隔 >=3 秒(单账号串行、每日一次)。
   requestIntervalMs: 3000,
@@ -12,13 +14,11 @@ export const DEFAULTS = {
   // 单实例锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,同伴按这条路径能找到。
   lockDir: 'logs',
   webhookFile: 'secrets/wecom-webhook.txt',
-  // 守卫阈值,与 src/guards.js 的 DEFAULT_LIMITS 同值;放这里是为了能按机器调,守卫本身不读环境。
+  // 守卫阈值不在本文件重抄:直接展开 guards.js 的 DEFAULT_LIMITS —— 只有一份字面量真源,
+  // 改 guards.js 立即生效。放这里是为了能按机器调,守卫本身不读环境。
+  ...DEFAULT_LIMITS,
+  // maxAttempts 不在 DEFAULT_LIMITS 里 —— 它是 checkLocalGuards 的默认参数,同样钉死为 3。
   maxAttempts: 3,
-  quietStart: '20:00',
-  quietEnd: '23:00',
-  shutdownTime: '02:00',
-  shutdownMarginMinutes: 30,
-  minFreeMb: 800,
 }
 
 /** 读 .env 文本成对象:跳过注释与空行,剥掉成对的引号。 */

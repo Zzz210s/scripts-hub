@@ -42,7 +42,8 @@ export function stubFetch(replies) {
     const hit = Object.entries(replies).find(([fragment]) => url.includes(fragment))
     const reply = hit ? hit[1] : {}
     if (reply.throw) throw new Error(reply.throw)
-    return { ok: true, status: 200, text: async () => JSON.stringify(reply.body ?? {}) }
+    const status = reply.status ?? 200
+    return { ok: status < 400, status, text: async () => JSON.stringify(reply.body ?? {}) }
   }
   return { calls, fetchImpl }
 }

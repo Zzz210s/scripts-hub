@@ -128,7 +128,8 @@ async function attemptOnce({ fetchImpl, target, verb, headers, body, timeoutMs }
     pending.catch(() => {})
     const res = await Promise.race([pending, timeout])
     text = await res.text()
-    if (!res.ok) return fail(`HTTP ${res.status} · ${snippet(text)}`, 'http', { raw: text })
+    // 非 2xx 时把状态码一并带出:classifyError 靠它把 HTTP 429 归入限流(只看 error 文案会漏)。
+    if (!res.ok) return fail(`HTTP ${res.status} · ${snippet(text)}`, 'http', { raw: text, httpStatus: res.status })
   } catch (error) {
     const aborted = error?.name === 'TimeoutError' || error?.name === 'AbortError'
     const message = aborted ? '请求超时' : `网络错误 · ${error?.message ?? String(error)}`
@@ -152,7 +153,8 @@ async function attemptOnce({ fetchImpl, target, verb, headers, body, timeoutMs }
 }
 
 /**
- * 调用一个网易云接口。返回 `{ ok, code, body, raw, error, reason }`;永不抛。
+ * 调用一个网易云接口。返回 `{ ok, code, body, raw, error, reason }`;非 2xx 时另有
+ * `httpStatus`(供 classifyError 把 HTTP 429 归入限流)。永不抛。
  * url 可以是完整 URL 或路径(路径按 crypto 补默认主机);crypto 省略时按路径前缀推断。
  * deps = { fetchImpl, timeoutMs, sleep, retries, retryDelayMs };只有 network 失败会退避重试,
  * 重试次数默认 0(单次尝试),sleep 可注入以便离线测试。
