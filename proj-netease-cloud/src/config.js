@@ -12,6 +12,13 @@ export const DEFAULTS = {
   // 单实例锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,同伴按这条路径能找到。
   lockDir: 'logs',
   webhookFile: 'secrets/wecom-webhook.txt',
+  // 守卫阈值,与 src/guards.js 的 DEFAULT_LIMITS 同值;放这里是为了能按机器调,守卫本身不读环境。
+  maxAttempts: 3,
+  quietStart: '20:00',
+  quietEnd: '23:00',
+  shutdownTime: '02:00',
+  shutdownMarginMinutes: 30,
+  minFreeMb: 800,
 }
 
 /** 读 .env 文本成对象:跳过注释与空行,剥掉成对的引号。 */
@@ -83,6 +90,16 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     lockDir: asPath(cwd, String(pick(merged, 'NETEASE_LOCK_DIR', DEFAULTS.lockDir))),
     webhookFile: asPath(cwd, String(pick(merged, 'NETEASE_WEBHOOK_FILE', DEFAULTS.webhookFile))),
     busyPeers: String(pick(merged, 'BUSY_PEERS', '')).split(',').map((item) => item.trim()).filter(Boolean),
+    // 下界 1:`NETEASE_MAX_ATTEMPTS=0` 会让 attempts-exhausted 守卫恒真 —— 每天只推 action、永远不签。
+    maxAttempts: int(pick(merged, 'NETEASE_MAX_ATTEMPTS', null), DEFAULTS.maxAttempts, 1),
+    quietStart: String(pick(merged, 'NETEASE_QUIET_START', DEFAULTS.quietStart)),
+    quietEnd: String(pick(merged, 'NETEASE_QUIET_END', DEFAULTS.quietEnd)),
+    shutdownTime: String(pick(merged, 'NETEASE_SHUTDOWN_TIME', DEFAULTS.shutdownTime)),
+    shutdownMarginMinutes: int(
+      pick(merged, 'NETEASE_SHUTDOWN_MARGIN_MINUTES', null),
+      DEFAULTS.shutdownMarginMinutes,
+    ),
+    minFreeMb: int(pick(merged, 'NETEASE_MIN_FREE_MB', null), DEFAULTS.minFreeMb),
     dryRun: merged.NETEASE_DRY_RUN === '1',
   }
 }

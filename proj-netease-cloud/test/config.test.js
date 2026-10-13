@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 
 import { accountsFrom, DEFAULTS, loadConfig, parseEnv } from '../src/config.js'
+import { DEFAULT_LIMITS } from '../src/guards.js'
 
 test('parseEnv:跳过注释与空行,剥成对引号', () => {
   const env = parseEnv('# 注释\n\nACCOUNT_1_MUSIC_U=SAMPLE\nA="quoted"\nB=\'single\'\nBAD\n')
@@ -57,4 +58,12 @@ test('loadConfig:没有 .env 也能跑,给默认值', () => {
   assert.deepEqual(cfg.accounts, [])
   assert.equal(cfg.timeoutMs, DEFAULTS.timeoutMs)
   assert.equal(cfg.dryRun, false)
+})
+
+test('守卫阈值只有一份真源:config 的默认值与 guards.DEFAULT_LIMITS 同值', () => {
+  for (const key of ['quietStart', 'quietEnd', 'shutdownTime', 'shutdownMarginMinutes', 'minFreeMb']) {
+    assert.equal(DEFAULTS[key], DEFAULT_LIMITS[key], key)
+  }
+  // maxAttempts 不在 DEFAULT_LIMITS 里,它是 checkLocalGuards 的默认参数,同样钉死为 3。
+  assert.equal(DEFAULTS.maxAttempts, 3)
 })
