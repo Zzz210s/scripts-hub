@@ -19,6 +19,15 @@ export const DEFAULTS = {
   lockDir: 'logs',
 };
 
+/** 读 .env;不存在或读不动一律当空(容器挂载点缺失时 Docker 会把它建成目录,见 loadConfig)。 */
+function readEnvFile(file, fsImpl) {
+  try {
+    return fsImpl.existsSync(file) ? fsImpl.readFileSync(file, 'utf8') : '';
+  } catch {
+    return '';
+  }
+}
+
 /** 读 .env 文本成对象:跳过注释与空行,剥掉成对的引号。 */
 export function parseEnv(text) {
   const out = {};
@@ -90,7 +99,9 @@ function filterFrom(env) {
 /** 读配置。cwd 决定 stateDir / webhookFile 的相对根;显式 env 覆盖 .env 文件。 */
 export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs } = {}) {
   const file = path.join(cwd, '.env');
-  const fromFile = fsImpl.existsSync(file) ? parseEnv(fsImpl.readFileSync(file, 'utf8')) : {};
+  // 读不动就当没有:容器挂载点在宿主上不存在时,Docker 会把它建成**目录**,readFileSync 抛 EISDIR。
+  // 那时正确的表现是「没有配置任何账号」这句人话,而不是一条 EISDIR 让人去猜挂载。
+  const fromFile = parseEnv(readEnvFile(file, fsImpl));
   const merged = { ...fromFile, ...(env ?? {}) };
   const stateDir = String(pick(merged, 'TIEBA_STATE_DIR', DEFAULTS.stateDir));
   const lockDir = String(pick(merged, 'TIEBA_LOCK_DIR', DEFAULTS.lockDir));

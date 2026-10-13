@@ -77,3 +77,16 @@ test('守卫阈值只有一份真源:config 的默认值与 guards.DEFAULT_LIMIT
   assert.equal(checkLocalGuards({ now: morning, attempts: DEFAULTS.maxAttempts }).reason, 'attempts-exhausted')
   assert.equal(checkLocalGuards({ now: morning, attempts: DEFAULTS.maxAttempts - 1 }).reason, 'ok')
 })
+
+// 2026-10-14:容器挂载点在宿主上不存在时,Docker 会把 .env 建成**目录** —— 读它会抛 EISDIR。
+// 那时应当是「没有配置任何账号」,而不是一条让人去猜挂载的 EISDIR。
+test('.env 读不动(例如被挂成目录)时按空配置处理,不抛', () => {
+  const fsImpl = {
+    existsSync: () => true,
+    readFileSync: () => {
+      throw Object.assign(new Error('EISDIR'), { code: 'EISDIR' })
+    },
+  }
+  const config = loadConfig('/tmp/whatever', { env: {}, fsImpl })
+  assert.deepEqual(config.accounts, [])
+})
