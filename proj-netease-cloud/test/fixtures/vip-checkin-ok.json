@@ -1,0 +1,12 @@
+{
+  "code": 200,
+  "data": {
+    "sign": true,
+    "type": 1,
+    "signDayTime": 1700000000000,
+    "checkinHistory": [
+      { "signDayTime": 1700000000000, "type": 1 },
+      { "signDayTime": 1699913600000, "type": 1 }
+    ]
+  }
+}
