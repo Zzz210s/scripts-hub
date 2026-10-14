@@ -1,117 +1,106 @@
 #!/usr/bin/env bash
 # 本机内容仓同步(三端同步的本机侧):本机 → GitHub → 服务器,以远程仓库为主。
-# 由 Windows 计划任务每 5 分钟调用一次;幂等,随时可以手动跑。
+# 由 Windows 计划任务调用(NoteSyncFast 每 1 分钟 / NoteSync 每 5 分钟兜底);幂等,随时可以手动跑。
 #
-# 规则(2026-10-05 与用户确认):
+# 规则(2026-10-05 与用户确认;2026-10-14 加锁、心跳、失败计数):
+#   0. 先抢锁 ~/.note-sync/run.lock:已有实例在跑就安静退出(退出码 0,不算失败)
 #   1. 先 pull --rebase --autostash —— 远端为主,但绝不丢本地改动
-#   2. 只提交"2 分钟没被改过"的文件 —— 这个库有多个 AI 会话同时写,
+#   2. 只提交"1 分钟没被改过"的文件 —— 这个库有多个 AI 会话同时写,
 #      立刻 add 会把别人写了一半的文件提交进去
 #   3. push 前跑脱敏闸门(check-privacy --staged):仓库是 public,命中即撤回暂存并通知
 #   3b. push 前跑内容仓巡检(check_vault --fail-on):课件规范 / 断链 / 索引登记这类硬规则必须为 0,
 #      历史欠账(A3 孤篇 / A5A6 元数据 / A8 标签)留在报告里但不拦(2026-10-06 加);
 #      告警正文要带命中条目(2026-10-12 加 —— 原先只说「按报告改掉」,报告却不在通知里)
 #   4. push 失败重试 3 次(每次先 rebase);冲突/被拒 → 停下 + 企业微信通知,绝不 force
+#   5. 每轮开始/结束各写一次心跳(字段见 note-sync-lib.sh 头部契约);
+#      拉取连续失败、真冲突、上游未设置都会写进心跳并在告警里给出错误首行
 #
 # 配置:~/.note-sync/config.env(机器私有,不入库)
 #   NOTE_DIR=/f/0-Note
 #   HAC_DIR=/c/Users/23652/home-automation-configs
+#   NOTE_SYNC_QUIET_MIN=1                            # 可选,静默窗(分钟),默认 1
 #   WECOM_WEBHOOK_FILE=~/.note-sync/wecom-blog.txt   # 可选,失败时通知用(内容仓群;
 #                                                    #  2026-10-12 起不再走服务器告警群)
+# 公共层(配置/日志/通知/锁/心跳/限流/推送前闸门):scripts/note-sync/note-sync-lib.sh
+# Windows 侧:任务定义与注册脚本在 ~/.note-sync/windows-tasks/*.xml 与
+#   ~/.note-sync/install-windows-tasks.ps1(机器私有,不入库);旧任务备份在
+#   ~/.note-sync/schedule-backup/NoteSync.xml。
 set -uo pipefail
 
-CONFIG="${NOTE_SYNC_CONFIG:-$HOME/.note-sync/config.env}"
-# shellcheck disable=SC1090
-[ -f "$CONFIG" ] && . "$CONFIG"
-NOTE_DIR="${NOTE_DIR:-/f/0-Note}"
-HAC_DIR="${HAC_DIR:-/c/Users/23652/home-automation-configs}"
-QUIET_MIN="${NOTE_SYNC_QUIET_MIN:-2}"
-LOG="${NOTE_SYNC_LOG:-$HOME/.note-sync/sync.log}"
-# 冲突提示里指路用:服务器侧由入口脚本覆盖成自己的路径
-NOTE_LABEL="${NOTE_LABEL:-本机内容仓}"
-mkdir -p "$(dirname "$LOG")"
-
-log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
-
-notify() {
-    # 真正的发送在 scripts/note-sync/notify-wecom.sh:统一按 UTF-8 编解码、超长截断、校验 errcode。
-    # 本机侧 2026-10-11 的乱码事故就出在这一层(老实现用 sys.stdin.read() 读 cp936 的 stdin),
-    # 抽出去既让修复只有一份,也守住本文件 200 行上限。
-    log "通知:$1"
-    [ -n "${WECOM_WEBHOOK_FILE:-}" ] || return 0
-    local helper="$HAC_DIR/scripts/note-sync/notify-wecom.sh"
-    if [ ! -f "$helper" ]; then
-        log "通知未发送:找不到 $helper"
-        return 0
-    fi
-    WECOM_WEBHOOK_FILE="$WECOM_WEBHOOK_FILE" bash "$helper" "$1" >>"$LOG" 2>&1 \
-        || log "通知未送达(原因见上一行)"
-}
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./note-sync-lib.sh
+. "$SELF_DIR/note-sync-lib.sh"
 
 cd "$NOTE_DIR" 2>/dev/null || { log "找不到 $NOTE_DIR"; exit 2; }
 git rev-parse --git-dir >/dev/null 2>&1 || { log "$NOTE_DIR 不是 git 仓库"; exit 2; }
 
-# 通知博客重建(note 仓是纯内容仓,不再有 workflow —— 这件事改由仓外做)。
-# 脚本真源:scripts/note-sync/notify-blog.sh。任何失败只记日志,绝不影响同步本身。
-blog_guard() {
-    local s="$HAC_DIR/scripts/note-sync/notify-blog.sh"
-    [ -f "$s" ] || return 0   # 用 -f 不用 -x:git 里可能没记可执行位(服务器实测踩过)
-    "$s" "$@" >>"$LOG" 2>&1 || log "博客通知脚本返回非零(忽略)"
+# ── 0. 锁 + 心跳 ─────────────────────────────────────────────────
+if ! acquire_lock; then exit 0; fi
+HEARTBEAT_NOTE="本轮开始"
+HEARTBEAT_OK=true
+write_heartbeat "$HEARTBEAT_NOTE" true
+
+# 结束心跳走 EXIT trap:所有 exit 路径(含意外中断)都会留一条,并释放锁。
+finish() {
+    write_heartbeat "${HEARTBEAT_NOTE:-本轮结束}" "${HEARTBEAT_OK:-false}"
+    release_lock
 }
+trap finish EXIT
 
 # ── 1. 拉取(远端为主)────────────────────────────────────────────
-
-# ── 拉取前:把"远端已有、本地未跟踪且同名"的文件移开 ──────────────────────────
-# 否则 git 直接拒绝合并(untracked working tree files would be overwritten by merge)。
-# 2026-10-05 实测:另一个会话在服务器上新建了 app_static.py,而远端也有同名文件,
-# 每次 pull 都失败并通知"需要你处理",但其实与远端内容完全一致。
-# 处理方式:移到备份目录(绝不删除),拉取完在日志里说明。
-move_conflicting_untracked() {
-    local branch f moved=0 backup
-    branch="$(git rev-parse --abbrev-ref HEAD)"
-    backup="${NOTE_UNTRACKED_BACKUP:-$HOME/.note-sync/untracked-backup/$(date +%F)}"
-    timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 fetch -q origin "$branch" 2>/dev/null || return 0
-    while IFS= read -r -d '' entry; do
-        case "${entry:0:3}" in
-            '?? '*) f="${entry:3}" ;;
-            *) continue ;;
-        esac
-        git cat-file -e "origin/$branch:$f" 2>/dev/null || continue
-        mkdir -p "$backup/$(dirname "$f")" 2>/dev/null
-        if mv -- "$f" "$backup/$f" 2>/dev/null; then
-            moved=$((moved + 1))
-            log "移开未跟踪同名文件:$f"
-        fi
-    done < <(git status --porcelain -z)
-    [ "$moved" -gt 0 ] && log "共移开 $moved 个未跟踪同名文件到 $backup(是移动不是删除)"
-    return 0
-}
-
 move_conflicting_untracked
 
 if ! out=$(timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 pull --rebase --autostash 2>&1); then
     # **区分「真冲突」与「链路不通」** —— 两者处置完全不同,混报会把人叫去解一个不存在的冲突。
     # 2026-10-09 实测:服务器到 github 的连接时断时续(15s 超时),而这里一律报
     # 「请你手动解决冲突后提交」;实际工作树干净、没有 rebase 在进行,根本无冲突可解。
+    # 原因一律取错误输出的**首行**:git 的首行是人话(第二行起常是文件列表 / 进度噪声),
+    # 原先非冲突分支贴「网络」标签再把真因裁成末行,等于把真因藏了。
+    reason=$(printf '%s' "$out" | head -n 1 | cut -c1-200)
     if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ] \
        || [ -n "$(git diff --name-only --diff-filter=U 2>/dev/null)" ]; then
+        # 真冲突:abort 会把本地提交丢掉,所以**先打包存证**再 abort,绝不自动选边。
+        mkdir -p "$STATE_DIR/conflicts"
+        bundle="$STATE_DIR/conflicts/$(date +%Y%m%d-%H%M%S).bundle"
+        bundle_args=(HEAD)
+        git rev-parse -q --verify refs/remotes/origin/master >/dev/null 2>&1 \
+            && bundle_args+=(--not refs/remotes/origin/master)
+        if ! git bundle create "$bundle" "${bundle_args[@]}" >>"$LOG" 2>&1; then
+            log "bundle 生成失败(见上一行输出)"
+            bundle="$bundle(生成失败)"
+        fi
         git rebase --abort >/dev/null 2>&1 || true
-        log "pull 冲突:$out"
-        notify "内容仓 同步 · 有真冲突要处理
-请你:在 ${NOTE_LABEL} 里手动解决冲突后提交
+        log "pull 冲突:$reason;存证 $(winpath "$bundle")"
+        HEARTBEAT_NOTE="真冲突,已存证并 abort:${reason}"
+        HEARTBEAT_OK=false
+        notify_throttled pull-conflict "内容仓 同步 · 有真冲突要处理
+请你:在 ${NOTE_LABEL} 里手动解决冲突后提交;想找回本机被 abort 掉的提交:
+  git fetch $(winpath "$bundle") HEAD:rescued
 原因:git pull --rebase 因冲突停下(有未合并的路径)
+存证:$(winpath "$bundle")
 不处理的后果:本机与远端会继续分叉,后面每次同步都会停"
     else
-        log "pull 失败(非冲突):$out"
-        notify "内容仓 同步 · 拉取失败(网络,不是冲突)
-请你:不用动仓库 —— 这是到 GitHub 的链路问题,下一轮会自动重试
-原因:$(printf '%s' "$out" | tail -n 1 | cut -c1-160)
-不处理的后果:这一轮同步跳过;连续多轮不通时,服务器内容会停在旧版本"
+        # 连续失败计数:单次抖动不值得打扰,连着 3 轮才发一次告警(同类 30 分钟限流)。
+        n=$(cat "$PULL_FAIL_FILE" 2>/dev/null || echo 0)
+        case "$n" in ''|*[!0-9]*) n=0 ;; esac
+        n=$((n + 1))
+        printf '%s\n' "$n" >"$PULL_FAIL_FILE"
+        log "pull 失败(非冲突,连续 ${n} 次):$reason"
+        HEARTBEAT_NOTE="拉取失败(连续 ${n} 次):${reason}"
+        HEARTBEAT_OK=false
+        if [ "$n" -ge 3 ]; then
+            notify_throttled pull-fail "内容仓 同步 · 连续 ${n} 次拉取失败
+请你:在本机查一下到 GitHub 的链路(网络 / 代理 / DNS),细节见 $LOG 最近几行
+原因:${reason}
+不处理的后果:本机拉不到远端新内容,会一直停在旧版本"
+        fi
     fi
     exit 1
 fi
+rm -f "$PULL_FAIL_FILE"
 [ "$out" != "Already up to date." ] && log "pull:$out"
 
-# ── 2. 挑出"已稳定"的改动(2 分钟没被改过)────────────────────────
+# ── 2. 挑出"已稳定"的改动(QUIET_MIN 分钟没被改过)──────────────
 declare -a READY=()
 while IFS= read -r -d '' entry; do
     rel="${entry:3}"
@@ -124,9 +113,25 @@ while IFS= read -r -d '' entry; do
 done < <(git status --porcelain -z 2>/dev/null)
 
 if [ "${#READY[@]}" -eq 0 ]; then
-    # 没有新改动;若本地有未推送提交(别的会话提交过)也要推
-    if [ "$(git log --oneline '@{u}..HEAD' 2>/dev/null | wc -l)" -eq 0 ]; then
+    # 没有新改动;若本地有未推送提交(别的会话提交过)也要推。
+    # @{u} 不存在时**不能**判成「无待推送」——那样本地提交永远发不出去也没人知道
+    # (2026-10-14 修:`git log '@{u}..HEAD'` 报错被 2>/dev/null 吞掉,wc 得到 0)。
+    if git rev-parse -q --verify '@{u}' >/dev/null 2>&1; then
+        pending=$(git log --oneline '@{u}..HEAD' 2>/dev/null | wc -l)
+    else
+        log "@{u} 不存在,无法判断哪些提交待推送"
+        HEARTBEAT_NOTE="本地有提交但上游未设置(@{u} 不存在)"
+        HEARTBEAT_OK=false
+        notify_throttled upstream-missing "内容仓 同步 · 本地有提交但上游未设置
+请你:在 ${NOTE_LABEL} 跑 git branch -vv 看当前分支的 upstream,必要时
+  git push -u origin $(git rev-parse --abbrev-ref HEAD)
+原因:@{u} 不存在,脚本无法判断哪些提交待推送(旧版本把这种情况误判成「无改动、无待推送」)
+不处理的后果:本地提交永远上不了云,服务器与博客都拉不到"
+        exit 1
+    fi
+    if [ "${pending:-0}" -eq 0 ]; then
         log "无改动、无待推送"
+        HEARTBEAT_NOTE="无改动、无待推送"
         blog_guard          # 兜底:每 30 分钟比一次(note HEAD vs 博客最近成功部署)+ 失败自愈
         exit 0
     fi
@@ -136,52 +141,31 @@ else
 fi
 
 # ── 3. 脱敏闸门(仓库是 public)────────────────────────────────────
-if ! gate=$(node "$HAC_DIR/scripts/check-privacy.mjs" --staged 2>&1); then
-    log "脱敏闸门拦下:$gate"
-    hits=$(printf '%s' "$gate" | head -3)
+if ! gate_privacy; then
     git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径,别动别的会话已暂存的内容
-    notify "内容仓 同步 · 需要你处理
+    HEARTBEAT_NOTE="脱敏闸门拦下(未推送)"
+    HEARTBEAT_OK=false
+    notify_throttled gate-privacy "内容仓 同步 · 需要你处理
 请你:看本机 $LOG 的最近几行,删掉凭据或把文件加进 .gitignore
 原因:push 前脱敏检查命中(个人标识或明文账号密码形状)
 命中:
-$hits
+${GATE_HITS}
 不处理的后果:这次不会推送 —— 仓库是公开的,推上去等于永久公开"
     exit 1
 fi
 
 # ── 3b. 巡检闸门(内容仓自己的规则:课件规范 / 断链 / 索引登记)────
-# 只拦「必须为 0」的阶段;A3/A5/A6/A8 是历史欠账,留在报告里但不拦。整轮检查约 2 秒。
-#
-# 脚本路径要容两个名字:库里 2026-10-13 把目录去掉了数字前缀(`50-资源` → `资源`)。
-# 写死旧路径时的后果是**闸门静默失效** —— `[ -f … ]` 不成立就直接跳过,没日志没告警,
-# 推送前巡检等于没跑(当天实测)。所以两个名字都试,都找不到才记一条日志说明。
-VAULT_GATE_STAGES="${VAULT_GATE_STAGES:-A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A22,A23}"
-VAULT_CHECK=""
-for rel in "资源/工具/vault-check/check_vault.py" "50-资源/工具/vault-check/check_vault.py"; do
-    if [ -f "$NOTE_DIR/$rel" ]; then VAULT_CHECK="$rel"; break; fi
-done
-if [ -z "$VAULT_CHECK" ]; then
-    log "跳过巡检闸门(两个候选路径都没找到 check_vault.py)"
-fi
-if [ -n "$VAULT_CHECK" ]; then
-    PY="$(command -v python3 || command -v python || true)"
-    if [ -z "$PY" ]; then
-        log "跳过巡检闸门(没找到 python)"
-    elif ! vault=$(cd "$NOTE_DIR" && PYTHONIOENCODING=utf-8 "$PY" -B \
-             "$VAULT_CHECK" --fail-on "$VAULT_GATE_STAGES" 2>&1); then
-        # 不加 --quiet:告警正文要带命中条目(2026-10-12 用户要求 —— 原先只说「先按报告改掉」,
-        # 报告却不在通知里,收到告警的人得自己 ssh 进来翻)。只取「计入失败的阶段」的细目行。
-        log "巡检闸门拦下:$(printf '%s' "$vault" | grep -E '^\[A[0-9]' | grep -v '不计入失败' | grep -v ' 0 处' | head -4 | tr '\n' ' ')"
-        hits=$(printf '%s' "$vault" | awk '/^\[/{ok=($0 ~ /^\[A[0-9]/ && $0 !~ /不计入失败/ && $0 !~ / 0 处/)} ok && /^   /{print}' | head -6)
-        git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
-        notify "内容仓 同步 · 需要你处理
-请你:在 ${NOTE_LABEL} 里跑 python3 -B $VAULT_CHECK --fail-on $VAULT_GATE_STAGES
+if ! gate_vault; then
+    git reset -q -- "${READY[@]}" >/dev/null 2>&1 || true   # 只撤回本次暂存的路径
+    HEARTBEAT_NOTE="巡检闸门拦下(未推送)"
+    HEARTBEAT_OK=false
+    notify_throttled gate-vault "内容仓 同步 · 需要你处理
+请你:在 ${NOTE_LABEL} 里跑 python3 -B ${VAULT_CHECK_REL} --fail-on ${VAULT_GATE_STAGES_USED}
 原因:推送前巡检未通过(课件规范 / 断链 / 索引登记这类硬规则)
 命中:
-$hits
+${GATE_HITS}
 不处理的后果:这次不会推送 —— 先按报告改掉,或临时把该阶段从 VAULT_GATE_STAGES 里去掉"
-        exit 1
-    fi
+    exit 1
 fi
 
 # ── 4. 提交并推送(失败重试 3 次)──────────────────────────────────
@@ -195,6 +179,9 @@ fi
 for attempt in 1 2 3; do
     if out=$(timeout -k 5 "${NET_TIMEOUT:-150}" git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push 2>&1); then
         log "push 成功(第 $attempt 次)"
+        HEARTBEAT_NOTE="推送成功(第 $attempt 次)"
+        HEARTBEAT_OK=true
+        rm -f "$PULL_FAIL_FILE"                                        # 网络恢复:清掉拉取失败计数
         blog_guard --force --reason "note-sync 推送成功(第 $attempt 次)"   # 内容刚变:立即通知博客重建
         exit 0
     fi
@@ -203,8 +190,11 @@ for attempt in 1 2 3; do
     sleep 3
 done
 
-notify "内容仓 同步 · 需要你处理
+last_reason=$(printf '%s' "$out" | head -n 1 | cut -c1-200)
+HEARTBEAT_NOTE="推送连续失败:${last_reason}"
+HEARTBEAT_OK=false
+notify_throttled push-fail "内容仓 同步 · 需要你处理
 请你:在 ${NOTE_LABEL} 跑一次 git push 看报错
-原因:自动推送连续 3 次失败(多半是远端有新提交或网络问题)
+原因:自动推送连续 3 次失败,最后一次:${last_reason}
 不处理的后果:本机改动还没上云,服务器也就拉不到"
 exit 1
