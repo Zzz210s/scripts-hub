@@ -17,11 +17,26 @@
 | 客户端伪装字段 `_client_type=2`、`_client_version=9.7.8.0`、`_phone_imei=000000000000000`、`model=MI+5`、`net_type=1` | 同上三处的 `BASE_SIGN_DATA` / `SIGN_DATA` |
 | 返回码 `0` 成功、`160002` 今日已签到、`340006` 贴吧已被屏蔽、`320022` TBS 校验失败 | `LuoSue/tieba_client.py` 的 `sign_forum()`;`Sitoi/dailycheckin` 的 `sign_forums()`;`aiotieba` 的 `docs/tutorial/many_utils.md`(判成功用 `code not in [160002, 340006]`);`Aruelius/tieba_sign` issue #17 的原始报错 `{'error': {'errno': 320022, 'errmsg': '', 'usermsg': 'TBS校验失败'}}` |
 | 顶层 `error_code == "0"` 不等于成功,真实错误可能只在嵌套 `error.errno` | 同上 issue #17 |
-| 取 tbs `GET https://tieba.baidu.com/dc/common/tbs`(返回 `is_login` / `tbs`) | `LuoSue/tieba_client.py` 的 `TBS_URL` / `get_tbs()`;`Sitoi/dailycheckin` 的 `TBS_URL` / `get_user_info()` |
-| 关注吧列表 `POST .../c/f/forum/forumGuide`,含 `forum_name` / `forum_id` / `is_sign` | `Aruelius/tieba_sign` 与 `Sitoi/dailycheckin` 的列表读取路径,见读回校验调研文档第 3 节 |
-| 关注吧列表分页:请求参数 `page_no`(页号)与 `res_num`(每页条数,实现取 200),响应字段 `like_forum_has_more`(`"1"` 继续翻页) | 读回校验调研文档第 3 节;`aiotieba` 的 `get_self_follow_forums` (`_classdef.py`)、`tbsign_go` 的 `GetForumList2`、`Tieba-Cloud-Sign` 的 `getTieba3` |
+| **会话与关注列表同源**:`GET https://tieba.baidu.com/mo/q/newmoindex` 一次给出 `data.uid`、`data.itb_tbs`(26 位客户端 tbs)与 `data.like_forum[]`(含 `forum_id` / `forum_name` / `is_sign`) | 读回校验调研文档第 3 节列了这条路径;2026-10-14 **真机实测确认**(见下「真机校正」) |
+| 签到用的 tbs 取 `data.itb_tbs`(不是同响应里的 16 位 `data.tbs`,也不是 `/dc/common/tbs` 的 tbs) | 2026-10-14 真机实测:用 `itb_tbs` 调 sign 成功 |
+| 旧接口 `GET /dc/common/tbs` 的 `is_login` **不可信** | 2026-10-14 真机实测:同一份有效 cookie 下它回 `is_login: 0`,而 newmoindex 与 sign 都正常工作 —— 拿它当凭据闸门会把有效凭据误判成失效(这正是本项目初版判「凭据已失效」的根因) |
+| 关注列表 `like_forum[]` 是**单次全量**返回,没有翻页 | 2026-10-14 真机实测:一个账号 134 个已关注吧一次返回完 |
+
+## 真机校正(2026-10-14)
+
+首次用真实账号核对协议时的实测结果,已据此改过客户端与测试:
+
+| 观察 | 结论 |
+| --- | --- |
+| `/dc/common/tbs` 回 `is_login: 0`,但 `forumGuide`、`newmoindex`、`sign` 全都正常 | 该标志位不能当凭据判据;会话改从 `newmoindex` 取 |
+| `newmoindex` 的 `data.tbs`(16 位)与 `data.itb_tbs`(26 位)并存 | 客户端 tbs 用 `itb_tbs`;用它调用 sign 返回 `user_info.is_sign_in: 1` |
+| 一个账号一次返回 134 个已关注吧 | 关注列表单次全量,原来的翻页逻辑已删除 |
+| 签到成功的完整响应 | 顶层 `error_code: "0"`,嵌套 `user_info.is_sign_in: 1` 与 `sign_bonus_point: 6`(夹具 `test/fixtures/real/sign-ok.json`) |
 
 ## 测试夹具
 
 `test/fixtures/sign-*.json` 是**按上面出处记载的响应形状人工重写的样例**,只保留判定所
 需的字段层级,不含任何真实账号的 `BDUSS`、`STOKEN`、cookie 或昵称。它们不是抓包原件。
+
+`test/fixtures/real/` 下的两份是 **2026-10-14 真机响应的脱敏件**:结构、字段名、枚举取值与
+真实响应一致,`uid` 已换成占位值,不含 cookie 或昵称。

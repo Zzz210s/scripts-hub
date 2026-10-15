@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-import { fetchFollowedForums, fetchTbs } from './client.js';
+import { fetchSession } from './client.js';
 import { dateText, logicalDay } from './clock.js';
 import { loadConfig } from './config.js';
 import { buildResult } from './messages.js';
@@ -67,21 +67,15 @@ async function runCheck({ config, deps, now, log }) {
   let allOk = true;
   for (const account of config.accounts) {
     resultsByAccount[account.id] = [];
-    const tbs = await fetchTbs({ cookie: account.cookie, deps });
-    if (!tbs.ok) {
+    const session = await fetchSession({ cookie: account.cookie, deps });
+    forumsAfter[account.id] = session;
+    if (!session.ok) {
       allOk = false;
-      log(`${account.name} · tbs 取不到 · ${tbs.error ?? tbs.reason}`);
+      log(`${account.name} · 会话取不到 · ${session.error ?? session.reason}`);
       continue;
     }
-    const list = await fetchFollowedForums({ cookie: account.cookie, deps });
-    forumsAfter[account.id] = list;
-    if (!list.ok) {
-      allOk = false;
-      log(`${account.name} · tbs 可取 · 关注列表取不到 · ${list.error ?? list.reason}`);
-      continue;
-    }
-    const signed = list.forums.filter((forum) => forum.isSign === true).length;
-    log(`${account.name} · tbs 可取 · 关注 ${list.forums.length} 个吧 · 已签 ${signed} 个`);
+    const signed = session.forums.filter((forum) => forum.isSign === true).length;
+    log(`${account.name} · 会话可取 · uid ${session.uid} · 关注 ${session.forums.length} 个吧 · 已签 ${signed} 个`);
   }
   const result = reconcile({ forumsAfter, resultsByAccount, expected: config.filter });
   const word = result.ok === true ? '通过' : result.ok === false ? '未通过' : '未能核对';

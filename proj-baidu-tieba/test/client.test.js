@@ -4,15 +4,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fetchTbs, signForum } from '../src/client.js';
+import { fetchSession, fetchTbs, signForum } from '../src/client.js';
 import { SIGN_STATUS } from '../src/sign.js';
 import { jsonReply, loadText, stub } from './stub.js';
 
-test('fetchTbs:GET /dc/common/tbs,带 cookie/UA/Referer,成功返回 tbs', async () => {
-  const { calls, fetchImpl } = stub(jsonReply({ is_login: 1, tbs: 'TBS_SAMPLE' }));
-  const result = await fetchTbs({ cookie: 'BDUSS=BDUSS_SAMPLE; STOKEN=x', deps: { fetchImpl } });
-  assert.deepEqual(result, { ok: true, tbs: 'TBS_SAMPLE', error: null, reason: 'ok' });
-  assert.equal(calls[0].url, 'https://tieba.baidu.com/dc/common/tbs');
+const SESSION_URL = 'https://tieba.baidu.com/mo/q/newmoindex';
+/** newmoindex 的成功形状(真机实测:uid + itb_tbs + like_forum)。 */
+const session = ({ tbs = 'TBS_SAMPLE', uid = '1000000000', forums = [] } = {}) => ({ no: 0, error: 'success', data: { uid, tbs: tbs.slice(-16), itb_tbs: tbs, like_forum: forums } });
+
+test('fetchSession:GET /mo/q/newmoindex,带 cookie/UA/Referer,tbs 取 itb_tbs', async () => {
+  const body = session({ tbs: 'ITB_TBS_SAMPLE', forums: [{ forum_id: 11, forum_name: '吧一', is_sign: 1 }] });
+  const { calls, fetchImpl } = stub(jsonReply(body));
+  const result = await fetchSession({ cookie: 'BDUSS=BDUSS_SAMPLE; STOKEN=x', deps: { fetchImpl } });
+  assert.equal(result.ok, true);
+  assert.equal(result.tbs, 'ITB_TBS_SAMPLE');
+  assert.equal(result.uid, '1000000000');
+  assert.deepEqual(result.forums, [{ fid: 11, kw: '吧一', isSign: true, isForbidden: false }]);
+  assert.equal(result.count, 1);
+  assert.equal(calls[0].url, SESSION_URL);
   assert.equal(calls[0].options.method, 'GET');
   assert.equal(calls[0].options.headers.Cookie, 'BDUSS=BDUSS_SAMPLE; STOKEN=x');
   assert.equal(calls[0].options.headers.Referer, 'https://tieba.baidu.com/');
@@ -20,96 +29,64 @@ test('fetchTbs:GET /dc/common/tbs,带 cookie/UA/Referer,成功返回 tbs', async
   assert.ok(calls[0].options.signal);
 });
 
-test('fetchTbs:is_login 为假判失败且 reason=auth,不把空 tbs 当成功', async () => {
-  const { fetchImpl } = stub(jsonReply({ is_login: 0, tbs: '' }));
-  const result = await fetchTbs({ cookie: 'BDUSS=SOMEVALUE', deps: { fetchImpl } });
+test('fetchSession:未登录的文案归 auth,不把空 tbs 当成功', async () => {
+  const { fetchImpl } = stub(jsonReply({ no: 1, error: '未登录' }));
+  const result = await fetchSession({ cookie: 'BDUSS=SOMEVALUE', deps: { fetchImpl } });
   assert.equal(result.ok, false);
-  assert.equal(result.tbs, null);
   assert.equal(result.reason, 'auth');
   assert.match(result.error, /登录/);
 });
 
-test('fetchTbs:HTTP 500 归一为 ok:false/reason=http,不抛', async () => {
-  const { fetchImpl } = stub(() => ({ status: 500, text: '<html>boom</html>' }));
-  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+test('fetchSession:非 0 no 但不是登录问题归 rejected', async () => {
+  const { fetchImpl } = stub(jsonReply({ no: 340006, error: '账号异常' }));
+  const result = await fetchSession({ cookie: 'BDUSS=x', deps: { fetchImpl } });
   assert.equal(result.ok, false);
-  assert.equal(result.tbs, null);
+  assert.equal(result.reason, 'rejected');
+});
+
+test('fetchSession:no=0 但缺 data 判 parse', async () => {
+  const { fetchImpl } = stub(jsonReply({ no: 0, error: 'success' }));
+  const result = await fetchSession({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'parse');
+});
+
+test('fetchSession:缺 BDUSS 时不发请求(reason=no-cookie)', async () => {
+  const { calls, fetchImpl } = stub(jsonReply(session()));
+  const result = await fetchSession({ cookie: 'STOKEN=x', deps: { fetchImpl } });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'no-cookie');
+  assert.equal(calls.length, 0);
+});
+
+test('fetchSession:HTTP 500 归一为 ok:false/reason=http,不抛', async () => {
+  const { fetchImpl } = stub(() => ({ status: 500, text: '<html>boom</html>' }));
+  const result = await fetchSession({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  assert.equal(result.ok, false);
   assert.equal(result.reason, 'http');
   assert.match(result.error, /500/);
 });
 
-test('fetchTbs:响应不是 JSON 归一为 ok:false/reason=parse', async () => {
+test('fetchSession:响应不是 JSON 归一为 ok:false/reason=parse', async () => {
   const { fetchImpl } = stub(() => ({ text: '<html>login</html>' }));
-  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  const result = await fetchSession({ cookie: 'BDUSS=x', deps: { fetchImpl } });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'parse');
   assert.match(result.error, /JSON/);
 });
 
-test('fetchTbs:JSON 里没有 tbs 也算 parse,不当成功', async () => {
-  const { fetchImpl } = stub(jsonReply({ is_login: 1 }));
-  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.tbs, null);
-  assert.equal(result.reason, 'parse');
-});
-
-test('fetchTbs:fetchImpl 抛错(网络失败)归一为 ok:false/reason=network', async () => {
+test('fetchSession:fetchImpl 抛错(网络失败)归一为 ok:false/reason=network', async () => {
   const { fetchImpl } = stub(() => ({ throw: new Error('ECONNRESET') }));
-  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  const result = await fetchSession({ cookie: 'BDUSS=x', deps: { fetchImpl } });
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'network');
   assert.match(result.error, /ECONNRESET/);
 });
 
-test('fetchTbs:超时经 AbortController 打断,归一为 ok:false/reason=network', async () => {
-  let seen = null;
-  const fetchImpl = (url, options) =>
-    new Promise((resolve, reject) => {
-      seen = options;
-      options.signal.addEventListener('abort', () => {
-        const error = new Error('aborted');
-        error.name = 'AbortError';
-        reject(error);
-      });
-    });
-  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl, timeoutMs: 10 } });
-  assert.equal(result.ok, false);
-  assert.equal(result.reason, 'network');
-  assert.match(result.error, /超时/);
-  assert.ok(seen.signal.aborted);
-});
-
-test('fetchTbs:cookie 为空或缺 BDUSS 时判 no-cookie 且不发匿名请求', async () => {
-  let called = false;
-  const { fetchImpl } = stub(() => {
-    called = true;
-    return { text: '{"is_login":1,"tbs":"T"}' };
-  });
-  const empty = await fetchTbs({ deps: { fetchImpl } });
-  const noBduss = await fetchTbs({ cookie: 'STOKEN=x', deps: { fetchImpl } });
-  assert.equal(empty.ok, false);
-  assert.equal(empty.tbs, null);
-  assert.equal(empty.reason, 'no-cookie');
-  assert.equal(noBduss.ok, false);
-  assert.equal(noBduss.reason, 'no-cookie');
-  assert.equal(called, false);
-});
-
-test('fetchTbs:deps 为 null 不抛(默认 globalThis.fetch)', async () => {
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: true,
-    status: 200,
-    text: async () => '{"is_login":1,"tbs":"T"}',
-  });
-  try {
-    const result = await fetchTbs({ cookie: 'BDUSS=x', deps: null });
-    assert.equal(result.ok, true);
-    assert.equal(result.tbs, 'T');
-  } finally {
-    globalThis.fetch = original;
-  }
+test('fetchTbs 是 fetchSession 的薄视图:成功时只回 tbs', async () => {
+  const { fetchImpl } = stub(jsonReply(session({ tbs: 'TBS_ONLY' })));
+  const result = await fetchTbs({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  assert.deepEqual(result, { ok: true, tbs: 'TBS_ONLY', error: null, reason: 'ok' });
 });
 
 test('signForum:POST /c/c/forum/sign,参数/头齐全且含大写签名', async () => {

@@ -157,3 +157,14 @@ test('error 是空串或普通字符串时不抛异常,也不当成嵌套错误'
     assert.equal(judgeSign(parsed), SIGN_STATUS.SIGNED);
   }
 });
+
+// 2026-10-14 真机抓到的完整成功响应(test/fixtures/real/sign-ok.json,uid 已打码):
+// 顶层有 error_code:"0" 与 user_info.is_sign_in:1 / sign_bonus_point:6 —— 第一层判定必须认它。
+test('真机夹具:签到成功的完整响应判为 signed', () => {
+  const body = JSON.parse(readFileSync(path.join(FIXTURES, 'real', 'sign-ok.json'), 'utf8'));
+  const parsed = parseSignResponse(body);
+  assert.equal(parsed.ok, true);
+  assert.equal(judgeSign(parsed), SIGN_STATUS.SIGNED);
+  assert.equal(parsed.errno, null);
+  assert.ok((parsed.bonusPoint ?? 0) > 0);
+});

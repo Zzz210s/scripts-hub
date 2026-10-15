@@ -1,0 +1,46 @@
+{
+  "user_info": {
+    "user_id": 1000000000,
+    "is_sign_in": 1,
+    "user_sign_rank": 246,
+    "sign_time": 1791908368,
+    "cont_sign_num": 1,
+    "total_sign_num": 1,
+    "cout_total_sing_num": 1,
+    "hun_sign_num": 0,
+    "total_resign_num": 0,
+    "is_org_name": 0,
+    "sign_bonus_point": 6,
+    "miss_sign_num": 13,
+    "level_name": "零号引擎",
+    "levelup_score": 15,
+    "all_level_info": null,
+    "last_level_score": 0,
+    "last_score_left": 0,
+    "last_level_name": "",
+    "last_level": 0,
+    "member_status": 0
+  },
+  "contri_info": [],
+  "forum": [
+    {
+      "id": "27745343",
+      "window_conf": {
+        "pic": "https://tieba-ares.cdn.bcebos.com/mis/2023-11/1699363102280/28ffd8f3aa65.png",
+        "jump_scheme": "https://tieba.baidu.com/mo/q/resign/index?forum_id=27745343&nonavigationbar=1&customfullscreen=1",
+        "btn_text": "去补签",
+        "text": "今日签到第246名 经验+6"
+      }
+    }
+  ],
+  "guide_info": {
+    "text": "「免费领」贴吧会员，全吧一键签到",
+    "url": "https://xindai.duxiaoman.com/xpage/userguide/operation.html#/?CH=guanming&fr=jd4PzXry35"
+  },
+  "multi_task_sign_switch": 0,
+  "server_time": 254799,
+  "time": 1791908368,
+  "ctime": 0,
+  "logid": 1168238359,
+  "error_code": "0"
+}

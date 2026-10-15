@@ -9,7 +9,7 @@
 // `ok` 的含义是「流程完整跑完」,不是「全部签成」—— 逐吧结论看 results/counts,
 // 整体是否算完成由 Task 5 的第二层对账(`is_sign` 读回)定,本文件不越权判定。
 
-import { fetchFollowedForums, fetchTbs, signForum } from './client.js';
+import { fetchSession, signForum } from './client.js';
 import { SIGN_STATUS, statusCountsKey } from './sign.js';
 
 const DEFAULT_INTERVAL_MS = 2000;
@@ -84,12 +84,12 @@ export async function signAccount({ name, cookie, filter, intervalMs, deps } = {
   const counts = emptyCounts();
   const results = [];
 
-  const first = await fetchTbs({ cookie, deps });
-  if (!first.ok) return fatal(name, results, counts, first.error, first.reason);
-  let tbs = first.tbs;
-
-  const list = await fetchFollowedForums({ cookie, deps });
-  if (!list.ok) return fatal(name, results, counts, list.error, list.reason);
+  // 会话与关注列表同源(`/mo/q/newmoindex` 一次给全),所以只请求一次:省一次往返,
+  // 也不会出现「tbs 拿到了、列表拿不到」这种半吊子状态。
+  const session = await fetchSession({ cookie, deps });
+  if (!session.ok) return fatal(name, results, counts, session.error, session.reason);
+  let tbs = session.tbs;
+  const list = session;
 
   // 两个下游必须区分的取值(见 client.js 注释):空列表可能读不到、hasMore 表示列表不全。
   // 一拿到列表就定死,好让循环里的 fatal 也带着它们返回。
@@ -106,7 +106,8 @@ export async function signAccount({ name, cookie, filter, intervalMs, deps } = {
     let outcome = await signForum({ cookie, forum, tbs, deps });
     if (outcome.status === SIGN_STATUS.TBS_STALE && !refreshed) {
       refreshed = true;
-      const again = await fetchTbs({ cookie, deps });
+      // 只重取会话拿新 tbs;关注列表不再重读(重试只针对那一个吧,列表没有变)。
+      const again = await fetchSession({ cookie, deps });
       if (!again.ok) {
         record(results, counts, forum.kw, SIGN_STATUS.TBS_STALE);
         return fatal(name, results, counts, again.error, again.reason, markers);

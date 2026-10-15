@@ -2,7 +2,7 @@
 // 账号形状适配 / 跳过路由 / 投递记账是纯逻辑,凭据体检与逐账号签到是薄适配 —— 都不做判定,
 // 「今天算不算完成」只由 verify.js 的对账决定。
 import { signAccount } from './account.js';
-import { fetchFollowedForums, fetchTbs } from './client.js';
+import { fetchSession } from './client.js';
 import { peerBusy } from './guards.js';
 import { buildAction } from './messages.js';
 
@@ -87,7 +87,7 @@ export const failedList = (error, reason) => ({ ok: false, forums: null, count: 
 export async function probeCredentials(accounts, deps) {
   const credentials = [];
   for (const account of accounts) {
-    const probe = await fetchTbs({ cookie: account.cookie, deps });
+    const probe = await fetchSession({ cookie: account.cookie, deps });
     credentials.push({ id: account.id, name: account.name, ok: probe.ok, error: probe.error, reason: probe.reason });
   }
   return credentials;
@@ -115,7 +115,8 @@ export async function signAll({ accounts, credentials, config, deps }) {
       deps,
     });
     outcomes.push({ ...outcome, id: account.id });
-    forumsAfter[account.id] = await fetchFollowedForums({ cookie: account.cookie, deps });
+    // 读回用同一个端点:它给的 like_forum[].is_sign 就是对账的权威口径。
+    forumsAfter[account.id] = await fetchSession({ cookie: account.cookie, deps });
   }
   return { outcomes, forumsAfter };
 }

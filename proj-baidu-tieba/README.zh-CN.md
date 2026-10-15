@@ -18,7 +18,7 @@
 
 程序对贴吧只发两类请求:
 
-- **读**:取 `tbs`,取已关注的吧列表。
+- **读**:一次 `mo/q/newmoindex` 请求,同时拿到会话、客户端 `tbs` 与已关注吧列表(含每个吧的已签状态)。
 - **一次写**:签到调用 `POST c.tieba.baidu.com/c/c/forum/sign`。
 
 它不发帖、不回帖、不关注也不取关、不点赞、不发私信、不花任何东西。这些动作在本目录里根本
@@ -128,12 +128,12 @@ docker compose -f /srv/apps/automation/compose.yaml run --rm -T tieba-run report
 ```
 cd proj-baidu-tieba
 npm test                       # 离线,不联网、不起子进程
-node src/cli.js check          # 只读:tbs、关注吧数量、已签数量与对账结论
+node src/cli.js check          # 只读:会话、uid、关注吧数量、已签数量与对账结论
 node src/cli.js run --dry      # 只打印会推送什么,不发送、不落盘
 node src/cli.js report --dry   # 把当天最后一条结果重渲染出来
 ```
 
-有账号取不到 `tbs` 或关注列表时 `check` 退出码为 1,部署侧可以据此做巡检。
+有账号取不到会话时 `check` 退出码为 1,部署侧可以据此做巡检。
 `run --dry` 与 `TIEBA_DRY_RUN=1` 都不联网、不写状态;仍会读 `.env` 与 `data/state.json`。
 
 在仓库根,`node scripts/check-wecom-drift.mjs` 校验通知核心与另外五份逐字节一致。

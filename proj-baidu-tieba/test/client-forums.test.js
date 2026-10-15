@@ -1,191 +1,88 @@
-// Task 3:HTTP 客户端的关注列表部分(含分页)。全部离线:fetchImpl 是桩,无真实网络。
-// 接口地址、表单参数、`like_forum_has_more` 分页口径的出处见 ../NOTICE。
-
+// 关注列表(fetchFollowedForums)用 2026-10-14 真机校正后的协议:`GET /mo/q/newmoindex`
+// 一次返回 uid、客户端 tbs 与 like_forum[](含 is_sign)。全部离线:fetchImpl 是桩。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fetchFollowedForums } from '../src/client.js';
+import { fetchFollowedForums, fetchSession } from '../src/client.js';
 import { jsonReply, stub } from './stub.js';
 
-const pageOf = (options) => new URLSearchParams(options.body).get('page_no');
+const SESSION_URL = 'https://tieba.baidu.com/mo/q/newmoindex';
+const session = ({ forums = [], tbs = 'ITB_TBS_SAMPLE', uid = '1000000000', no = 0, error = 'success' } = {}) => ({
+  no,
+  error,
+  data: no === 0 ? { uid, tbs: tbs.slice(-16), itb_tbs: tbs, like_forum: forums } : undefined,
+});
 
-test('fetchFollowedForums:POST forumGuide,表单参数与头齐全,映射 is_sign/is_forbidden', async () => {
-  const payload = {
-    like_forum: [
-      { forum_id: 1, forum_name: '吧一', is_sign: 1, is_forbidden: 0 },
-      { forum_id: 2, forum_name: '吧二', is_sign: '0', is_forbidden: 1 },
+test('fetchFollowedForums:映射 is_sign/is_forbidden,并带上 count 与 hasMore', async () => {
+  const { calls, fetchImpl } = stub(jsonReply(session({
+    forums: [
+      { forum_id: 11, forum_name: '吧一', is_sign: 1 },
+      { forum_id: 12, forum_name: '吧二', is_sign: 0, is_forbidden: 1 },
+      { forum_id: 13, forum_name: '吧三' },
     ],
-  };
-  const { calls, fetchImpl } = stub(jsonReply(payload));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  })));
+  const result = await fetchFollowedForums({ cookie: 'BDUSS=BDUSS_SAMPLE', deps: { fetchImpl } });
   assert.equal(result.ok, true);
-  assert.equal(result.error, null);
-  assert.equal(result.reason, 'ok');
-  assert.equal(result.hasMore, false);
-  assert.equal(result.count, 2);
+  assert.equal(result.count, 3);
+  assert.equal(result.hasMore, false); // 单次全量返回,不存在翻页
   assert.deepEqual(result.forums, [
-    { fid: 1, kw: '吧一', isSign: true, isForbidden: false },
-    { fid: 2, kw: '吧二', isSign: false, isForbidden: true },
+    { fid: 11, kw: '吧一', isSign: true, isForbidden: false },
+    { fid: 12, kw: '吧二', isSign: false, isForbidden: true },
+    { fid: 13, kw: '吧三', isSign: false, isForbidden: false },
   ]);
-  assert.equal(calls[0].url, 'https://tieba.baidu.com/c/f/forum/forumGuide');
-  assert.equal(calls[0].options.method, 'POST');
-  assert.equal(calls[0].options.headers['Subapp-Type'], 'hybrid');
-  assert.equal(calls[0].options.headers['Content-Type'], 'application/x-www-form-urlencoded');
-  assert.equal(calls[0].options.headers.Referer, 'https://tieba.baidu.com/');
-  const body = new URLSearchParams(calls[0].options.body);
-  assert.equal(body.get('sort_type'), '3');
-  assert.equal(body.get('call_from'), '3');
-  assert.equal(body.get('page_no'), '1');
-  assert.equal(body.get('res_num'), '200');
+  assert.equal(calls[0].url, SESSION_URL);
+  assert.equal(calls[0].options.method, 'GET');
 });
 
-test('fetchFollowedForums:按 like_forum_has_more 翻页并汇总', async () => {
-  const pages = {
-    1: { like_forum: [{ forum_id: 1, forum_name: 'a', is_sign: 0 }], like_forum_has_more: '1' },
-    2: { like_forum: [{ forum_id: 2, forum_name: 'b', is_sign: 1 }], like_forum_has_more: '0' },
-  };
-  const { calls, fetchImpl } = stub((url, options) => ({
-    text: JSON.stringify(pages[pageOf(options)]),
-  }));
+test('fetchFollowedForums:合法地关注 0 个吧是 ok + 空数组,由下游处理歧义', async () => {
+  const { fetchImpl } = stub(jsonReply(session({ forums: [] })));
   const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
   assert.equal(result.ok, true);
-  assert.equal(result.count, 2);
-  assert.equal(result.hasMore, false);
-  assert.deepEqual(result.forums.map((f) => f.fid), [1, 2]);
-  assert.deepEqual(calls.map((c) => pageOf(c.options)), ['1', '2']);
-  assert.equal(new URLSearchParams(calls[1].options.body).get('res_num'), '200');
-});
-
-test('fetchFollowedForums:达 10 页上限仍未取完时如实回报 hasMore=true', async () => {
-  const { calls, fetchImpl } = stub((url, options) => ({
-    text: JSON.stringify({
-      like_forum: [{ forum_id: pageOf(options), forum_name: 'x', is_sign: 0 }],
-      like_forum_has_more: '1',
-    }),
-  }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, true);
-  assert.equal(calls.length, 10);
-  assert.equal(result.count, 10);
-  assert.equal(result.hasMore, true);
-});
-
-test('fetchFollowedForums:第 10 页恰好取完(has_more=0)不算 hasMore', async () => {
-  const { calls, fetchImpl } = stub((url, options) => ({
-    text: JSON.stringify({
-      like_forum: [{ forum_id: pageOf(options), forum_name: 'x', is_sign: 0 }],
-      like_forum_has_more: pageOf(options) === '10' ? '0' : '1',
-    }),
-  }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, true);
-  assert.equal(calls.length, 10);
-  assert.equal(result.count, 10);
-  assert.equal(result.hasMore, false);
-});
-
-test('fetchFollowedForums:服务端忽略 page_no 时按 fid 去重,count 不虚高', async () => {
-  const { calls, fetchImpl } = stub(() => ({
-    text: JSON.stringify({
-      like_forum: [{ forum_id: 7, forum_name: 'same', is_sign: 0 }],
-      like_forum_has_more: '1',
-    }),
-  }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, true);
-  assert.equal(calls.length, 10);
-  assert.equal(result.count, 1);
-  assert.deepEqual(result.forums.map((f) => f.fid), [7]);
-  assert.equal(result.hasMore, true);
-});
-
-test('fetchFollowedForums:跨页重复 fid 也只保留第一条', async () => {
-  const pages = {
-    1: { like_forum: [{ forum_id: 1, forum_name: 'a', is_sign: 0 }], like_forum_has_more: '1' },
-    2: {
-      like_forum: [
-        { forum_id: 1, forum_name: 'a', is_sign: 1 },
-        { forum_id: 2, forum_name: 'b', is_sign: 0 },
-      ],
-      like_forum_has_more: '0',
-    },
-  };
-  const { fetchImpl } = stub((url, options) => ({ text: JSON.stringify(pages[pageOf(options)]) }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.count, 2);
-  assert.deepEqual(result.forums.map((f) => f.fid), [1, 2]);
-  assert.equal(result.forums[0].isSign, false);
-});
-
-test('fetchFollowedForums:缺 like_forum 数组且 error_code 非 0 判 rejected(不是 auth)', async () => {
-  const { fetchImpl } = stub(jsonReply({ error_code: '1', error_msg: 'not login' }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.forums, null);
-  assert.equal(result.reason, 'rejected');
-  assert.equal(result.error, 'not login');
-});
-
-test('fetchFollowedForums:空列表 + error_code 非 0 不当成功(不能只看有没有数组)', async () => {
-  const { fetchImpl } = stub(jsonReply({ error_code: 340006, like_forum: [] }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.forums, null);
-  assert.equal(result.reason, 'rejected');
-  assert.ok(result.error);
-});
-
-test('fetchFollowedForums:空列表 + is_login 为假才判 auth(不能被空数组绕过)', async () => {
-  const { fetchImpl } = stub(jsonReply({ is_login: 0, like_forum: [], error_code: '0' }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.forums, null);
-  assert.equal(result.reason, 'auth');
-  assert.ok(result.error);
-});
-
-test('fetchFollowedForums:无数组 + is_login 为假判 auth(与空数组口径一致)', async () => {
-  const { fetchImpl } = stub(jsonReply({ is_login: 0 }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.forums, null);
-  assert.equal(result.reason, 'auth');
-});
-
-test('fetchFollowedForums:空列表且 error_code 为 0 是合法结果(ok + 空数组)', async () => {
-  const { fetchImpl } = stub(jsonReply({ error_code: '0', like_forum: [] }));
-  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.forums, []);
   assert.equal(result.count, 0);
+  assert.deepEqual(result.forums, []);
+});
+
+test('fetchFollowedForums:非 0 no + 非登录文案判 rejected(不能只看有没有数组)', async () => {
+  const { fetchImpl } = stub(jsonReply({ no: 340006, error: '账号异常' }));
+  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  assert.equal(result.ok, false);
+  assert.equal(result.forums, null);
+  assert.equal(result.reason, 'rejected');
+});
+
+test('fetchFollowedForums:未登录判 auth,不能被空数组绕过', async () => {
+  const { fetchImpl } = stub(jsonReply({ no: 1, error: '未登录' }));
+  const result = await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl } });
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'auth');
 });
 
 test('fetchFollowedForums:HTTP 500 判 http,响应非 JSON 判 parse', async () => {
-  const failed = await fetchFollowedForums({
-    cookie: 'BDUSS=x',
-    deps: { fetchImpl: stub(() => ({ status: 503, text: 'down' })).fetchImpl },
-  });
-  assert.equal(failed.ok, false);
-  assert.equal(failed.reason, 'http');
-  assert.equal(failed.hasMore, false);
-
-  const bad = await fetchFollowedForums({
-    cookie: 'BDUSS=x',
-    deps: { fetchImpl: stub(() => ({ text: '<html>' })).fetchImpl },
-  });
-  assert.equal(bad.ok, false);
-  assert.equal(bad.reason, 'parse');
+  const down = stub(() => ({ status: 500, text: 'boom' }));
+  assert.equal((await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl: down.fetchImpl } })).reason, 'http');
+  const html = stub(() => ({ text: '<html>login</html>' }));
+  assert.equal((await fetchFollowedForums({ cookie: 'BDUSS=x', deps: { fetchImpl: html.fetchImpl } })).reason, 'parse');
 });
 
 test('fetchFollowedForums:cookie 里没有 BDUSS 判 no-cookie 且不发请求', async () => {
-  let called = false;
-  const { fetchImpl } = stub(() => {
-    called = true;
-    return { text: '{}' };
-  });
+  const { calls, fetchImpl } = stub(jsonReply(session()));
   const result = await fetchFollowedForums({ cookie: 'STOKEN=x', deps: { fetchImpl } });
-  assert.equal(result.ok, false);
-  assert.equal(result.forums, null);
   assert.equal(result.reason, 'no-cookie');
-  assert.equal(called, false);
+  assert.equal(calls.length, 0);
+});
+
+// 2026-10-14 真机抓到的夹具:同一份 cookie 下 `/dc/common/tbs` 会回 is_login:0,而这里的
+// like_forum 与 tbs 都正常 —— 会话判定绝不能再依赖那个标志位(见 NOTICE)。
+test('真机夹具:newmoindex 的返回能解析出 tbs/uid/关注列表', async () => {
+  const fixture = JSON.parse(await (await import('node:fs/promises')).readFile(
+    new URL('./fixtures/real/newmoindex-ok.json', import.meta.url), 'utf8',
+  ));
+  const { fetchImpl } = stub(jsonReply(fixture));
+  const result = await fetchSession({ cookie: 'BDUSS=BDUSS_SAMPLE', deps: { fetchImpl } });
+  assert.equal(result.ok, true);
+  assert.equal(result.tbs, fixture.data.itb_tbs);
+  assert.equal(result.uid, '1000000000'); // 夹具里 uid 已打码
+  assert.equal(result.forums.length, fixture.data.like_forum.length);
+  assert.equal(result.forums[0].kw, fixture.data.like_forum[0].forum_name);
+  assert.equal(result.forums[0].isSign, String(fixture.data.like_forum[0].is_sign) === '1');
 });

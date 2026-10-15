@@ -146,9 +146,9 @@ test('没有账号 → 推送一条请你配置 BDUSS 的 action', async () => {
 
 test('账号级流程失败但读回显示全签 → 对账仍通过并锁当天', async () => {
   const dir = tmp();
-  // 第一次关注列表请求回 500,让 signAccount 记 ok:false;随后的读回成功且 is_sign 全为 1。
+  // 第 2 次会话请求(签到前那次)回 500,让 signAccount 记 ok:false;随后的读回成功且 is_sign 为 1。
   const stub = tiebaStub({
-    accounts: { 'BDUSS=A': { forums: [{ fid: 11, kw: '吧一', isSign: true }], guideFailures: 1 } },
+    accounts: { 'BDUSS=A': { forums: [{ fid: 11, kw: '吧一', isSign: true }], sessionFailAt: [2] } },
   });
   const { result, config } = await run({ dir, stub });
   assert.equal(result.ok, true);

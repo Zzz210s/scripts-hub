@@ -21,7 +21,8 @@ signed today. Zero npm dependencies; the only network traffic is the sign-in pro
 
 The program performs exactly two kinds of request against Tieba:
 
-- **Reads**: fetch `tbs` and the followed-forum list.
+- **Reads**: one call to `mo/q/newmoindex`, which returns the session, the client `tbs` and the
+  followed-forum list with its per-forum sign state.
 - **One write**: the sign-in call `POST c.tieba.baidu.com/c/c/forum/sign`.
 
 It never posts, replies, follows or unfollows, likes, sends messages, or spends anything. Those
@@ -138,12 +139,12 @@ program is disabled by default: verify with `check` and a single `run` first, th
 ```
 cd proj-baidu-tieba
 npm test                       # offline, no network and no subprocesses
-node src/cli.js check          # read-only: tbs, followed-forum count, already-signed count, reconciliation
+node src/cli.js check          # read-only: session, uid, followed-forum count, already-signed count, reconciliation
 node src/cli.js run --dry      # prints the messages it would send, sends nothing, writes nothing
 node src/cli.js report --dry   # re-renders today's last result
 ```
 
-`check` exits 1 when an account cannot fetch `tbs` or the followed-forum list, so a deployment probe can gate on it.
+`check` exits 1 when an account cannot fetch its session, so a deployment probe can gate on it.
 `run --dry` and `TIEBA_DRY_RUN=1` do not go online and write no state; they still read `.env` and `data/state.json`.
 
 From the repository root, `node scripts/check-wecom-drift.mjs` verifies the notification core is

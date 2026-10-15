@@ -1,0 +1,40 @@
+{
+  "no": 0,
+  "error": "success",
+  "data": {
+    "uid": 1000000000,
+    "tbs": "ad6c817fc04d04b5",
+    "itb_tbs": "3f422ecc52f0774f1791908367",
+    "like_forum": [
+      {
+        "forum_name": "2ch",
+        "user_level": "8",
+        "user_exp": "746",
+        "forum_id": 839326,
+        "is_like": true,
+        "favo_type": 2,
+        "is_sign": 1
+      },
+      {
+        "forum_name": "asoul",
+        "user_level": "1",
+        "user_exp": "1",
+        "forum_id": 3255599,
+        "is_like": true,
+        "favo_type": 2,
+        "is_sign": 0
+      },
+      {
+        "forum_name": "bilibili",
+        "user_level": "8",
+        "user_exp": "711",
+        "forum_id": 2265748,
+        "is_like": true,
+        "favo_type": 2,
+        "is_sign": 0
+      }
+    ],
+    "ubs_sample_ids": [],
+    "ubs_abtest_config": {}
+  }
+}

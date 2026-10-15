@@ -58,7 +58,7 @@ test('全部凭据失效 → 推 action 且带逐账号错误细节', async () =
   assert.equal(sent.length, 1);
   assert.match(sent[0], /需要你处理/);
   assert.match(sent[0], /细节:/);
-  assert.match(sent[0], /未登录或凭据已失效/);
+  assert.match(sent[0], /未登录/);
 });
 
 test('手动暂停 → 静默跳过,不推送', async () => {

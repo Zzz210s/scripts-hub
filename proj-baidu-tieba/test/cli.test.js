@@ -34,10 +34,10 @@ test('check 打印逐账号 tbs、关注数、已签数与对账结论', async (
     log,
     deps: { fetchImpl: stub.fetchImpl, freeMb: () => 4096 },
   });
-  assert.equal(code, 1); // 有一个账号取不到 tbs
+  assert.equal(code, 1); // 有一个账号取不到会话
   assert.match(join(), /只读体检/);
-  assert.match(join(), /账号 1 · tbs 可取 · 关注 2 个吧 · 已签 1 个/);
-  assert.match(join(), /账号 2 · tbs 取不到/);
+  assert.match(join(), /账号 1 · 会话可取 · uid \d+ · 关注 2 个吧 · 已签 1 个/);
+  assert.match(join(), /账号 2 · 会话取不到 · 未登录/);
   assert.ok(lines.length >= 4);
 });
 

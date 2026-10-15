@@ -6,7 +6,7 @@
 //
 // 失败一律附机器可读的 `reason`(与 ok/status 正交),取值:
 //   'ok'        本跳拿到可用响应;业务层结论另看 ok / status
-//   'auth'      服务器明确说凭据失效(响应里 `is_login` 为假);换 cookie 才能解决
+//   'auth'      服务器明确说未登录(newmoindex 的 error 文案里带「登录」);换 cookie 才能解决
 //   'rejected'  服务器回了非 0 的 error_code(如贴吧已被屏蔽 340006);不是凭据问题、
 //               也不是形状问题,编排按业务拒绝处理
 //   'http'      非 2xx
@@ -18,12 +18,11 @@
 import { cookieValue, FORM, request } from './http.js';
 import { buildSignParams, judgeSign, parseSignResponse, SIGN_STATUS } from './sign.js';
 
-const MAX_PAGES = 10;
-const PAGE_SIZE = 200;
-
 const URLS = Object.freeze({
-  tbs: 'https://tieba.baidu.com/dc/common/tbs',
-  forumGuide: 'https://tieba.baidu.com/c/f/forum/forumGuide',
+  // 会话与关注列表都从这一个接口拿:它一次给出 uid、客户端 tbs 与 like_forum[](含 is_sign)。
+  // 2026-10-14 真机实测:旧的 `/dc/common/tbs` 会回 `is_login: 0` 而同一份 cookie 在
+  // 这里与 sign 接口上都正常 —— 拿它当凭据闸门会把有效凭据误判成失效(见 NOTICE)。
+  session: 'https://tieba.baidu.com/mo/q/newmoindex',
   sign: 'https://c.tieba.baidu.com/c/c/forum/sign',
 });
 
@@ -40,16 +39,6 @@ function hasErrorCode(data) {
   return Number.isFinite(code) && code !== 0;
 }
 
-/**
- * 服务器的**明确拒绝信号**:`is_login` 为假 -> `'auth'`;否则非 0 error_code ->
- * `'rejected'`;两者都没有 -> `null`。`null` 只表示「没有明确拒绝」,不代表响应可用 ——
- * 「有没有可用数据」是调用方自己按形状判的。
- */
-function rejectionReason(data) {
-  if (data && data.is_login !== undefined && !toFlag(data.is_login)) return 'auth';
-  return hasErrorCode(data) ? 'rejected' : null;
-}
-
 /** 从响应里取一句人类可读的报错;取不到返回 null。 */
 function responseMessage(data) {
   const text = data?.error_msg || data?.error?.usermsg || data?.error?.errmsg || null;
@@ -57,88 +46,70 @@ function responseMessage(data) {
 }
 
 /**
- * 取 tbs。`is_login` 为假 = 凭据失效(reason `'auth'`),不算拿到 tbs。
- * cookie 里没有 BDUSS 时先判 `'no-cookie'`,不发匿名请求。
- * @returns {Promise<{ ok: boolean, tbs: string|null, error: string|null, reason: string }>}
+ * 取会话:`GET /mo/q/newmoindex` 一次给出 uid、客户端 tbs(`data.itb_tbs`)与已关注吧列表。
+ *
+ * 凭据失效怎么判:`data` 缺失或 `no !== 0` 即视为没拿到会话;错误文案里带「登录」的归
+ * `'auth'`,其余非 0 归 `'rejected'`。**不再看 `/dc/common/tbs` 的 `is_login`** —— 真机实测
+ * 它对有效凭据也回 0(见 NOTICE),那是我们上一版误判「凭据已失效」的根因。
+ *
+ * tbs 取 `data.itb_tbs`(26 位客户端串,真机验证可直接用于 sign);缺失时退回 `data.tbs`。
+ * 两者都没有 = 形状不对(reason `'parse'`)。
+ *
+ * @returns {Promise<{ ok: boolean, tbs: string|null, uid: string|null,
+ *                     forums: Array|null, count: number, error: string|null, reason: string }>}
  */
-export async function fetchTbs({ cookie, deps } = {}) {
-  if (!cookieValue(cookie, 'BDUSS')) {
-    return { ok: false, tbs: null, error: 'cookie 里没有 BDUSS', reason: 'no-cookie' };
+export async function fetchSession({ cookie, deps } = {}) {
+  const failure = (error, reason) => ({ ok: false, tbs: null, uid: null, forums: null, count: 0, error, reason });
+  if (!cookieValue(cookie, 'BDUSS')) return failure('cookie 里没有 BDUSS', 'no-cookie');
+  const res = await request(URLS.session, { cookie, deps });
+  if (!res.ok) return failure(res.error, res.reason);
+  const data = res.data?.data;
+  const no = Number(res.data?.no);
+  const rawError = typeof res.data?.error === 'string' ? res.data.error : '';
+  if (!data || typeof data !== 'object') {
+    // 三种都不是「有会话」:明确说未登录 -> auth;非 0 no 有别的含义 -> rejected;其余是形状不对。
+    if (/登录|login/i.test(rawError)) return failure(rawError, 'auth');
+    if (Number.isFinite(no) && no !== 0) return failure(rawError || `接口返回 no=${no}`, 'rejected');
+    return failure(rawError && rawError !== 'success' ? rawError : '响应里没有 data', 'parse');
   }
-  const res = await request(URLS.tbs, { cookie, deps });
-  if (!res.ok) return { ok: false, tbs: null, error: res.error, reason: res.reason };
-  if (!toFlag(res.data?.is_login)) {
-    return { ok: false, tbs: null, error: '未登录或凭据已失效', reason: 'auth' };
-  }
-  const tbs = res.data?.tbs;
-  if (typeof tbs !== 'string' || tbs === '') {
-    return { ok: false, tbs: null, error: '响应里没有 tbs', reason: 'parse' };
-  }
-  return { ok: true, tbs, error: null, reason: 'ok' };
+  const tbs = typeof data.itb_tbs === 'string' && data.itb_tbs !== '' ? data.itb_tbs : data.tbs;
+  if (typeof tbs !== 'string' || tbs === '') return failure('响应里没有可用的 tbs', 'parse');
+  const list = Array.isArray(data.like_forum) ? data.like_forum : [];
+  const forums = list.map((item) => ({
+    fid: item?.forum_id ?? null,
+    kw: item?.forum_name ?? null,
+    isSign: toFlag(item?.is_sign),
+    isForbidden: toFlag(item?.is_forbidden),
+  }));
+  return { ok: true, tbs, uid: data.uid === undefined ? null : String(data.uid), forums, count: forums.length, error: null, reason: 'ok' };
 }
 
-/** 关注列表失败时的统一返回。 */
-function forumsFailure(error, reason) {
-  return { ok: false, forums: null, hasMore: false, count: 0, error, reason };
+/** 取 tbs:`fetchSession` 的薄视图(调用方只需要 tbs 时用它)。 */
+export async function fetchTbs({ cookie, deps } = {}) {
+  const session = await fetchSession({ cookie, deps });
+  return { ok: session.ok, tbs: session.tbs, error: session.error, reason: session.reason };
 }
 
 /**
- * 取已关注贴吧列表,`like_forum[]` -> `{ fid, kw, isSign, isForbidden }`。
- * 按 `like_forum_has_more` 翻页(每页 200),最多 `MAX_PAGES` 页防死循环;重复的 `fid`
- * 只保留第一条(服务端忽略 `page_no` 时会连续回同一批),故 `count` 是去重后的数量。
- * `hasMore` 为真 = 达上限仍未取完,下游必须拒绝锁当天(Task 5)。
+ * 取已关注贴吧列表:`fetchSession` 的薄视图。`like_forum` 是**单次全量**返回(真机实测
+ * 134 个吧一次给全),所以 `hasMore` 恒为假;`count` 就是列表长度。
  *
- * 注意 `count === 0` 有歧义:`ok:true` + `count:0` 既可能是「合法地关注 0 个吧」,
- * 也可能是「关注列表读不到但没报错」;下游(Task 4/5)必须单独处理这个取值,不能把它
- * 当成「全部已签」。
+ * 注意 `count === 0` 的歧义:`ok:true` + `count:0` 既可能是「合法地关注 0 个吧」,也可能是
+ * 「列表读不到但没报错」;下游必须单独处理这个取值,不能当成「全部已签」。
  *
  * @returns {Promise<{ ok: boolean, forums: Array|null, hasMore: boolean,
  *                     count: number, error: string|null, reason: string }>}
  */
 export async function fetchFollowedForums({ cookie, deps } = {}) {
-  if (!cookieValue(cookie, 'BDUSS')) return forumsFailure('cookie 里没有 BDUSS', 'no-cookie');
-  const forums = [];
-  const seen = new Set();
-  let hasMore = false;
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const body = new URLSearchParams({
-      sort_type: '3',
-      call_from: '3',
-      page_no: String(page),
-      res_num: String(PAGE_SIZE),
-    }).toString();
-    const res = await request(URLS.forumGuide, {
-      cookie,
-      deps,
-      method: 'POST',
-      headers: { 'Subapp-Type': 'hybrid', 'Content-Type': FORM },
-      body,
-    });
-    if (!res.ok) return forumsFailure(res.error, res.reason);
-    const list = res.data?.like_forum;
-    const rejection = rejectionReason(res.data);
-    const message = responseMessage(res.data) ?? '响应里没有可用的 like_forum 数组';
-    // 不是数组 = 形状不对;空数组则看服务器有没有明确拒绝 —— 凭据失效时可能回
-    // `like_forum: []` 而不是缺字段,而合法地关注 0 个吧也会回 `[]`。
-    if (!Array.isArray(list)) return forumsFailure(message, rejection ?? 'parse');
-    if (list.length === 0 && rejection !== null) return forumsFailure(message, rejection);
-    for (const item of list) {
-      const fid = item?.forum_id ?? null;
-      if (fid !== null) {
-        if (seen.has(fid)) continue;
-        seen.add(fid);
-      }
-      forums.push({
-        fid,
-        kw: item?.forum_name ?? null,
-        isSign: toFlag(item?.is_sign),
-        isForbidden: toFlag(item?.is_forbidden),
-      });
-    }
-    if (!toFlag(res.data?.like_forum_has_more)) break;
-    if (page === MAX_PAGES) hasMore = true;
-  }
-  return { ok: true, forums, hasMore, count: forums.length, error: null, reason: 'ok' };
+  const session = await fetchSession({ cookie, deps });
+  return {
+    ok: session.ok,
+    forums: session.forums,
+    hasMore: false,
+    count: session.count,
+    error: session.error,
+    reason: session.reason,
+  };
 }
 
 /**
