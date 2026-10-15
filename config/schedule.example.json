@@ -139,6 +139,7 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
       "actionVbs": ""
     }
   }

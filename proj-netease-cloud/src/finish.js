@@ -21,11 +21,14 @@ const failedReason = (outcomes) => outcomes.find((one) => one.reason && one.reas
  * 返回形状与 runOnce 的成功分支一致,run.js 直接原样返回。
  */
 export async function finishRun({ config, state, outcomes, date, day, now, deliver, log, deliveries, messages, deps }) {
-  // 成长基线:首次运行采一次,之后只用「相对基线变化」,没有基线就不写这一行。
-  // 读不到余额时**不落基线** —— 写一个 {yunbei:null} 会让这一行永远消失,以后也再采不到。
+  // 基线:首次运行采一次(云贝今日所得 + 成长值),之后只用「相对基线变化」。
+  // 两个数字都要有才落基线 —— 落后一个 null 会让「相对基线」那行永远消失(评审抓过一次)。
   const previous = state.baseline
-  const balance = numOrNull(outcomes.find((one) => one.yunbei?.ok === true)?.yunbei?.balance)
-  if (!state.baseline && balance !== null) state.baseline = day0Baseline(state, { yunbei: balance, growthPoint: null })
+  const balance = numOrNull(outcomes.find((one) => one.yunbei?.ok === true)?.yunbei?.todayShells)
+  const growthPoint = numOrNull(outcomes.find((one) => one.vip?.before)?.vip?.before?.growth?.growthPoint)
+  if (!state.baseline && balance !== null && growthPoint !== null) {
+    state.baseline = day0Baseline(state, { yunbei: balance, growthPoint })
+  }
 
   const ok = overallOk(outcomes)
   const exitCode = ok ? 0 : 1

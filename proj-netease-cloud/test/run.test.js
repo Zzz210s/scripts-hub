@@ -176,3 +176,18 @@ test('首次运行读不到云贝余额:不落基线,下次还能再采', async 
   // 落一个 {yunbei:null} 会让「相对基线」永远消失;没有数字就什么都不写。
   assert.equal(readStateFile(config).baseline, null)
 })
+
+// 2026-10-15 真机教训:基线两个数字都要有才落 —— 只写半个(另一个 null)会让「相对基线」
+// 那行永远消失,而且事后看不出来(历史里只看到 baseline 存在)。
+test('基线:云贝与成长值都取到才落,落下来的两个数都不是 null', async () => {
+  const root = tempDir()
+  const config = configFor(root)
+  const { fetchImpl } = stubFetch({
+    ...okYunbei(),
+    ...okVipReads({ point: 7527 }),
+    [PATHS.vipSign]: { body: { code: 200, data: true, message: '' } },
+  })
+  const { deps } = harness({ fetchImpl, root, config })
+  await runOnce({ cwd: root, now: NOW, deps })
+  assert.deepEqual(readStateFile(config).baseline, { yunbei: 130, growthPoint: 7527 })
+})
