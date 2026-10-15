@@ -46,11 +46,19 @@ export function stubFetch(replies) {
 
 export const countOf = (calls, fragment) => calls.filter((url) => url.includes(fragment)).length
 
-/** 云贝两条查询都成功的回复;可整体覆盖。 */
+/** 云贝两条查询都成功的回复(真机形状:days/shells 与 shells);可整体覆盖。 */
 export function okYunbei() {
   return {
-    [PATHS.yunbeiSignedGet]: { body: { code: 200, data: { sign: true, yunbeiNum: 120 } } },
-    [PATHS.yunbeiTodayGet]: { body: { code: 200, data: { yunbeiNum: 120 } } },
+    [PATHS.yunbeiSignedGet]: { body: { code: 200, data: { days: 4, shells: 2 } } },
+    [PATHS.yunbeiTodayGet]: { body: { code: 200, data: { shells: 130 } } },
+  }
+}
+
+/** 成长值 + 逐日记录两条只读回复(真机形状)。 */
+export function okVipReads({ point = 7527, score = 3 } = {}) {
+  return {
+    [PATHS.vipGrowthPoint]: { body: { code: 200, data: { userLevel: { level: 4, growthPoint: point, yesterdayPoint: 6 } } } },
+    [PATHS.vipSignInfo]: { body: { code: 200, data: [{ timeStr: '2026-10-11', today: true, score }] } },
   }
 }
 

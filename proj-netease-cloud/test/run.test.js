@@ -7,15 +7,15 @@ import fs from 'node:fs'
 import { PATHS } from '../src/crypto.js'
 import { runOnce } from '../src/run.js'
 import { emptyState, historyFile, setPaused, stateFile, writeState } from '../src/state.js'
-import { DAY, NOW, configFor, countOf, harness, okYunbei, readStateFile, stubFetch, tempDir } from './run-harness.js'
+import { DAY, NOW, configFor, countOf, harness, okVipReads, okYunbei, readStateFile, stubFetch, tempDir } from './run-harness.js'
 
 test('乐签成功:两条请求都生效,读回确认后锁当天并落历史', async () => {
   const root = tempDir()
   const config = configFor(root)
   const { calls, fetchImpl } = stubFetch({
     ...okYunbei(),
-    [PATHS.vipSign]: { body: { code: 200, data: { sign: true } } },
-    [PATHS.vipCheckinDetail]: { body: { code: 200, data: { sign: true } } },
+    ...okVipReads(),
+    [PATHS.vipSign]: { body: { code: 200, data: true, message: '' } },
   })
   const { deps, sent } = harness({ fetchImpl, root, config })
 
@@ -24,7 +24,7 @@ test('乐签成功:两条请求都生效,读回确认后锁当天并落历史', 
   assert.equal(result.skipped, false)
   assert.equal(result.ok, true)
   assert.equal(result.exitCode, 0)
-  assert.equal(calls.length, 4) // 云贝两条 + 签到两条,逐条串行
+  assert.equal(calls.length, 7) // 云贝 2 + 状态读回 2 + 签到 1 + 签后状态读回 2,逐条串行
   assert.equal(countOf(calls, PATHS.vipSign), 1)
   const state = readStateFile(config)
   assert.equal(state.days[DAY].ok, true) // 锁当天
@@ -57,10 +57,10 @@ test('鉴权失效:只读体检即判死,当天熔断 + 一条 action,只发一�
   assert.equal(calls.length, 1)
 })
 
-test('签到阶段鉴权失效:当天熔断,不发读回那条 eapi 请求', async () => {
+test('签到阶段鉴权失效:当天熔断,不再发签到之后的状态读回', async () => {
   const root = tempDir()
   const config = configFor(root)
-  const { calls, fetchImpl } = stubFetch({ ...okYunbei(), [PATHS.vipSign]: { body: { code: 447, data: null } } })
+  const { calls, fetchImpl } = stubFetch({ ...okYunbei(), ...okVipReads(), [PATHS.vipSign]: { body: { code: 447, data: null } } })
   const { deps } = harness({ fetchImpl, root, config })
 
   const result = await runOnce({ cwd: root, now: NOW, deps })
@@ -68,7 +68,9 @@ test('签到阶段鉴权失效:当天熔断,不发读回那条 eapi 请求', asy
   assert.equal(result.ok, false)
   assert.equal(result.exitCode, 1)
   assert.equal(countOf(calls, PATHS.vipSign), 1)
-  assert.equal(countOf(calls, PATHS.vipCheckinDetail), 0) // 鉴权类失败提前止损
+  // 鉴权类失败提前止损:签后那次状态读回不该发生(状态读回只各发生一次)
+  assert.equal(countOf(calls, PATHS.vipGrowthPoint), 1)
+  assert.equal(countOf(calls, PATHS.vipSignInfo), 1)
   assert.equal(readStateFile(config).days[DAY].circuitKind, 'auth')
 })
 
@@ -115,6 +117,7 @@ test('签到阶段 HTTP 429:当天熔断为 rate-limit,不写「结构不符」'
   const config = configFor(root)
   const { calls, fetchImpl } = stubFetch({
     ...okYunbei(),
+    ...okVipReads(),
     [PATHS.vipSign]: { status: 429, body: { code: 429 } },
   })
   const { deps, sent } = harness({ fetchImpl, root, config })
@@ -123,7 +126,8 @@ test('签到阶段 HTTP 429:当天熔断为 rate-limit,不写「结构不符」'
 
   assert.equal(result.exitCode, 1)
   assert.equal(countOf(calls, PATHS.vipSign), 1) // 限流不重试
-  assert.equal(countOf(calls, PATHS.vipCheckinDetail), 0) // 也不发读回那条 eapi
+  // 限流也不该再发签后那次状态读回(状态读回各只发生一次)
+  assert.equal(countOf(calls, PATHS.vipGrowthPoint), 1)
   assert.equal(readStateFile(config).days[DAY].circuitKind, 'rate-limit') // 当天熔断
   const text = sent.join('\n')
   assert.equal(text.includes('结构不符'), false)
@@ -159,10 +163,10 @@ test('首次运行读不到云贝余额:不落基线,下次还能再采', async 
   const root = tempDir()
   const config = configFor(root)
   const { fetchImpl } = stubFetch({
-    [PATHS.yunbeiSignedGet]: { body: { code: 200, data: { sign: true } } },
+    [PATHS.yunbeiSignedGet]: { body: { code: 200, data: { days: 4, shells: 2 } } },
     [PATHS.yunbeiTodayGet]: { body: { code: 200, data: {} } },
-    [PATHS.vipSign]: { body: { code: 200, data: { sign: true } } },
-    [PATHS.vipCheckinDetail]: { body: { code: 200, data: { sign: true } } },
+    ...okVipReads(),
+    [PATHS.vipSign]: { body: { code: 200, data: true, message: '' } },
   })
   const { deps } = harness({ fetchImpl, root, config })
 

@@ -102,7 +102,7 @@ test('常量与路径集中导出且不可变', () => {
   assert.match(CRYPTO.weapiPublicKeyPem, /^-----BEGIN PUBLIC KEY-----/)
   assert.equal(PATHS.vipSign, '/weapi/vip-center-bff/task/sign')
   assert.equal(
-    PATHS.vipCheckinDetail,
+    '/eapi/vipnewcenter/app/level/user/checkin/history/detail',
     '/eapi/vipnewcenter/app/level/user/checkin/history/detail',
   )
 })

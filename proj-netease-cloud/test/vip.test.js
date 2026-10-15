@@ -1,180 +1,141 @@
-// T4:VIP 乐签两条请求 + 读回判定的离线单测。fetchImpl 全是桩,没有真实网络请求。
-// 夹具 test/fixtures/vip-*.json 目前是「按调研文档推断的形状」的脱敏占位样本
-// (字段名来自 api-enhanced issue #197/#234 的 data.sign),待 T3 探针跑通后用真实响应替换。
-// vip-sign-ok.json 是「签到动作」的响应:此时仍为未签(sign:false),真正的「已签」由读回段证明 ——
-// 旧夹具在这里写成 sign:true 与「签到前未签」自相矛盾,已按语义改顺。
-// 待 T3 校正的字段清单见 .superpowers/.../task-4-6-report.md 与 NOTICE。
+// T4:VIP 乐签。协议形状按 2026-10-15 真机校正:
+//   读状态(成长值 + 逐日记录)→ pace → POST /weapi/vip-center-bff/task/sign → pace → 再读一次
+// 判定以签到动作的**业务字段**(code 200 且 data true)为准,不再依赖那条稳定 HTTP 400 的 eapi。
+// 全部离线:fetchImpl 是桩,没有任何真实网络请求。
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createDecipheriv } from 'node:crypto'
 
-import { judgeVipSign, readSignState, signVip } from '../src/vip.js'
-import { CRYPTO, PATHS } from '../src/crypto.js'
+import { judgeVipAction, judgeVipSign, readVipState, signVip } from '../src/vip.js'
+import { PATHS } from '../src/crypto.js'
 import { COOKIE, form } from './support.js'
 
-const fixture = (name) =>
-  JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'))
+const GROWTH = PATHS.vipGrowthPoint
+const INFO = PATHS.vipSignInfo
+const SIGN = PATHS.vipSign
 
-/** 按调用次序返回预置响应的桩;同时记录 url/body 与 sleep 的入参。 */
-function scripted(replies) {
+const growthBody = ({ point = 7527, yesterday = 6, level = 4 } = {}) => ({
+  code: 200,
+  data: { userLevel: { level, growthPoint: point, yesterdayPoint: yesterday } },
+})
+const infoBody = ({ score = 3, today = '2026-10-15' } = {}) => ({
+  code: 200,
+  data: [{ timeStr: today, today: true, score }, { timeStr: '2026-10-14', today: false, score: 0 }],
+})
+const signBody = ({ code = 200, data = true } = {}) => ({ code, data, message: '' })
+
+/** 按 URL 分派;`sign` 可以给对象或函数(按调用次数变化)。 */
+const stubFetch = ({ growth = growthBody(), info = infoBody(), sign = signBody(), status = {}, throwOn = null } = {}) => {
   const calls = []
-  const sleeps = []
   const fetchImpl = async (url, options) => {
     calls.push({ url, options })
-    const reply = replies[Math.min(calls.length - 1, replies.length - 1)]
-    if (reply?.throwError) throw reply.throwError
-    const status = reply?.status ?? 200
-    return { ok: status < 400, status, text: async () => JSON.stringify(reply?.body ?? {}) }
+    if (throwOn && url.includes(throwOn)) throw new Error('ECONNRESET')
+    const reply = url.includes(SIGN) ? sign : url.includes(GROWTH) ? growth : info
+    const payload = typeof reply === 'function' ? reply(calls.length) : reply
+    const code = status[url.includes(SIGN) ? 'sign' : url.includes(GROWTH) ? 'growth' : 'info'] ?? 200
+    return { status: code, ok: code < 400, text: async () => JSON.stringify(payload) }
   }
-  const sleep = async (ms) => {
-    sleeps.push(ms)
-  }
-  return { calls, sleeps, fetchImpl, sleep }
+  return { calls, fetchImpl }
 }
 
-/** 解开 eapi 表单里的密文,拿回逻辑路径与实际入参,用于断言第二条请求的内容。 */
-function eapiPlain(paramsHex) {
-  const decipher = createDecipheriv('aes-128-ecb', Buffer.from(CRYPTO.eapiAesKey, 'utf8'), null)
-  const text = Buffer.concat([
-    decipher.update(Buffer.from(paramsHex, 'hex')),
-    decipher.final(),
-  ]).toString('utf8')
-  const [url, data] = text.split(CRYPTO.eapiSeparator)
-  return { url, data: JSON.parse(data) }
-}
+const deps = (stub, extra = {}) => ({ fetchImpl: stub.fetchImpl, sleep: async () => {}, retries: 0, ...extra })
 
-test('两条请求都成功且业务字段显示已签:businessOk=true、step=done', async () => {
-  const { calls, sleeps, fetchImpl, sleep } = scripted([
-    { body: fixture('vip-sign-ok.json') },
-    { body: fixture('vip-checkin-ok.json') },
-  ])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+test('签到成功:先读状态再签到再读一次,业务字段确认 → businessOk=true、step=done', async () => {
+  const stub = stubFetch()
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
   assert.equal(result.ok, true)
   assert.equal(result.step, 'done')
   assert.equal(result.businessOk, true)
-  assert.equal(result.before, false)
-  assert.equal(result.after, true)
-  assert.equal(calls.length, 2)
-  assert.equal(calls[0].url, `https://music.163.com${PATHS.vipSign}`)
-  assert.equal(calls[1].url, `https://interfacepc.music.163.com${PATHS.vipCheckinDetail}`)
-  // 单账号串行:两条之间必须等一次,且间隔不低于 3 秒(设计文档第 5 节硬约束)。
-  assert.equal(sleeps.length, 1)
-  assert.ok(sleeps[0] >= 3000, `请求间隔应 >=3000ms,实际 ${sleeps[0]}`)
-  // 第二条必须带 signDayTime 与 type=1;eapi 的密文可在测试里用公开常量解开复核。
-  const second = eapiPlain(form(calls[1].options.body).get('params'))
-  assert.equal(second.url, '/api/vipnewcenter/app/level/user/checkin/history/detail')
-  assert.equal(second.data.type, 1)
-  assert.equal(typeof second.data.signDayTime, 'number')
-  assert.ok(result.raw.sign && result.raw.checkin)
-})
+  assert.equal(result.before.growth.growthPoint, 7527)
+  assert.equal(result.before.today.score, 3)
+  // 三次调用:读成长值、读记录、签到;之后再读一次成长值与记录
+  assert.equal(stub.calls.filter((c) => c.url.includes(SIGN)).length, 1)
+  assert.equal(stub.calls.filter((c) => c.url.includes(GROWTH)).length, 2)
+  assert.equal(stub.calls.filter((c) => c.url.includes(INFO)).length, 2)
+  assert.equal(stub.calls.find((c) => c.url.includes(SIGN)).options.method, 'POST')
+});
 
-test('HTTP 200 但业务字段显示未签:businessOk=false、不重试、不算成功', async () => {
-  const { calls, fetchImpl, sleep } = scripted([
-    { body: fixture('vip-sign-ok.json') },
-    { body: fixture('vip-fake-success.json') },
-  ])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+test('签到动作返回 data:false:businessOk=false、不算成功', async () => {
+  const stub = stubFetch({ sign: signBody({ data: false }) })
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
+  assert.equal(result.step, 'sign')
   assert.equal(result.businessOk, false)
   assert.equal(result.ok, false)
-  assert.equal(result.step, 'checkin')
-  assert.equal(result.before, false)
-  assert.equal(result.after, false)
-  // 读回发过,但没有第三次请求(设计文档:失败就是失败,不做接口级重试)。
-  assert.equal(calls.length, 2)
-})
+});
 
-test('第一条成功第二条失败:step=sign、businessOk=null、不算完成', async () => {
-  const { calls, fetchImpl, sleep } = scripted([
-    { body: fixture('vip-sign-ok.json') },
-    { status: 500, body: { code: 500 } },
-  ])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(result.step, 'sign')
+test('签到动作 code 非 200:businessOk=false,不因为 HTTP 200 就算成功', async () => {
+  const stub = stubFetch({ sign: signBody({ code: 250, data: true }) })
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
+  assert.equal(result.businessOk, false);
   assert.equal(result.ok, false)
-  // 读回没拿到 → 无法确认,绝不因为签到动作自称 200 就判成功。
-  assert.equal(result.businessOk, null)
-  assert.equal(result.after, null)
-  assert.equal(calls.length, 2)
-})
+});
 
-test('字段缺失:不抛,businessOk=null', async () => {
-  const { fetchImpl, sleep } = scripted([
-    { body: fixture('vip-shape-missing.json') },
-    { body: fixture('vip-shape-missing.json') },
-  ])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
+test('签到动作形状不认识(没有 data):businessOk=null,不猜成功', async () => {
+  const stub = stubFetch({ sign: { code: 200, message: 'ok' } })
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
   assert.equal(result.businessOk, null)
   assert.equal(result.ok, false)
-  assert.equal(result.step, 'checkin')
-})
+});
 
-test('凭据失效:不再发读回,只发一次请求', async () => {
-  const { calls, fetchImpl, sleep } = scripted([{ body: { code: 301 } }])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(calls.length, 1)
+test('凭据失效(301):只发一次请求,当天熔断,不发读回', async () => {
+  const stub = stubFetch({ sign: { code: 301, message: '未登录' }, status: { sign: 200 } })
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
   assert.equal(result.step, 'sign')
-  assert.equal(result.businessOk, null)
-  assert.equal(result.raw.checkin, undefined)
-})
+  assert.equal(stub.calls.filter((c) => c.url.includes(SIGN)).length, 1)
+  // 只读了开始前那次状态:签到之后没有再去读
+  assert.equal(stub.calls.filter((c) => c.url.includes(GROWTH)).length, 1)
+});
 
-test('风控/鉴权码 447:不再发读回,只发一次请求(回归:与 AUTH_CODES 同源)', async () => {
-  const { calls, fetchImpl, sleep } = scripted([{ body: { code: 447 } }])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(calls.length, 1)
-  assert.equal(result.step, 'sign')
-  assert.equal(result.businessOk, null)
-  assert.equal(result.raw.sign.reason, 'auth')
-})
+test('限流(业务 code 429 与 HTTP 429)都不重试、不发读回', async () => {
+  for (const [label, sign, status] of [
+    ['业务 code 429', { code: 429, message: '过于频繁' }, {}],
+    ['HTTP 429', { code: 200, data: true }, { sign: 429 }],
+  ]) {
+    const stub = stubFetch({ sign, status })
+    const result = await signVip({ cookie: COOKIE, deps: deps(stub, { retries: 0 }) })
+    assert.equal(result.ok, false, label)
+    assert.equal(stub.calls.filter((c) => c.url.includes(SIGN)).length, 1, label)
+    assert.equal(stub.calls.filter((c) => c.url.includes(GROWTH)).length, 1, label)
+  }
+});
 
-test('业务 code 429 限流:不再发读回,只发一次请求(回归:限流不重试)', async () => {
-  // scripted 只有一条回复:若还发第二条,它会回空对象 —— calls 断言把它抓住。
-  const { calls, fetchImpl, sleep } = scripted([{ body: { code: 429 } }])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(calls.length, 1)
-  assert.equal(result.step, 'sign')
-  assert.equal(result.businessOk, null)
-  assert.equal(result.raw.checkin, undefined)
-  assert.equal(result.raw.sign.code, 429)
-  assert.equal(result.raw.sign.reason, 'http')
-})
+test('读状态失败时如实标出,但签到动作仍按自己的业务字段判定', async () => {
+  const stub = stubFetch({ growth: { code: 500, message: 'boom' }, status: { growth: 500 } })
+  const result = await signVip({ cookie: COOKIE, deps: deps(stub) })
+  assert.equal(result.before.ok, false)
+  assert.equal(result.before.growth.growthPoint, null)
+  assert.equal(result.businessOk, true) // 签到动作自己回了 data:true
+});
 
-test('HTTP 429 限流:同样不发读回(回归:httpStatus 必须传进分类矩阵)', async () => {
-  const { calls, fetchImpl, sleep } = scripted([{ status: 429, body: { code: 429 } }])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(calls.length, 1)
-  assert.equal(result.step, 'sign')
-  assert.equal(result.businessOk, null)
-  assert.equal(result.raw.sign.httpStatus, 429)
-})
+test('readVipState:把成长值与今天那一条读出来,形状不认识就是 null', async () => {
+  const stub = stubFetch()
+  const state = await readVipState({ cookie: COOKIE, deps: deps(stub) })
+  assert.deepEqual(state.growth, { level: 4, growthPoint: 7527, yesterdayPoint: 6 })
+  assert.deepEqual(state.today, { timeStr: '2026-10-15', score: 3 })
+  const broken = await readVipState({ cookie: COOKIE, deps: deps(stubFetch({ growth: {}, info: {} })) })
+  assert.deepEqual(broken.growth, { level: null, growthPoint: null, yesterdayPoint: null })
+  assert.equal(broken.today, null)
+});
 
-test('签到请求业务失败但读回显示已签:判为已签过,ok=true', async () => {
-  const { calls, fetchImpl, sleep } = scripted([
-    { body: { code: 250, msg: 'SAMPLE_ALREADY_SIGNED' } },
-    { body: fixture('vip-checkin-ok.json') },
-  ])
-  const result = await signVip({ cookie: COOKIE, deps: { fetchImpl, sleep } })
-  assert.equal(calls.length, 2)
-  assert.equal(result.businessOk, true)
-  assert.equal(result.ok, true)
-  assert.equal(result.step, 'done')
-})
+test('真机夹具:签到动作与状态读回的真实形状', async () => {
+  const action = JSON.parse(readFileSync(new URL('./fixtures/vip-sign-action-ok.json', import.meta.url), 'utf8'))
+  assert.equal(judgeVipAction(action), true)
+  assert.equal(judgeVipAction({ code: 200, data: false }), false)
+  assert.equal(judgeVipAction({ code: 200 }), null)
+  assert.equal(judgeVipAction(null), null)
+});
 
-test('readSignState:只认明确布尔或 1/0,其余一律 null', () => {
-  assert.equal(readSignState({ code: 200, data: { sign: true } }), true)
-  assert.equal(readSignState({ code: 200, data: { sign: false } }), false)
-  assert.equal(readSignState({ code: 200, data: { signed: 1 } }), true)
-  assert.equal(readSignState({ code: 200, data: { hasSigned: 0 } }), false)
-  assert.equal(readSignState({ code: 200, data: {} }), null)
-  assert.equal(readSignState({ code: 200, data: { sign: 'yes' } }), null)
-  assert.equal(readSignState({ code: 200 }), null)
-  assert.equal(readSignState(null), null)
-})
+test('judgeVipSign:动作给出明确答案时以它为准,否则未能确认', () => {
+  assert.equal(judgeVipSign(true, { timeStr: '2026-10-15', score: 3 }), true)
+  assert.equal(judgeVipSign(false, null), false)
+  assert.equal(judgeVipSign(null, { timeStr: '2026-10-15', score: 3 }), null)
+});
 
-test('judgeVipSign:以读回为权威,读回缺失时不回退成 true', () => {
-  assert.equal(judgeVipSign(true, true), true)
-  assert.equal(judgeVipSign(true, false), false)
-  assert.equal(judgeVipSign(null, true), true)
-  assert.equal(judgeVipSign(true, null), null)
-  assert.equal(judgeVipSign(null, null), null)
-})
+test('body 里的 weapi 参数仍然加密(form 里是 params/encSecKey)', async () => {
+  const stub = stubFetch()
+  await signVip({ cookie: COOKIE, deps: deps(stub) })
+  const action = stub.calls.find((c) => c.url.includes(SIGN))
+  const body = form(action.options.body)
+  assert.ok(body.get('params'))
+  assert.ok(body.get('encSecKey'))
+});

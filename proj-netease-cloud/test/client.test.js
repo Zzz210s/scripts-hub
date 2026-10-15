@@ -33,14 +33,14 @@ test('weapi 成功:路径正确、params 表单、UA/Cookie 透传', async () =>
 test('eapi 成功:走 interfacepc 主机、params 是大写 hex、UA 是移动端', async () => {
   const { calls, fetchImpl } = stub(json({ code: 200, data: {} }))
   const result = await call({
-    url: PATHS.vipCheckinDetail,
+    url: '/eapi/vipnewcenter/app/level/user/checkin/history/detail',
     crypto: 'eapi',
     data: { type: 1 },
     cookie: COOKIE,
     deps: { fetchImpl },
   })
   assert.equal(result.ok, true)
-  assert.equal(calls[0].url, `https://interfacepc.music.163.com${PATHS.vipCheckinDetail}`)
+  assert.equal(calls[0].url, `https://interfacepc.music.163.com${'/eapi/vipnewcenter/app/level/user/checkin/history/detail'}`)
   assert.match(calls[0].options.headers['User-Agent'], /NeteaseMusic/)
   assert.equal(calls[0].options.headers['User-Agent'], UA.eapi)
   assert.match(form(calls[0].options.body).get('params'), /^[0-9A-F]+$/)
@@ -49,7 +49,7 @@ test('eapi 成功:走 interfacepc 主机、params 是大写 hex、UA 是移动�
 test('eapi 摘要用逻辑路径:client 实际发出的 params 等于固定向量', async () => {
   const { calls, fetchImpl } = stub(json({ code: 200 }))
   await call({
-    url: PATHS.vipCheckinDetail,
+    url: '/eapi/vipnewcenter/app/level/user/checkin/history/detail',
     crypto: 'eapi',
     data: { signDayTime: 1700000000000, type: 1 },
     cookie: COOKIE,
@@ -65,12 +65,12 @@ test('eapi 摘要用逻辑路径:client 实际发出的 params 等于固定向�
       'D9B22F27D01CA0B90677BB0A11E4D15EB005FCCE467CAE575D6D25BD2D3A9EBF' +
       '09775E2D7D4462F93294872C1944276B00731E665A87F4CAD5295723AFC3EE63',
   )
-  assert.equal(calls[0].url, `https://interfacepc.music.163.com${PATHS.vipCheckinDetail}`)
+  assert.equal(calls[0].url, `https://interfacepc.music.163.com${'/eapi/vipnewcenter/app/level/user/checkin/history/detail'}`)
 })
 
 test('crypto 省略时按路径前缀推断', () => {
   assert.equal(cryptoFromUrl(PATHS.vipSign), 'weapi')
-  assert.equal(cryptoFromUrl(PATHS.vipCheckinDetail), 'eapi')
+  assert.equal(cryptoFromUrl('/eapi/vipnewcenter/app/level/user/checkin/history/detail'), 'eapi')
   assert.equal(cryptoFromUrl('/api/point/today/get'), 'none')
 })
 

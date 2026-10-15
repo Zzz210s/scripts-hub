@@ -13,7 +13,9 @@ import { queryYunbei } from './yunbei.js'
 /** 一次请求失败的分类:只认 client 给出的 reason / code / httpStatus,矩阵在 verify.js。 */
 export function kindOfVip(vip) {
   if (!vip) return null
-  const raw = vip.raw?.sign ?? vip.raw?.checkin
+  // 2026-10-15 起签到只有一条动作请求(见 src/vip.js):失败分类看它;形状不认识
+  // (businessOk === null 但没有传输失败)不算熔断类,交给正常的失败路径。
+  const raw = vip.raw?.action
   if (!raw || raw.ok === true) return null
   return classifyError({ reason: raw.reason, code: raw.code, httpStatus: raw.httpStatus, error: raw.error })
 }

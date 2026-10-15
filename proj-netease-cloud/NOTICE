@@ -22,36 +22,20 @@
 以固定 secretKey 生成,并用 OpenSSL 3.5.5 独立复核过同一算法:AES-CBC 双层链、
 AES-ECB + MD5、以及 RSA 原文加密。复核只用假数据与公开公钥,不含任何真实凭据。
 
-## 待 T3 探针实测校正
+## 真机实测校正(2026-10-15)
 
-校正点分两处,改完同步跑 `npm test`:
+首次用真实账号核对协议的结果,已据此改过代码与测试:
 
-`src/crypto.js`:
+| 观察 | 结论 |
+| --- | --- |
+| 只带 cookie 的 eapi 请求(`/eapi/vipnewcenter/app/level/user/checkin/history/detail`、`/eapi/vipnewcenter/app/minidesk/music/sign/pc`)稳定回 **HTTP 400 空体** | 原设计的「第二条 eapi 必发」在只带 cookie 的前提下不成立(缺 App 的 `header` 包)。范围收敛为**只发签到动作那一条 weapi 请求**,判定改用业务字段;这两条路径已从 `PATHS` 删除 |
+| `POST /weapi/vip-center-bff/task/sign` → `{code:200,data:true,message:""}`,**重复调用同答案** | 这是幂等的业务答复而不是 HTTP 层结论,可作判定依据:`code===200 && data===true` 判成功,`data===false` 或非 0 code 判未签成,形状不认识判「未能确认」 —— 见 `src/vip.js` 的 `judgeVipAction` |
+| `GET /weapi/vipnewcenter/app/level/growhpoint/basic` → `data.userLevel.{level,growthPoint,yesterdayPoint}` | 成长值**当天不涨**(实测签到前后都是 7527,昨日点数才是 6),只用于呈现,不能当判据 |
+| `GET /weapi/vipnewcenter/app/user/sign/info` → `data[{timeStr:"2026-10-15",today:true,score:3}, …]` | 「今天签没签」没有布尔字段,只有逐日记录;`readToday` 按 `today===true` 或 `timeStr` 等于今天挑那一条 |
+| `GET /weapi/point/signed/get` → `{days,shells}`;`GET /weapi/point/today/get` → `{shells}` | 接口里没有「余额」概念,消息只呈现「今日 +X · 连续 N 天 · 本次 M」,不再假装有余额 |
+| weapi 的常量、主机、UA 与 Referer 全部按原样可用 | 这几项**无需校正**;`UA.eapi`/`HOSTS.eapi`/eapi 设备字段随着 eapi 路径一起不再使用 |
 
-- RSA 公钥与 `-36cd479b6b5-` 分隔符是否仍是服务端当前使用的那一组;
-- weapi 的预设密钥与双层顺序、eapi 摘要串格式;
-- `PATHS` 里每条路径的加密层前缀 `/weapi` 或 `/eapi`,以及是否需要 query 形态;
-- eapi 的摘要与明文用**逻辑路径** `/api/...`(client 发送前把 `/eapi/` 归一),探针确认真机是否同此。
-
-`src/client.js`:
-
-- `UA.weapi`(Chrome 桌面)与 `UA.eapi`(NeteaseMusic iPhone)是否仍是服务端接受的形态;
-- `HOSTS.weapi` / `HOSTS.eapi` / `HOSTS.none` 三个默认主机;
-- `Referer` 固定值 `https://music.163.com/` 是否仍被接受,以及 eapi 是否需要 Referer;
-- **eapi 设备字段 `os` / `deviceId` / `osver` / `appver` / `versioncode` 当前一个都没发**:
-  调研称由客户端本地生成或从 cookie 派生(`util/request.js` 的 `processCookieObject`),
-  探针实测若服务端要求,由 T6 在 eapi 请求里补 —— 本层不伪造指纹;
-- weapi 是否还要求 `csrf_token` / `e_r` 一类附加表单字段,由 T2/T6 拼装。
-
-`src/fields.js`(T4/T5 读回字段,唯一真源,vip 与 yunbei 共用):
-
-- `SIGN_FIELDS` 第一顺位 `sign` 假定表示「今日已签」;若真机其实是「已开通乐签」这类长期状态,跨天会误报成功 ——
-  探针须确认,必要时改成「用响应内带的 `signDayTime` 与今天比对」,不要继续信 `sign` 的布尔;
-- 真机字段名与这张表不同时,只改这一处,`readSignState` / `readSigned` 与夹具同步跟进。
-
-`src/client.js` 的 `AUTH_CODES` 归组(唯一真源,`verify.js` 复用):
-
-- 447 归 `auth`(需重新登录/风控态),与设计矩阵一致;若探针证明 447 属另一类,只改这一处。
+夹具:`test/fixtures/vip-sign-action-ok.json` 是签到动作的脱敏真机响应(整份就这么短)。
 
 ## 风险声明
 

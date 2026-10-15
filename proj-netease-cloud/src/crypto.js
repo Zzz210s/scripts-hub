@@ -29,8 +29,6 @@ MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDgtQn2JZ34ZC28NWYpAUd98iZ37BUrX/aKzmFbt7cl
  */
 export const PATHS = Object.freeze({
   vipSign: '/weapi/vip-center-bff/task/sign',
-  vipCheckinDetail: '/eapi/vipnewcenter/app/level/user/checkin/history/detail',
-  vipMinideskSignPc: '/eapi/vipnewcenter/app/minidesk/music/sign/pc',
   vipSignInfo: '/weapi/vipnewcenter/app/user/sign/info',
   vipGrowthPoint: '/weapi/vipnewcenter/app/level/growhpoint/basic',
   yunbeiSignedGet: '/weapi/point/signed/get',

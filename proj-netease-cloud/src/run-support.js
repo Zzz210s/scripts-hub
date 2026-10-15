@@ -84,5 +84,5 @@ export const trimAccounts = (outcomes) =>
     error,
     reason,
     vip: vip ? { ok: vip.ok, step: vip.step, businessOk: vip.businessOk } : null,
-    yunbei: yunbei ? { ok: yunbei.ok, balance: yunbei.balance, signedToday: yunbei.signedToday } : null,
+    yunbei: yunbei ? { ok: yunbei.ok, days: yunbei.days, shells: yunbei.shells, todayShells: yunbei.todayShells } : null,
   }))

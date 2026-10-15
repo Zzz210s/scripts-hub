@@ -3,7 +3,7 @@
 English | [简体中文](README.zh-CN.md)
 
 A minimal self-hosted check-in runner for NetEase Cloud Music. It completes the VIP sign-in and
-reads the 云贝 balance, for one account list, with WeCom notifications. Zero npm dependencies; the
+reads the 云贝 numbers, for one account list, with WeCom notifications. Zero npm dependencies; the
 only requests it makes are reads plus the sign-in call itself.
 
 Read [Scope and risk](#scope-and-risk) before you deploy this. This is the one program in this
@@ -11,10 +11,10 @@ suite whose vendor terms explicitly forbid third-party clients.
 
 ## What it does
 
-- Runs the VIP sign-in flow: `task/sign` followed by the mandatory `checkin/history/detail` call,
-  then reads the sign state back and only counts the day as done when the **business** result says
-  signed.
-- Reads the 云贝 balance and renders it in the message. It does **not** claim 云贝.
+- Runs the VIP sign-in flow: one `task/sign` call, then reads the state back and only counts the day
+  as done when the **business** field of that answer confirms it. The `checkin/history/detail` call
+  that other clients make is not used: with a cookie-only request it answers HTTP 400, see `NOTICE`.
+- Reads the 云贝 counters and renders them in the message. It does **not** claim 云贝.
 - Sends a `start` message before a real run and a `result` message after it. Silent skips write to
   the run log only.
 - Stops the day on auth or rate-limit responses: no retry, one request only, plus an `action`
@@ -35,7 +35,7 @@ and there is no code path that could reach it:
 - No musician / 云豆 / reward tasks, no 云贝 claim, no gift claiming.
 - No login of any kind: no password, SMS or QR flow. Cookie only.
 
-**What it does do**: read the sign state and 云贝 balance, and call the two VIP sign-in endpoints.
+**What it does do**: read the sign state and the 云贝 counters, and call the VIP sign-in endpoint.
 It stays serial, one request every three seconds or more, once per day per account.
 
 **Where it runs.** The cookie is captured in a browser and then lives on the machine that runs it.
@@ -141,7 +141,7 @@ disabled by default: verify with `check` and one `run` first, then set `enabled:
 ```
 cd proj-netease-cloud
 npm test                        # offline, no network and no subprocesses
-node src/cli.js probe           # read-only: sign state and 云贝 balance · never signs
+node src/cli.js probe           # read-only: sign state, growth points and 云贝 counters · never signs
 node src/cli.js check           # read-only health check for the deployment probe
 node src/cli.js run --dry       # prints the messages it would send, sends nothing, writes nothing
 node src/cli.js report --dry    # re-renders today's last result

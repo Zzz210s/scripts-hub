@@ -13,7 +13,7 @@ const PAREN = /[()（）]/
 const FORBIDDEN = new RegExp(`${EMOJI.source}|${PAREN.source}`, 'u')
 
 const VIP_OK = { ok: true, step: 'done', businessOk: true }
-const YUNBEI = { ok: true, balance: 130, signedToday: true }
+const YUNBEI = { ok: true, days: 4, shells: 2, todayShells: 130 }
 
 test('buildStart:四段式标题含程序名、账号、日期与动作', () => {
   const text = buildStart({ date: DATE, account: ACCOUNT })
@@ -29,7 +29,7 @@ test('buildResult:businessOk=true 含 VIP 乐签结论与云贝行,标题是运�
   const text = buildResult({ date: DATE, account: ACCOUNT, vip: VIP_OK, yunbei: YUNBEI })
   assert.match(text, /运行成功$|运行成功/)
   assert.match(text, /VIP 乐签:已确认/)
-  assert.match(text, /云贝:余额 130 · 今日已签/)
+  assert.match(text, /云贝:今日 \+130 · 连续 4 天 · 本次 2/)
 })
 
 test('buildResult:businessOk=false 时不得出现「成功」,结论为未生效', () => {

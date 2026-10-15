@@ -19,7 +19,7 @@ import { buildResult } from './messages.js'
 import { pace } from './pacing.js'
 import { runOnce } from './run.js'
 import { attemptsOn, doneToday, historyFile, readState } from './state.js'
-import { readSignState } from './vip.js'
+import { readAccounts, vipWord } from './probe.js'
 import { queryYunbei, renderYunbeiLine } from './yunbei.js'
 
 const USAGE = `用法:node src/cli.js <命令> [--dry]
@@ -61,32 +61,6 @@ function lastEntryForDay(day, dir, fsImpl = fs) {
     }
   }
   return null
-}
-
-const vipWord = (body) => {
-  const signed = readSignState(body)
-  return signed === true ? 'VIP 乐签状态:已签' : signed === false ? 'VIP 乐签状态:未签' : 'VIP 乐签状态:未能确认'
-}
-
-/**
- * 逐账号只读:VIP 状态读回 + 云贝查询。check 与 probe 共用,全程不写状态、不重试。
- * verbose 时逐接口打印「接口 · 加密层 · code · reason」,给 T3 探针留实测记录。
- */
-async function readAccounts({ config, deps, log, verbose }) {
-  let allOk = true
-  for (const [index, account] of config.accounts.entries()) {
-    if (index > 0) await pace(deps)
-    const status = await call({ url: PATHS.vipSignInfo, crypto: 'weapi', data: {}, cookie: account.cookie, deps })
-    if (verbose) log(`  ${PATHS.vipSignInfo} · weapi · code ${status.code ?? '无'} · ${status.reason}`)
-    await pace(deps)
-    const yunbei = await queryYunbei({ cookie: account.cookie, deps })
-    const signed = yunbei.raw?.signed
-    if (verbose) log(`  ${PATHS.yunbeiSignedGet} · weapi · code ${signed?.code ?? '无'} · ${signed?.reason}`)
-    const ok = status.ok === true && yunbei.ok === true
-    if (!ok) allOk = false
-    log(`${account.name} · ${vipWord(status.body)} · ${renderYunbeiLine(yunbei)} · ${ok ? '可用' : '有失败'}`)
-  }
-  return allOk
 }
 
 /** check:只读,不写状态不发送。任何账号读不到就给 1,便于部署侧巡检。 */

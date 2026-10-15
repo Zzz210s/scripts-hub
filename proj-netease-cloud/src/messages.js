@@ -69,18 +69,19 @@ const vipWord = (vip) =>
 /** 云贝只读查询的一行;字段缺失写「未知」,失败写「暂不可用」,不崩不谎报。 */
 const yunbeiWord = (yunbei) => {
   if (!yunbei || yunbei.ok !== true) return '云贝:暂不可用'
-  const balance = num(yunbei.balance)
-  const head = balance === null ? '云贝:余额未知' : `云贝:余额 ${balance}`
-  const status =
-    yunbei.signedToday === true ? '今日已签' : yunbei.signedToday === false ? '今日未签' : '签到状态未知'
-  return `${head}${SEP}${status}`
+  const today = num(yunbei.todayShells)
+  const days = num(yunbei.days)
+  const parts = [today === null ? '今日 +未知' : `今日 +${today}`]
+  parts.push(days === null ? '连续未知' : `连续 ${days} 天`)
+  if (num(yunbei.shells) !== null) parts.push(`本次 ${num(yunbei.shells)}`)
+  return `云贝:${parts.join(SEP)}`
 }
 
 /** 相对基线的变化:基线或本次数字缺一就不写这一行,不用「较昨日」冒充基线。 */
 function baselineWord(baseline, yunbei) {
   if (!baseline || typeof baseline !== 'object') return null
   const base = num(baseline.yunbei)
-  const now = num(yunbei?.balance)
+  const now = num(yunbei?.todayShells)
   return base === null || now === null ? null : `相对基线 ${signed(now - base)}`
 }
 

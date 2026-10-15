@@ -76,7 +76,6 @@ test('probe:只打只读接口,绝不调用签到,也不写状态', async () => 
 
   assert.equal(await io.run(['probe']), 0)
   assert.equal(countOf(calls, PATHS.vipSign), 0)
-  assert.equal(countOf(calls, PATHS.vipCheckinDetail), 0)
   assert.equal(fs.existsSync(stateFile(config.stateDir)), false)
   assert.equal(io.logs.some((line) => line.includes('未发送任何签到请求')), true)
 })
