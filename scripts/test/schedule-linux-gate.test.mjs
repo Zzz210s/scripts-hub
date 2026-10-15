@@ -25,21 +25,22 @@ test('闸门默认值:linuxEnabled 优先,缺省回落 enabled,再缺省按启�
     assert.equal(linuxEnabled(undefined), false);
 });
 
-test('干跑清单 = run-all.sh 的闸门输出,百度贴吧被挡、现有四个照跑', () => {
+test('干跑清单 = run-all.sh 的闸门输出;贴吧真机验证通过后已启用,网易云仍未启用', () => {
     const { schedule } = loadSchedule();
     const fromGenerator = schedule.order.filter((id) => schedule.programs[id].linuxEnabled);
-    assert.deepEqual(fromGenerator, ['microsoft-rewards', 'weread-signin', 'epic-free-games', 'bilibili-tasks']);
+    assert.deepEqual(fromGenerator, ['microsoft-rewards', 'weread-signin', 'epic-free-games', 'bilibili-tasks', 'baidu-tieba']);
 
     const listed = gate(['list', path.join(REPO_DIR, 'config', 'schedule.json')]);
     assert.equal(listed.status, 0, listed.stderr);
     assert.deepEqual(listed.stdout.trim().split('\n'), fromGenerator);
 });
 
-test('is-enabled:贴吧退出 1,微信读书退出 0', () => {
+test('is-enabled:贴吧(已验证)与微信读书退出 0,网易云(未验证)退出 1', () => {
     const file = path.join(REPO_DIR, 'config', 'schedule.json');
-    assert.equal(gate(['is-enabled', file, 'baidu-tieba']).status, 1);
+    assert.equal(gate(['is-enabled', file, 'baidu-tieba']).status, 0);
     assert.equal(gate(['is-enabled', file, 'weread-signin']).status, 0);
     assert.equal(gate(['is-enabled', file, 'epic-free-games']).status, 0);
+    assert.equal(gate(['is-enabled', file, 'netease-cloud']).status, 1);
 });
 
 test('闸门对自定义配置与坏输入的行为', () => {
@@ -91,7 +92,7 @@ test('非布尔 linuxEnabled:闸门与干跑都按读不到处理', () => {
 // 闸门读不到时 run-all.sh 必须 fail-closed:跑固定四程序,贴吧不跑,并写告警。
 const posix = (p) => p.replace(/\\/g, '/');
 const hasBash = spawnSync('bash', ['-c', 'exit 0']).status === 0;
-const PROGRAMS = [['microsoft-rewards', 'rewards'], ['weread-signin', 'weread'], ['epic-free-games', 'epic'], ['bilibili-tasks', 'bilibili'], ['baidu-tieba', 'tieba']];
+const PROGRAMS = [['microsoft-rewards', 'rewards'], ['weread-signin', 'weread'], ['epic-free-games', 'epic'], ['bilibili-tasks', 'bilibili'], ['baidu-tieba', 'tieba'], ['netease-cloud', 'netease']];
 
 function runSuite(scheduleBody) {
     const dir = posix(tmp());
@@ -133,8 +134,8 @@ test('run-all.sh:缺配置 fail-closed 四程序清单', { skip: !hasBash }, () 
     assert.match(ledger, /调度闸门不可用/);
 });
 
-test('run-all.sh:正常配置四个照跑贴吧跳过', { skip: !hasBash }, () => {
+test('run-all.sh:正常配置按配置跑(贴吧已验证并启用,网易云仍未启用)', { skip: !hasBash }, () => {
     const { status, ran } = runSuite(fs.readFileSync(path.join(REPO_DIR, 'config', 'schedule.json'), 'utf8'));
     assert.equal(status, 0);
-    assert.deepEqual(ran.trim().split('\n'), FOUR);
+    assert.deepEqual(ran.trim().split('\n'), [...FOUR, 'baidu-tieba']);
 });
