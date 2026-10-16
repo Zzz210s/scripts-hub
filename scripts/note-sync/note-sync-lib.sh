@@ -146,7 +146,9 @@ gate_privacy() {
 # 推送前巡检等于没跑(当天实测)。所以两个名字都试,都找不到才记一条日志说明。
 gate_vault() {
     local stages check rel py vault
-    stages="${VAULT_GATE_STAGES:-A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13,A14,A15,A16,A17,A18,A19,A20,A22,A23}"
+    # 2026-10-13:A11/A15(教学工作区 / 课件规范)从默认闸门里摘掉 —— 课件形态不再作硬约束,
+    # 巡检照跑、结论里标「不计入失败」;要临时收紧就 VAULT_GATE_STAGES=…,A15 显式带上。
+    stages="${VAULT_GATE_STAGES:-A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A12,A13,A14,A16,A17,A18,A19,A20,A22,A23}"
     VAULT_GATE_STAGES_USED="$stages"
     check=""
     for rel in "资源/工具/vault-check/check_vault.py" "50-资源/工具/vault-check/check_vault.py"; do
