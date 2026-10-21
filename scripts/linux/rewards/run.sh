@@ -87,10 +87,11 @@ flog "free memory ${FREE_MB}MB -> clusters=$CLUSTERS"
 
 # ---- 跑一次(容器内),带看门狗 ----
 COMPOSE="$SUITE_DIR/compose.yaml"
-docker compose -f "$COMPOSE" run --rm -T rewards-run >> "$LOG" 2>&1 &
+docker compose -f "$COMPOSE" run --rm -T rewards-run </dev/null >> "$LOG" 2>&1 &
 RUNPID=$!
 (
     exec 8>&-          # 别继承锁 fd:脚本退出后这个 sleep 还在,会一直占着锁
+    exec </dev/null >/dev/null 2>&1   # 同理:别让这个 sleep 占住调用方的通道
     sleep $((WATCHDOG_MIN * 60))
     if kill -0 "$RUNPID" 2>/dev/null; then
         echo "[WATCHDOG] run killed after $WATCHDOG_MIN minutes" >> "$LOG"
@@ -102,6 +103,7 @@ RUNPID=$!
 ) &
 WDPID=$!
 wait "$RUNPID"; CODE=$?
+pkill -P "$WDPID" 2>/dev/null   # sleep 是它的子进程,父先死会留孤儿
 kill "$WDPID" 2>/dev/null
 wait "$WDPID" 2>/dev/null
 

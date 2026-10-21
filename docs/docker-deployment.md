@@ -480,3 +480,14 @@ Disable-ScheduledTask -TaskName WeReadSignIn
 | 关机避让 | 有(02:00 关机前 30 分钟不启动) | 无(云主机不关机) |
 | 安静时段 | 有(20:00-23:00) | 微信读书保留;微软积分不看这个 |
 | 程序形态 | 裸装 Node/Python | 容器(镜像本地构建) |
+
+## 11. 部署后必跑的一步:布局体检(2026-10-21 补)
+
+```bash
+sudo install -m 755 scripts/linux/check-layout.sh /srv/apps/automation/check-layout.sh
+/srv/apps/automation/check-layout.sh     # 退出码 0 才算铺完
+```
+
+它会硬查三件「一定让调度失败」的事:每个程序的 `<程序>/run.sh` 是否存在且可执行、`run.sh` 里的 `docker compose run` 是否断了 stdin、`compose.yaml` 里是否有对应服务;另外提示缺 Dockerfile 或缺状态目录的程序。
+
+这条是补一个真实事故:贴吧与网易云部署时只铺了 `deploy/`、`Dockerfile`、`src/` 与 `verify.sh`,**漏了宿主入口 `run.sh`**,于是 `run-all.sh` 每次调用都是退出码 127,`suite.log` 里只有一行「退出码 127」,看起来像程序自身故障,而 `data/state.json` 停在上一次手工验证的日期。同类前例是 B站的宿主入口丢了可执行位(退出码 126)。
