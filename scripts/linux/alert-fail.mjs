@@ -56,10 +56,18 @@ if (!webhookFile || (!isUrl(webhookFile) && !fs.existsSync(webhookFile))) {
     process.exit(1)
 }
 
-const response = await fetch(isUrl(webhookFile) ? webhookFile : fs.readFileSync(webhookFile, 'utf8').trim(), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ msgtype: 'text', text: { content: text } })
-})
+// 发送失败也要落地而不是抛穿:这是兜底提醒的最后一环,它自己崩了就彻底没人知道了
+// (2026-10-21 沙箱实测:webhook 不可达时 fetch 抛 ECONNREFUSED，整个脚本以 uncaught 崩掉)
+let response
+try {
+    response = await fetch(isUrl(webhookFile) ? webhookFile : fs.readFileSync(webhookFile, 'utf8').trim(), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ msgtype: 'text', text: { content: text } })
+    })
+} catch (error) {
+    console.error(`${program}:兜底提醒发送失败(${error?.message ?? error})`)
+    process.exit(1)
+}
 console.log(response.ok ? `${program}:兜底提醒已发送` : `${program}:兜底提醒发送失败(HTTP ${response.status})`)
 process.exit(response.ok ? 0 : 1)

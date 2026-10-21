@@ -53,6 +53,53 @@ if ! flock -n 7; then
     exit 0
 fi
 
+# --- 启动前体检:宿主入口缺失或丢了可执行位时,跳过它并说明原因 --------------------------
+# 2026-10-21 的真实事故:贴吧与网易云部署时漏铺 <程序>/run.sh,run-all.sh 每次调用都是
+# 退出码 127,suite.log 里只有一行「退出码 127」,看起来像程序自身故障。这里先跑布局体检,
+# 把「宿主入口不可用」和「程序自己跑失败」区分开。
+BROKEN=""
+export SUITE_DIR   # check-layout.sh 读它定位套件根目录
+if [ -x "$SUITE_DIR/check-layout.sh" ]; then
+    BROKEN="$("$SUITE_DIR/check-layout.sh" 2>&1 \
+        | grep -E '^  FAIL ' \
+        | grep -oE '(rewards|weread|epic|bilibili|tieba|netease): (缺 run\.sh|run\.sh 不可执行|run\.sh 的 docker)' \
+        | cut -d: -f1 | sort -u | tr '\n' ' ')"
+fi
+broken() { case " $BROKEN " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+for b in $BROKEN; do
+    note "[警告] $b 的宿主入口不可用(布局体检查出),本次跳过它"
+done
+
+# 跳过时的措辞要分清三种原因:入口坏了 / 配置里关了 / 闸门失效时不在固定清单里
+skip_note() {   # $1=显示名 $2=目录名
+    if broken "$2"; then note "$1 跳过:宿主入口不可用"
+    elif [ "$GATE_MODE" = "ok" ]; then note "$1 已关闭(schedule.json),跳过"
+    else note "$1 不在固定四程序清单里,跳过"
+    fi
+}
+
+# --- 中断兜底:编排半路被打断(内存耗尽、被 kill、某步自身报错)时补一条提醒 -------------
+# 用 EXIT trap 而不是只包某一步:任何位置退出都会经过它,并且能说清停在第几步。
+STEP="准备"
+COMPLETED=0
+ALERTED=0
+on_exit() {
+    local code="${1:-0}"   # 由 trap 显式传进来:$? 在函数体里会被前一条命令覆盖(实测得到的是 0)
+    [ "$ALERTED" -eq 1 ] && return "$code"   # 信号与 EXIT 两个 trap 会先后触发,只报一次
+    ALERTED=1
+    if [ "$COMPLETED" -ne 1 ]; then
+        note "[异常] 编排在第 ${STEP} 步中断,退出码 $code"
+        node "$SUITE_DIR/alert-fail.mjs" 服务器 "编排中断:第 ${STEP} 步,退出码 $code" \
+            >> "$SUITE_DIR/logs/suite-alert.log" 2>&1 || true
+    fi
+    return "$code"
+}
+# 被 kill 时 $? 不进 EXIT trap(实测拿到的是 0),所以信号要单独接:先记真实码再退出
+trap 'on_exit 143; exit 143' TERM
+trap 'on_exit 130; exit 130' INT
+trap 'on_exit 129; exit 129' HUP
+trap 'saved=$?; on_exit "$saved"' EXIT
+
 if [ -n "$SCHEDULE" ] && [ -f "$SCHEDULE" ] && [ -f "$GATE" ]; then
     if GATE_ERROR=$(node "$GATE" list "$SCHEDULE" 2>&1 >/dev/null); then
         GATE_MODE="ok"
@@ -68,69 +115,72 @@ else
     note "=== 编排开始(闸门失效:微软积分、微信读书、Epic 限免、B站任务照跑;百度贴吧与网易云不跑)==="
 fi
 
-if enabled_in_schedule microsoft-rewards; then
+if enabled_in_schedule microsoft-rewards && ! broken rewards; then
+    STEP="微软积分"
     "$SUITE_DIR/rewards/run.sh" 7>&-
     RC_REWARDS=$?
     note "微软积分退出码 $RC_REWARDS"
 else
     RC_REWARDS=0
-    note "微软积分已关闭(schedule.json),跳过"
+    skip_note "微软积分" rewards
 fi
 
-if enabled_in_schedule weread-signin; then
+if enabled_in_schedule weread-signin && ! broken weread; then
+    STEP="微信读书"
     "$SUITE_DIR/weread/run.sh" 7>&-
     RC_WEREAD=$?
     note "微信读书退出码 $RC_WEREAD"
 else
     RC_WEREAD=0
-    note "微信读书已关闭(schedule.json),跳过"
+    skip_note "微信读书" weread
 fi
 
-if enabled_in_schedule epic-free-games; then
+if enabled_in_schedule epic-free-games && ! broken epic; then
+    STEP="Epic 限免"
     "$SUITE_DIR/epic/run.sh" 7>&-
     RC_EPIC=$?
     note "Epic 限免退出码 $RC_EPIC"
 else
     RC_EPIC=0
-    note "Epic 限免已关闭(schedule.json),跳过"
+    skip_note "Epic 限免" epic
 fi
 
-if enabled_in_schedule bilibili-tasks; then
+if enabled_in_schedule bilibili-tasks && ! broken bilibili; then
+    STEP="B站任务"
     "$SUITE_DIR/bilibili/run.sh" 7>&-
     RC_BILIBILI=$?
     note "B站任务退出码 $RC_BILIBILI"
 else
     RC_BILIBILI=0
-    note "B站任务已关闭(schedule.json),跳过"
+    skip_note "B站任务" bilibili
 fi
 
-if enabled_in_schedule baidu-tieba; then
+if enabled_in_schedule baidu-tieba && ! broken tieba; then
+    STEP="百度贴吧"
     "$SUITE_DIR/tieba/run.sh" 7>&-
     RC_TIEBA=$?
     note "百度贴吧退出码 $RC_TIEBA"
 else
     RC_TIEBA=0
-    if [ "$GATE_MODE" = "ok" ]; then
-        note "百度贴吧已关闭(schedule.json),跳过"
-    else
-        note "百度贴吧不在固定四程序清单里,跳过"
-    fi
+    skip_note "百度贴吧" tieba
 fi
 
-if enabled_in_schedule netease-cloud; then
+if enabled_in_schedule netease-cloud && ! broken netease; then
+    STEP="网易云"
     "$SUITE_DIR/netease/run.sh" 7>&-
     RC_NETEASE=$?
     note "网易云退出码 $RC_NETEASE"
 else
     RC_NETEASE=0
-    if [ "$GATE_MODE" = "ok" ]; then
-        note "网易云已关闭(schedule.json),跳过"
-    else
-        note "网易云不在固定四程序清单里,跳过"
-    fi
+    skip_note "网易云" netease
 fi
 
+COMPLETED=1
 note "=== 编排结束 ==="
+if [ -n "$BROKEN" ]; then
+    # 跳过是「少跑了一个程序」而不是「跑失败」,不走各程序自己的通道,发到套件那条线上
+    node "$SUITE_DIR/alert-fail.mjs" 服务器 "宿主布局不全,本次跳过:$BROKEN" >> "$SUITE_DIR/logs/suite-alert.log" 2>&1 || true
+fi
 if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ]; then
     exit 0
 fi
