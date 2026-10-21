@@ -491,3 +491,23 @@ sudo install -m 755 scripts/linux/check-layout.sh /srv/apps/automation/check-lay
 它会硬查三件「一定让调度失败」的事:每个程序的 `<程序>/run.sh` 是否存在且可执行、`run.sh` 里的 `docker compose run` 是否断了 stdin、`compose.yaml` 里是否有对应服务;另外提示缺 Dockerfile 或缺状态目录的程序。
 
 这条是补一个真实事故:贴吧与网易云部署时只铺了 `deploy/`、`Dockerfile`、`src/` 与 `verify.sh`,**漏了宿主入口 `run.sh`**,于是 `run-all.sh` 每次调用都是退出码 127,`suite.log` 里只有一行「退出码 127」,看起来像程序自身故障,而 `data/state.json` 停在上一次手工验证的日期。同类前例是 B站的宿主入口丢了可执行位(退出码 126)。
+
+## 12. 每日启动的正确形态(2026-10-21 定)
+
+一天的启动只有一条链路,不要在别处再加定时:
+
+```
+systemd automation-suite.timer(08:00 主力 + 12:00 兜底,Persistent=true)
+  -> automation-suite.service(Type=oneshot,User=ubuntu,TimeoutStartSec=infinity)
+    -> /srv/apps/automation/run-all.sh(flock 单实例)
+       -> 启动前布局体检(check-layout.sh):入口缺失/不可执行的程序当场跳过并提醒,不再拿退出码 127
+       -> 按 schedule.json 的 order 串行跑 6 个 <程序>/run.sh
+       -> 中途被打断(TERM/INT/HUP 或异常退出)时记一条中断日志并发套件级提醒
+```
+
+要点:
+
+- **各程序的时刻只对 Windows 有意义**(`programs.*.startTime` 那套是 Windows 计划任务的重复触发窗口)。Linux 侧是「一项跑完再下一项」,由 `run-all.sh` 的顺序保证,不靠错峰时刻去赌。
+- **开关只有一处**:`config/schedule.json` 的 `linuxEnabled`(缺省回落 `enabled`);`run-all.sh` 用 `program-enabled.mjs` 读它,读不到时 fail-closed 只跑固定四程序并把贴吧/网易云排除。
+- **12:00 那次是兜底**:当天已完成的程序会一秒跳过,所以重复触发不产生重复动作。
+- 核对方法:`/srv/apps/automation/check-layout.sh`(布局)、`node program-enabled.mjs list schedule.json`(启用清单)、`systemctl list-timers automation-suite.timer`(下次触发),以及 `logs/suite.log` 里每天那两段「编排开始 / 编排结束」。
