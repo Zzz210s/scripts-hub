@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { loadFromBlob } from "@excalidraw/excalidraw";
-import { call, downloadText, parentOf, readLast, serializeScene, TOKEN_KEY, type Tree, withSuffix, writeLast } from "./serverStorageApi";
-import { box, childrenOf, row, StorageList } from "./storageList";
-import { useAutoTokenPrompt, useCtrlSOpen } from "./serverStorageHooks";
+import { saveLocal } from "../localFile";
+import { call, parentOf, readLast, serializeScene, TOKEN_KEY, type Tree, withSuffix, writeLast } from "./api";
+import { box, childrenOf, row, StorageList } from "./list";
+import { useAutoTokenPrompt, useCtrlSOpen } from "./hooks";
 
 // 服务器存储面板:存到自建服务的目录树 / 从目录树打开 / 下载到本地。
 // 由 scripts-hub/proj-excalidraw-web 注入上游 excalidraw-app(见 patch.mjs);锚点消失时补丁会直接失败。
@@ -170,7 +171,7 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
         ) : (
           <button disabled={busy || !name.trim()} onClick={() => void doOpen(name)}>打开</button>
         )}
-        <button onClick={() => { downloadText(serializeScene(excalidrawAPI), withSuffix(name.trim() || "未命名")); setStatus("已下载到本地"); }}>
+        <button onClick={async () => { const how = await saveLocal(serializeScene(excalidrawAPI), withSuffix(name.trim() || "未命名")); setStatus(how); }}>
           下载到本地
         </button>
       </div>
