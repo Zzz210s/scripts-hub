@@ -80,8 +80,8 @@ for (const event of MESSAGE_EVENTS) {
         // 收到消息时回一句,让对方知道通道是通的;失败不影响记住会话
         const chatKey = chatKeyOf(frame?.body)
         if (chatKey) {
-            client.sendMessage(chatKey, { msgtype: 'text', text: { content: '通知通道已就绪,后续博客与同步告警会推到这里。' } })
-                .catch((e) => log(`回执失败: ${String(e)}`))
+            client.sendMessage(chatKey, { msgtype: 'markdown', markdown: { content: '通知通道已就绪,后续博客与同步告警会推到这里。' } })
+                .catch((e) => log(`回执失败: ${e instanceof Error ? e.message : JSON.stringify(e)}`))
         }
     })
 }
@@ -97,9 +97,12 @@ async function push(text) {
     const failures = []
     for (const chatKey of targets) {
         try {
-            await client.sendMessage(chatKey, { msgtype: 'text', text: { content: text } })
+            // aibot_send_msg 只接受 markdown / template_card:发 text 会被拒(errcode=40008 invalid message type)。
+            // markdown 渲染纯文本完全等价,所以统一走 markdown。
+            await client.sendMessage(chatKey, { msgtype: 'markdown', markdown: { content: text } })
         } catch (error) {
-            failures.push(`${chatKey}: ${String(error)}`)
+            const detail = error instanceof Error ? error.message : JSON.stringify(error)
+            failures.push(`${chatKey}: ${detail}`)
         }
     }
     if (failures.length === targets.length) return { ok: false, code: 502, message: failures.join('; ') }
