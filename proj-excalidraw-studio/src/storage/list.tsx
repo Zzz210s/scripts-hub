@@ -1,5 +1,5 @@
 // 面板样式与列表:与逻辑分开,既让 ServerStorage.tsx 守住行数,也便于单独调外观。
-import { parentOf, sizeText, whenText, type Tree } from "./serverStorageApi";
+import { parentOf, sizeText, whenText, type Tree } from "./api";
 
 export const box: React.CSSProperties = {
   position: "fixed",

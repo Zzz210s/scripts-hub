@@ -48,3 +48,9 @@ export function readLast(): { path: string; version: string } | null {
 
 export const writeLast = (path: string, version: string) =>
   localStorage.setItem(LAST_KEY, JSON.stringify({ path, version }));
+
+/** 把当前编辑器内容序列化成 .excalidraw 的文本(与官方导出同格式,含图片)。 */
+export function serializeScene(api: ExcalidrawImperativeAPI | null): string {
+  if (!api) return "";
+  return serializeAsJSON(api.getSceneElementsIncludingDeleted(), api.getAppState(), api.getFiles(), "local");
+}
