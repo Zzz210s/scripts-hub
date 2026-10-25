@@ -103,7 +103,10 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     try {
       const blob = new Blob([JSON.stringify(body.scene)], { type: "application/json" });
       const data = await loadFromBlob(blob, null, null);
-      excalidrawAPI?.updateScene({ elements: data.elements, appState: data.appState, files: data.files });
+      // updateScene 不接受 files:图片要先通过 addFiles 注册,再更新场景(顺序反了图片会缺)
+      const images = Object.values(data.files ?? {});
+      if (images.length) excalidrawAPI?.addFiles(images);
+      excalidrawAPI?.updateScene({ elements: data.elements, appState: data.appState });
       writeLast(target, body.version);
       setFolder(parentOf(target));
       setName(target.split("/").pop() ?? "");
