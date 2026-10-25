@@ -12,6 +12,7 @@
 | 账号邮箱与密码(可多个) | `.env` 的 `ACCOUNT_N_EMAIL` / `ACCOUNT_N_PASSWORD` | 自己的微软账号;从本仓库 `proj-microsoft-rewards/env.example` 复制成 `.env` 后填 | 无固定期限,改密码即失效;更新 `.env`,无需重新构建。注意别把 6 位 PIN 当密码 |
 | TOTP 密钥(可选) | `.env` 的 `ACCOUNT_N_TOTP_SECRET` | 账号的 2FA 设置 | 随账号 2FA 重置;不配就得手动批准登录挑战(当前未配) |
 | 登录态与浏览器指纹 | `sessions\sessions.db`(SQLite) | 程序自动生成 | 会话级;失效会退回密码登录,删掉即强制重登 |
+| 企业微信智能机器人(Bot ID + Secret) | 服务器 `~/.config/wecom-relay/secrets.json`(权限 600,`{botId, secret}`) | 企业微信 → 工作台 → 智能机器人 → API 模式 + 使用长连接;由 `proj-wecom-relay` 订阅长连接并对外暴露本机 `http://127.0.0.1:9099/webhook` | 更换后 `docker compose up -d --force-recreate wecom-relay`;**博客通道 2026-10-25 起走它**(note-app `.env` 的 `NOTIFY_WEBHOOK`),原群机器人 `wecom-blog.txt` 已删除 |
 | 企业微信群机器人 webhook | `wechat-bridge\data\wecom-webhook.txt` | 企业微信 App → 目标群 → 右上角 `...` → 群机器人 → 添加机器人 → 复制地址 | 无固定期限;把机器人移出群即失效,重新复制一份写回 |
 
 ## 微信读书签到(`%WEREAD_DIR%`)

@@ -14,6 +14,17 @@
 | B站任务 | `proj-bilibili-tasks/src/{notify,policy,messages}.js`、`run.js` | `secrets/wecom-webhook.txt` |
 | 百度贴吧签到 | `proj-baidu-tieba/src/{notify,messages,message-text,run-support,run}.js`、`cli.js` | `secrets/wecom-webhook.txt` |
 
+## 0. 通道(2026-10-25 起)
+
+| 通道 | 谁在用 | 形态 |
+|---|---|---|
+| 博客 | note-app 的 `deploy/*.sh`(分叉修复 / 看门狗 / 收敛),读 `NOTIFY_WEBHOOK` | **企业微信智能机器人**(`proj-wecom-relay` 暴露的本机 `http://127.0.0.1:9099/webhook`,与群机器人 webhook 同形状) |
+| 服务器 | `mem-guard.sh`、`alert-fail.mjs` 的「服务器」程序、服务器侧 note-sync | 企业微信群机器人 webhook(`secrets/wecom-server.txt`) |
+| 各无人值守项目 | epic / bilibili / weread / microsoft-rewards | 各自独立的群机器人 webhook |
+
+换通道只改 URL,不用改脚本:中继对外就是群机器人 webhook 的形状(`{msgtype:"text",text:{content}}`),
+成功回 `{"errcode":0}`;还没有任何会话时回 HTTP 503 并在 `errmsg` 里说明「请先给机器人发一条消息」。
+
 ## 1. 消息类型表
 
 **类型名统一,分工统一**;每条消息只属于一个类型。子形态(例如"结果成功"与"结果有失败")
