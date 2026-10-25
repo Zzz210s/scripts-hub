@@ -16,6 +16,7 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
+  const [needToken, setNeedToken] = useState(false);
 
   const loadTree = useCallback(
     async (nextToken = token) => {
@@ -23,9 +24,12 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
       const { status: code, body } = await call("/tree", nextToken);
       setBusy(false);
       if (code === 401) {
+        // 首次使用/令牌失效:直接弹一次输入框,不用让用户自己找「令牌」按钮
         localStorage.removeItem(TOKEN_KEY);
         setToken("");
-        return setStatus("令牌不对:点「令牌」重新填写");
+        setStatus("需要服务器令牌");
+        setNeedToken(true);
+        return;
       }
       if (code !== 200) return setStatus(`读取目录失败(${code})`);
       setTree(body as Tree);
@@ -46,6 +50,18 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
+
+  // 401 时自动弹一次令牌输入(只在拿到 401 的那次触发,避免死循环)
+  useEffect(() => {
+    if (!needToken) return;
+    setNeedToken(false);
+    const entered = window.prompt("服务器令牌(只存在本浏览器 localStorage)", "");
+    if (entered === null) return setStatus("没有令牌,无法访问服务器文件");
+    localStorage.setItem(TOKEN_KEY, entered);
+    setToken(entered);
+    void loadTree(entered);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needToken]);
 
   useEffect(() => {
     if (mode) void loadTree();
