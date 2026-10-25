@@ -74,6 +74,8 @@ webhook 地址写进 `secrets/wecom-webhook.txt`,一行,权限 600。没有它�
 | `TIEBA_FORUMS` | 空 | 逗号分隔的目标吧白名单;空 = 签全部已关注吧 |
 | `TIEBA_INTERVAL_MS` | `2000` | 账号之间的间隔,压低请求频率 |
 | `TIEBA_MAX_ATTEMPTS` | `3` | 每个逻辑日最多真跑几次 |
+| `TIEBA_DETAIL` | `1` | 结果消息之后再发一条逐吧明细 · 一行一个 `吧名 LvN` · 置 `0` 关闭 |
+| `TIEBA_DETAIL_MAX` | `200` | 明细最多列多少个吧 · 超出的写成「另有 N 个未列出」 |
 | `TIEBA_QUIET_START` / `TIEBA_QUIET_END` | `20:00` / `23:00` | 安静时段 · 跳过且不推送 |
 | `TIEBA_MIN_FREE_MB` | `800` | 内存闸门 |
 | `TIEBA_DAY_BOUNDARY_HOUR` | `4` | 逻辑日 04:00 换日 · 凌晨那次算前一天 |

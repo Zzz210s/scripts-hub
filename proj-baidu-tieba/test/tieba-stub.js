@@ -1,8 +1,9 @@
 // run/cli 集成测试共用的完整贴吧协议桩(不匹配 *.test.js,不会被 node --test 当用例跑)。
 // 2026-10-14 起协议形状按真机实测:会话与关注列表都来自 `GET /mo/q/newmoindex`。
 //
-// `accounts` 键为 cookie 串,值为 { ok?: false, forums: [{ fid, kw, isSign?, isForbidden? }],
+// `accounts` 键为 cookie 串,值为 { ok?: false, forums: [{ fid, kw, isSign?, isForbidden?, level? }],
 //   honorSign?: false 该账号的签到不计入已签,sessionFailAt?: [n] 第 n 次会话请求回 500 }。
+// `level` 对应该吧的 `user_level` 字符串(默认 "8");传 null 可测「等级取不到」。
 // `honorSign: false`(顶层)模拟「第一层说成功但读回 is_sign 仍为 0」的谎报,用来驱动对账不通过。
 import { stub } from './stub.js';
 
@@ -33,6 +34,8 @@ export function tiebaStub({ accounts = {}, honorSign = true, tbs = 'TBS1' } = {}
       const forums = (account.forums ?? []).map((forum) => ({
         forum_id: forum.fid,
         forum_name: forum.kw,
+        // 真机里 user_level 是字符串;显式 level: null 用来测「等级取不到 -> Lv?」。
+        user_level: forum.level === null ? null : String(forum.level ?? 8),
         is_sign: signed.has(`${cookie}|${forum.kw}`) || forum.isSign === true ? 1 : 0,
         is_forbidden: forum.isForbidden === true ? 1 : 0,
       }));

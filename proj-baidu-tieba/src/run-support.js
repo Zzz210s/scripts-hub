@@ -3,6 +3,7 @@
 // 「今天算不算完成」只由 verify.js 的对账决定。
 import { signAccount } from './account.js';
 import { fetchSession } from './client.js';
+import { buildDetailMessages } from './detail.js';
 import { peerBusy } from './guards.js';
 import { buildAction } from './messages.js';
 
@@ -123,6 +124,25 @@ export async function signAll({ accounts, credentials, config, deps }) {
 
 /** 最后一条投递结果(结果消息);没有投递时给 null。 */
 export const lastDelivery = (deliveries) => deliveries[deliveries.length - 1] ?? null;
+
+/**
+ * 逐吧明细:结果消息之后再单发一条(或几条)。
+ *
+ * - `config.detail !== true` 时不发(`TIEBA_DETAIL=0`);
+ * - 没有可列的吧时不发(不发一条只有标题的空消息);
+ * - 段与段之间隔 1 秒,避开企业微信每分钟 20 条的限流。
+ */
+export async function sendDetails({ deliver, date, accounts, config, sleep, log = () => {} }) {
+  if (config?.detail !== true) return [];
+  const messages = buildDetailMessages({ date, accounts, maxForums: config.detailMax });
+  const pause = sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  for (let index = 0; index < messages.length; index += 1) {
+    if (index > 0) await pause(1000);
+    const delivery = await deliver(messages[index]);
+    if (delivery?.ok === false) log(`[警告] 明细消息第 ${index + 1} 段发送失败 · ${delivery.error ?? '未知原因'}`);
+  }
+  return messages;
+}
 
 /** 发送失败不能静默:逐条写进日志,让没有通知渠道时也能在日志里看到。 */
 export function warnFailedDeliveries(log, deliveries) {

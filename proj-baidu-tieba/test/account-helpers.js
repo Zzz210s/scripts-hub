@@ -6,7 +6,8 @@ export const SESSION = 'https://tieba.baidu.com/mo/q/newmoindex';
 export const SIGN = 'https://c.tieba.baidu.com/c/c/forum/sign';
 export const json = (payload, status = 200) => ({ status, text: JSON.stringify(payload) });
 export const signCalls = (calls) => calls.filter((call) => call.url === SIGN);
-export const forum = (id, kw, extra = {}) => ({ forum_id: id, forum_name: kw, is_sign: 0, ...extra });
+// 默认带一个等级(真机 `user_level` 是字符串);传 `user_level: null` 可测「等级取不到」。
+export const forum = (id, kw, extra = {}) => ({ forum_id: id, forum_name: kw, is_sign: 0, user_level: '8', ...extra });
 export const ZERO = { signed: 0, already: 0, blocked: 0, tbsStale: 0, failed: 0 };
 
 /** 一次成功的会话响应(uid + itb_tbs + like_forum)。 */

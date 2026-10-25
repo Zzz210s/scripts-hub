@@ -17,6 +17,10 @@ export const DEFAULTS = {
   // 单实例锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,同伴按这条路径能找到;
   // 状态与历史仍留 data/。见 proj-weread-signin/src/peer.js 的约定说明。
   lockDir: 'logs',
+  // 逐吧明细:结果消息之后再发一条「吧名 Lv8」一行一个的消息。默认开;条数上限防极端情况
+  // (一个账号关注上千个吧时消息会拆成十几条)。
+  detail: true,
+  detailMax: 200,
 };
 
 /** 读 .env;不存在或读不动一律当空(容器挂载点缺失时 Docker 会把它建成目录,见 loadConfig)。 */
@@ -123,6 +127,10 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     lockDir: path.isAbsolute(lockDir) ? lockDir : path.join(cwd, lockDir),
     webhookFile: path.isAbsolute(webhookFile) ? webhookFile : path.join(cwd, webhookFile),
     busyPeers: String(pick(merged, 'BUSY_PEERS', '')).split(',').map((item) => item.trim()).filter(Boolean),
+    // 只有显式写 `0` 才关;不写/写错一律当开 —— 用户要的就是每天能看到逐吧明细。
+    detail: String(pick(merged, 'TIEBA_DETAIL', '1')) !== '0',
+    // 下界 1:0 会让明细只剰一句「另有 N 个未列出」,没意义。
+    detailMax: int(pick(merged, 'TIEBA_DETAIL_MAX', null), DEFAULTS.detailMax, 1),
     dryRun: merged.TIEBA_DRY_RUN === '1',
   };
 }

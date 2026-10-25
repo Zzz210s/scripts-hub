@@ -43,9 +43,9 @@ function fatal(name, results, counts, error, reason, markers) {
   return { name, ok: false, results, counts, error, reason, ...markers };
 }
 
-/** 记一条逐吧结果并同步计数。 */
-function record(results, counts, kw, status) {
-  results.push({ kw, status });
+/** 记一条逐吧结果并同步计数。等级一并保留:明细消息要逐吧渲染 `吧名 Lv8`。 */
+function record(results, counts, forum, status) {
+  results.push({ kw: forum?.kw ?? null, level: forum?.level ?? null, status });
   counts[countKeyFor(status)] += 1;
 }
 
@@ -74,7 +74,8 @@ export function selectForums(forums, filter) {
  * @param {{ name?: string, cookie?: string,
  *           filter?: ((forum: object) => boolean) | Array<string> | Set<string>,
  *           intervalMs?: number, deps?: object }} [input]
- * @returns {Promise<{ name: string, ok: boolean, results: Array<{kw: unknown, status: string}>,
+ * @returns {Promise<{ name: string, ok: boolean,
+ *   results: Array<{kw: unknown, level: number|null, status: string}>,
  *   counts: { signed: number, already: number, blocked: number, tbsStale: number, failed: number },
  *   error: string|null, reason: string, emptyForums?: boolean, incompleteForums?: boolean }>}
  */
@@ -109,13 +110,13 @@ export async function signAccount({ name, cookie, filter, intervalMs, deps } = {
       // 只重取会话拿新 tbs;关注列表不再重读(重试只针对那一个吧,列表没有变)。
       const again = await fetchSession({ cookie, deps });
       if (!again.ok) {
-        record(results, counts, forum.kw, SIGN_STATUS.TBS_STALE);
+        record(results, counts, forum, SIGN_STATUS.TBS_STALE);
         return fatal(name, results, counts, again.error, again.reason, markers);
       }
       tbs = again.tbs;
       outcome = await signForum({ cookie, forum, tbs, deps });
     }
-    record(results, counts, forum.kw, outcome.status);
+    record(results, counts, forum, outcome.status);
   }
 
   return { name, ok: true, results, counts, error: null, reason: 'ok', ...markers };

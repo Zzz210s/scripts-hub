@@ -31,6 +31,16 @@ function toFlag(value) {
   return value === 1 || value === '1' || value === true;
 }
 
+/**
+ * 吧等级:`like_forum[].user_level` 是字符串(如 `"8"`)。转不成非负整数就给 null ——
+ * 消息层渲染成 `Lv?`,绝不拿经验值或其它数字顶替。
+ */
+function toLevel(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 /** 响应里是否带非 0 的顶层 error_code(即服务器拒绝了这次请求)。 */
 function hasErrorCode(data) {
   const raw = data?.error_code;
@@ -78,6 +88,7 @@ export async function fetchSession({ cookie, deps } = {}) {
   const forums = list.map((item) => ({
     fid: item?.forum_id ?? null,
     kw: item?.forum_name ?? null,
+    level: toLevel(item?.user_level),
     isSign: toFlag(item?.is_sign),
     isForbidden: toFlag(item?.is_forbidden),
   }));
@@ -92,7 +103,8 @@ export async function fetchTbs({ cookie, deps } = {}) {
 
 /**
  * 取已关注贴吧列表:`fetchSession` 的薄视图。`like_forum` 是**单次全量**返回(真机实测
- * 134 个吧一次给全),所以 `hasMore` 恒为假;`count` 就是列表长度。
+ * 136 个吧一次给全),所以 `hasMore` 恒为假;`count` 就是列表长度。
+ * 每项带 `level`(吧等级,转不成数字则为 null)供逐吧明细消息渲染。
  *
  * 注意 `count === 0` 的歧义:`ok:true` + `count:0` 既可能是「合法地关注 0 个吧」,也可能是
  * 「列表读不到但没报错」;下游必须单独处理这个取值,不能当成「全部已签」。

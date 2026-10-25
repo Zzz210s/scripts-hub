@@ -45,7 +45,7 @@ test('对账通过 → ok true 且当天锁定', async () => {
   assert.equal(result.reconcile.ok, true);
   assert.equal(result.ok, true);
   assert.equal(result.exitCode, 0);
-  assert.equal(sent.length, 2); // start + result
+  assert.equal(sent.length, 3); // start + result + 逐吧明细(default TIEBA_DETAIL=1)
   const { state } = readState(config.stateDir);
   assert.equal(doneToday(state, DAY), true);
   assert.equal(state.days[DAY].attempts, 1);

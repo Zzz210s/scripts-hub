@@ -56,6 +56,6 @@ test('signAccount:重取 tbs 失败时账号失败,该吧如实记为 tbs-stale'
   const r = await signAccount({ name: 'a', cookie: 'BDUSS=x', intervalMs: 0, deps });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'auth');
-  assert.deepEqual(r.results, [{ kw: '甲', status: 'tbs-stale' }]);
+  assert.deepEqual(r.results, [{ kw: '甲', level: 8, status: 'tbs-stale' }]);
   assert.equal(r.counts.tbsStale, 1);
 });

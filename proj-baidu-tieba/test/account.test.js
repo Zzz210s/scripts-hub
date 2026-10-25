@@ -22,9 +22,9 @@ test('signAccount:逐吧状态与账号计数正确,间隔走注入 sleep', asyn
   assert.equal(r.error, null);
   assert.equal(r.reason, 'ok');
   assert.deepEqual(r.results, [
-    { kw: '甲', status: 'signed' },
-    { kw: '乙', status: 'already' },
-    { kw: '丙', status: 'blocked' },
+    { kw: '甲', level: 8, status: 'signed' },
+    { kw: '乙', level: 8, status: 'already' },
+    { kw: '丙', level: 8, status: 'blocked' },
   ]);
   assert.deepEqual(r.counts, { signed: 1, already: 1, blocked: 1, tbsStale: 0, failed: 0 });
   assert.equal(signCalls(calls).length, 3);
@@ -87,7 +87,7 @@ test('signAccount:中途重取会话失败时,账号失败且已签结果保留'
   const r = await signAccount({ name: 'a', cookie: 'BDUSS=x', intervalMs: 0, deps });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'auth');
-  assert.deepEqual(r.results, [{ kw: '甲', status: 'tbs-stale' }]);
+  assert.deepEqual(r.results, [{ kw: '甲', level: 8, status: 'tbs-stale' }]);
 });
 
 test('countKeyFor:已知态映射到计数键,未知态归 failed 不写 NaN', () => {

@@ -21,7 +21,7 @@ test('signAccount:filter 谓词只签命中的吧;数组形态按吧名白名单
     deps: byFn.deps,
     filter: (f) => f.kw === '乙',
   });
-  assert.deepEqual(first.results, [{ kw: '乙', status: 'signed' }]);
+  assert.deepEqual(first.results, [{ kw: '乙', level: 8, status: 'signed' }]);
   assert.equal(signCalls(byFn.calls).length, 1);
   const byList = makeDeps(route({ session: [sessionReply], sign }));
   const second = await signAccount({
@@ -31,7 +31,7 @@ test('signAccount:filter 谓词只签命中的吧;数组形态按吧名白名单
     deps: byList.deps,
     filter: ['甲'],
   });
-  assert.deepEqual(second.results, [{ kw: '甲', status: 'signed' }]);
+  assert.deepEqual(second.results, [{ kw: '甲', level: 8, status: 'signed' }]);
 });
 
 test('signAccount:filter 传 Set 也按吧名白名单', async () => {
@@ -43,7 +43,7 @@ test('signAccount:filter 传 Set 也按吧名白名单', async () => {
     deps,
     filter: new Set(['甲']),
   });
-  assert.deepEqual(r.results, [{ kw: '甲', status: 'signed' }]);
+  assert.deepEqual(r.results, [{ kw: '甲', level: 8, status: 'signed' }]);
   assert.equal(signCalls(calls).length, 1);
 });
 
