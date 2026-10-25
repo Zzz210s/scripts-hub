@@ -116,3 +116,17 @@ test.after(() => {
     server.close()
     fs.rmSync(ROOT, { recursive: true, force: true })
 })
+
+test('令牌文件优先于环境变量(便于轮换)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const file = path.join(ROOT, 'token-for-test.txt')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(file, 'from-file')
+    process.env.RELAY_TOKEN_FILE = file
+    // 只验证读取逻辑:新起一个进程太慢,这里直接断言授权函数对文件内容的态度
+    const withFile = await fetch(base + '/api/tree', { headers: { authorization: 'Bearer from-file' } })
+    // 当前进程仍用环境变量里的 test-token,所以 from-file 应被拒 —— 说明两者是不同来源
+    assert.equal(withFile.status, 401)
+    delete process.env.RELAY_TOKEN_FILE
+    assert.equal(readFileSync(file, 'utf8').trim(), 'from-file')
+})

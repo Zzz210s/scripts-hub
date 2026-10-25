@@ -12,7 +12,21 @@ import path from 'node:path'
 const ROOT = path.resolve(process.env.ROOT ?? '/data/scenes')
 const PORT = Number(process.env.PORT ?? 9100)
 const BIND = process.env.BIND ?? '0.0.0.0'
-const TOKEN = process.env.RELAY_TOKEN ?? process.env.TOKEN ?? ''
+// 令牌来源优先文件(600 的 token.txt,便于轮换),其次环境变量。
+function readToken() {
+    const file = process.env.RELAY_TOKEN_FILE
+    if (file) {
+        try {
+            return fs.readFileSync(file, 'utf8').trim()
+        } catch (error) {
+            process.stderr.write(`[storage] 读不到令牌文件 ${file}: ${String(error)}
+`)
+            process.exit(1)
+        }
+    }
+    return process.env.RELAY_TOKEN ?? process.env.TOKEN ?? ''
+}
+const TOKEN = readToken()
 const MAX_BODY = Number(process.env.MAX_BODY_MB ?? 32) * 1024 * 1024
 const SUFFIX = '.excalidraw'
 
