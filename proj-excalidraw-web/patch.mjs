@@ -34,7 +34,7 @@ const problems = []
 if (!original.includes(IMPORT_ANCHOR)) problems.push(`缺少导入锚点:${IMPORT_ANCHOR}`)
 if (!original.includes(RENDER_ANCHOR)) problems.push('缺少渲染锚点:<Excalidraw viewportStatusFrame=...')
 
-for (const component of ['excalidraw-app/components/ServerStorage.tsx', 'excalidraw-app/components/serverStorageApi.ts']) {
+for (const component of ['ServerStorage.tsx', 'serverStorageApi.ts', 'storageList.tsx'].map((f) => `excalidraw-app/components/${f}`)) {
     if (!fs.existsSync(component)) problems.push(`缺少组件文件 ${component}(应随构建上下文拷入)`)
 }
 
