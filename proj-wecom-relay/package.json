@@ -1,0 +1,16 @@
+{
+  "name": "proj-wecom-relay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "把企业微信智能机器人(长连接)包装成本机 HTTP 通知端点,替代群机器人 webhook",
+  "scripts": {
+    "start": "node src/relay.mjs"
+  },
+  "dependencies": {
+    "@wecom/aibot-node-sdk": "^1.0.7"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

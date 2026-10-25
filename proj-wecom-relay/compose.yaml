@@ -1,0 +1,23 @@
+# 智能机器人通知中继。host 网络是为了让 note-app(network_mode: host)直接打 127.0.0.1:9099,
+# 同时服务本身只监听 127.0.0.1,不会把端口暴露到公网(无需安全组/ufw 放行)。
+services:
+  wecom-relay:
+    build: .
+    image: wecom-relay:local
+    container_name: wecom-relay
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SECRETS_FILE: /secrets/secrets.json
+      DATA_DIR: /data
+      PORT: "9099"
+      BIND: 127.0.0.1
+    volumes:
+      - ${HOME}/.config/wecom-relay/secrets.json:/secrets/secrets.json:ro
+      - ./data:/data
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
