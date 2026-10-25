@@ -6,7 +6,7 @@ WORKDIR /opt/node_app
 
 COPY build/src/ ./
 # 面板由三个文件组成,少拷一个就会在 vite 阶段报 Could not resolve(2026-10-25 踩过)
-COPY web/ServerStorage.tsx web/serverStorageApi.ts web/storageList.tsx ./excalidraw-app/components/
+COPY web/ServerStorage.tsx web/serverStorageApi.ts web/storageList.tsx web/serverStorageHooks.ts ./excalidraw-app/components/
 COPY web/patch.mjs ./patch.mjs
 
 # 自建实例没有 Excalidraw+ 账号,关掉该入口(否则点「导出到 Excalidraw+」必然报错)

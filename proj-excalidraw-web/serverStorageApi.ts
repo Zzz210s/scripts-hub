@@ -1,4 +1,6 @@
 // 服务器存储的 HTTP 客户端与纯函数(与 UI 分开,便于单独看逻辑、也守住单文件行数)。
+import { serializeAsJSON } from "@excalidraw/excalidraw";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 export type Tree = {
   folders: { path: string }[];
   files: { path: string; name: string; size: number; version: string; mtime: number }[];
@@ -55,4 +57,10 @@ export function downloadText(text: string, fileName: string) {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/** 把当前编辑器内容序列化成 .excalidraw 的文本(与官方导出同格式,含图片)。 */
+export function serializeScene(api: ExcalidrawImperativeAPI | null): string {
+  if (!api) return "";
+  return serializeAsJSON(api.getSceneElementsIncludingDeleted(), api.getAppState(), api.getFiles(), "local");
 }

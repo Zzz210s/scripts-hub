@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
-import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
-import { call, downloadText, parentOf, readLast, TOKEN_KEY, type Tree, withSuffix, writeLast } from "./serverStorageApi";
+import { loadFromBlob } from "@excalidraw/excalidraw";
+import { call, downloadText, parentOf, readLast, serializeScene, TOKEN_KEY, type Tree, withSuffix, writeLast } from "./serverStorageApi";
 import { box, childrenOf, row, StorageList } from "./storageList";
+import { useAutoTokenPrompt, useCtrlSOpen } from "./serverStorageHooks";
 
 // 服务器存储面板:存到自建服务的目录树 / 从目录树打开 / 下载到本地。
 // 由 scripts-hub/proj-excalidraw-web 注入上游 excalidraw-app(见 patch.mjs);锚点消失时补丁会直接失败。
@@ -38,30 +39,16 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     [token],
   );
 
-  // Ctrl/Cmd+S 开保存面板(同时拦掉浏览器自己"保存网页")
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        event.stopPropagation();
-        setMode("save");
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, []);
-
-  // 401 时自动弹一次令牌输入(只在拿到 401 的那次触发,避免死循环)
-  useEffect(() => {
-    if (!needToken) return;
-    setNeedToken(false);
-    const entered = window.prompt("服务器令牌(只存在本浏览器 localStorage)", "");
-    if (entered === null) return setStatus("没有令牌,无法访问服务器文件");
-    localStorage.setItem(TOKEN_KEY, entered);
-    setToken(entered);
-    void loadTree(entered);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needToken]);
+  useCtrlSOpen(() => setMode("save"));
+  useAutoTokenPrompt(needToken, {
+    consume: () => setNeedToken(false),
+    submit: (entered) => {
+      localStorage.setItem(TOKEN_KEY, entered);
+      setToken(entered);
+      void loadTree(entered);
+    },
+    cancel: () => setStatus("没有令牌,无法访问服务器文件"),
+  });
 
   useEffect(() => {
     if (mode) void loadTree();
@@ -76,15 +63,6 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     void loadTree(entered);
   };
 
-  const sceneText = () =>
-    excalidrawAPI
-      ? serializeAsJSON(
-          excalidrawAPI.getSceneElementsIncludingDeleted(),
-          excalidrawAPI.getAppState(),
-          excalidrawAPI.getFiles(),
-          "local",
-        )
-      : "";
 
   const doSave = async (overwrite = false) => {
     if (!name.trim()) return setStatus("先填文件名");
@@ -96,7 +74,7 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     setBusy(true);
     const { status: code, body } = await call(`/scene?path=${encodeURIComponent(path)}`, token, {
       method: "PUT",
-      body: JSON.stringify({ scene: JSON.parse(sceneText()), baseVersion }),
+      body: JSON.stringify({ scene: JSON.parse(serializeScene(excalidrawAPI)), baseVersion }),
     });
     setBusy(false);
     if (code === 409) {
@@ -191,7 +169,7 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
         ) : (
           <button disabled={busy || !name.trim()} onClick={() => void doOpen(name)}>打开</button>
         )}
-        <button onClick={() => { downloadText(sceneText(), withSuffix(name.trim() || "未命名")); setStatus("已下载到本地"); }}>
+        <button onClick={() => { downloadText(serializeScene(excalidrawAPI), withSuffix(name.trim() || "未命名")); setStatus("已下载到本地"); }}>
           下载到本地
         </button>
       </div>
