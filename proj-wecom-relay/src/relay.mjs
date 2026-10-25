@@ -106,14 +106,34 @@ async function push(text) {
     return { ok: true, code: 200, message: failures.length ? `部分失败: ${failures.join('; ')}` : 'ok' }
 }
 
+/** SDK 的 `isConnected` 是 getter(不是方法);包一层避免取值本身抛错把请求打挂。 */
+function isConnected() {
+    try {
+        return Boolean(client.isConnected)
+    } catch {
+        return false
+    }
+}
+
 const server = http.createServer((req, res) => {
     const reply = (code, payload) => {
         res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' })
         res.end(JSON.stringify(payload))
     }
+    try {
+        handle(req, res, reply)
+    } catch (error) {
+        // 单个请求处理出错不能把整个中继带走(2026-10-25:isConnected 被当方法调用,把进程崩了)
+        log(`请求处理异常: ${String(error)}`)
+        if (!res.headersSent) reply(500, { errcode: 500, errmsg: '中继内部错误' })
+        else res.end()
+    }
+})
+
+function handle(req, res, reply) {
     if (TOKEN && req.headers['x-relay-token'] !== TOKEN) return reply(401, { errcode: 401, errmsg: 'token 不对' })
     if (req.method === 'GET' && req.url === '/health') {
-        return reply(200, { ok: true, connected: Boolean(client.isConnected?.()), chats: Object.keys(chats).length })
+        return reply(200, { ok: true, connected: isConnected(), chats: Object.keys(chats).length })
     }
     if (req.method !== 'POST') return reply(405, { errcode: 405, errmsg: '只支持 POST' })
 
@@ -139,7 +159,7 @@ const server = http.createServer((req, res) => {
             ? { errcode: 0, errmsg: result.message }
             : { errcode: result.code, errmsg: result.message })
     })
-})
+}
 
 server.listen(PORT, BIND, () => log(`HTTP 端点就绪 http://${BIND}:${PORT} (POST /webhook 或 /send,GET /health)`))
 client.connect()
