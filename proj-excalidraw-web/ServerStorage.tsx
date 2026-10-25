@@ -84,8 +84,9 @@ export const ServerStorage = ({ excalidrawAPI }: { excalidrawAPI: ExcalidrawImpe
     if (code !== 200) return setStatus(`保存失败(${code})${body.error ? `:${body.error}` : ""}`);
     writeLast(path, body.version);
     setConflict(null);
+    // 先刷列表再报成功:loadTree 成功时会把 status 清空,顺序反了成功提示会被自己抹掉(2026-10-25 实测)
+    await loadTree();
     setStatus(`已保存到服务器:${path}`);
-    void loadTree();
   };
 
   const doOpen = async (raw: string) => {
