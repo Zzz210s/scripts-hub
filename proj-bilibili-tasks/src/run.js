@@ -2,6 +2,7 @@
 // -> Console -> 归类 -> result -> 落状态。外部动作全部从 deps 注入,整条链路可离线测试。
 import { buildConsoleEnv, RUN_TASKS } from './console-runner.js'
 import { classifyRun, computeExp, readMangaFacts } from './classify.js'
+import { buildFailures } from './failures.js'
 import { expFromReward, incompleteTasks } from './exp.js'
 import { coinTarget } from './donate.js'
 import { dayKey, dateText } from './clock.js'
@@ -151,12 +152,8 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
         }
 
         // 9. result(券结果并入这一条)
-        const failures = classify.failures.slice()
-        if (voucher.failure) failures.push(voucher.failure)
-        if (incomplete.length > 0) {
-            const names = { login: '登录', watch: '观看', share: '分享', coins: '投币' }
-            failures.push({ kind: 'incomplete', label: '每日任务未完成', note: `每日任务未完成 · ${incomplete.map((name) => names[name] ?? name).join(' ')}未达标` })
-        }
+        // 失败清单单独在 failures.js 里组:同一件事只能说一遍(风控拦截 + 投币未达标会折叠成一句)
+        const failures = buildFailures({ classify, incomplete, voucherFailure: voucher.failure })
         const completed = classify.ok && !voucher.failure && incomplete.length === 0
         const result = buildResultMessage({
             date,

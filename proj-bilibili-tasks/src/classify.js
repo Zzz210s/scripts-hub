@@ -2,7 +2,12 @@
 // `-403` 与 `352` 是纯数字串(时间戳/aid/余额里都会出现),必须与同行的中文关键词同现才算命中。
 const FEATURES = {
     risk403: { markers: ['-403'], keywords: ['投币', '观看', '分享', '风控', '账号异常', '操作失败'] },
-    task352: { markers: ['352'], keywords: ['投币', '观看', '分享', '任务', '失败', '异常'] },
+    // 2026-10-25 实测:投币一条都没投出去,根因是 WAF 把两个接口临时拦了 ——
+    // `/x/web-interface/view` 回 `{"code":-412,"message":"request was banned"}`,榜单回 `-352`。
+    // 这两个是「接口被风控」,不是账号被封、也不是脚本坏了,下次触发通常就好了。
+    rate412: { markers: ['-412', 'request was banned', 'precondition failed'] },
+    // `352` 是纯数字串(时间戳/aid/余额里都会出现),必须与同行的中文关键词同现才算命中
+    rate352: { markers: ['352'], keywords: ['投币', '观看', '分享', '任务', '失败', '异常'] },
     cookieInvalid: { markers: ['账号未登录', '未登录', 'login required', 'not logged in'] },
     voucherTaken: { markers: ['69801', '你已领取过该权益'] },
     bigPointFlaky: { markers: ['6007000'] },
@@ -12,9 +17,12 @@ const FEATURES = {
     watchFailed: { markers: ['观看失败', '观看视频失败'] }
 }
 
+// 多个特征归一类时在这里合并:同一件事只报一条原因。
+const KIND = { rate412: 'rate-limited', rate352: 'rate-limited' }
+
 const NOTES = {
     risk403: { label: '账号级风控', note: '账号级风控 · 会自行过期' },
-    task352: { label: '任务失败 352', note: '任务接口返回 352' },
+    'rate-limited': { label: '临时风控拦截', note: 'B站 临时风控拦截 · 该接口稍后再试' },
     cookieInvalid: { label: '登录态失效', note: '登录态失效' },
     bigPointFlaky: { label: '接口要求升级客户端', note: '接口要求升级客户端' },
     'guard-skipped': { label: '运行被上游跳过', note: '运行被上游跳过 · 登录态检查超时 · 未做任何任务' },
@@ -22,106 +30,10 @@ const NOTES = {
     watchFailed: { label: '观看失败', note: '观看视频失败' }
 }
 
-const DETAIL_LIMIT = 60
-const BRACES = /["{}[\]]/g
-const PARENS = /[（）()]/g
-const SEPARATORS = /[：:，,；;]/g
+import { sanitizeDetail } from './log-read.js'
 
-/** 把一行 Console 原始日志净化成能进消息的短句:去日志前缀/JSON 片段与字段名残留,
- *  保留错误码数字,换掉圆括号,压空白,硬上限 60 字符。无有效信息时返回空串。 */
-export function sanitizeDetail(line = '') {
-    let text = String(line ?? '')
-    text = text.replace(/^\s*\[[^\]]*\]\s*/, '')                       // [12:30:26 INF] / [2026-10-11 12:30:26 INF]
-    text = text.replace(/\{[^{}]*\}/g, (fragment) => {                 // JSON 片段只留错误码
-        const codes = [...fragment.matchAll(/"(?:Code|code)"\s*:\s*(-?\d+)/g)].map((m) => m[1])
-        return codes.length ? ` ${codes.join(' ')} ` : ' '
-    })
-    text = text.replace(BRACES, ' ').replace(PARENS, ' ')
-    text = text.replace(SEPARATORS, ' · ').replace(/\s+/g, ' ').trim()
-    text = text.replace(/(?:\s*·\s*)+/g, ' · ').replace(/^·\s*|\s*·$/g, '').trim()
-    return text.length > DETAIL_LIMIT ? text.slice(0, DETAIL_LIMIT).trim() : text
-}
-
-/** 在 stdout 里定位 `start` 之后、该段结束之前的 `marker` 行,返回 marker 之后的值。
- *  段的边界靠日志里的 `-------结束-------` 与下一个 `---开始 X ---` 夹住 —— 不夹的话,
- *  后面别的任务里的 `【原因】` 会被误当成这一段的(2026-10-12 实测踩到)。 */
-function segment(stdout, start) {
-    const lines = String(stdout ?? '').split(/\r?\n/)
-    const at = lines.findIndex((line) => line.includes(start))
-    if (at === -1) return null
-    const body = []
-    for (const line of lines.slice(at + 1)) {
-        if (line.includes('结束') || line.includes('---开始')) break
-        body.push(line)
-    }
-    return body.join('\n')
-}
-
-const verdict = (value) => {
-    if (value === null) return 'unknown'
-    if (/成功|√|\bok\b/i.test(value)) return 'ok'
-    if (/失败|×|\berror\b/i.test(value)) return 'failed'
-    return 'unknown'
-}
-
-const NO_REASON = /^(null|undefined|空|无|nil|-|—)$/i
-// 上游把这些当「失败」报(响应码非 0),对用户来说却是「今天/这个月已经做过了」。
-// 2026-10-12 实测:第二次跑时漫画签到返回 `{"code":1,"msg":"不能重复签到~"}` 而被记为失败,
-// 结果消息里写成「漫画:签到失败」—— 与事实不符,必须识别为 already。
-const ALREADY = /不能重复签到|重复签到|已经签到|已签到|今日已签|重复领取|已经领取|已领取|已完成|已参与/
-
-/** 在切好的段里找 marker 行并取其后值。 */
-function readResultAfterIn(text, marker) {
-    for (const line of String(text ?? '').split(/\r?\n/)) {
-        const index = line.indexOf(marker)
-        if (index === -1) continue
-        const value = line.slice(index + marker.length).trim()
-        return value || null
-    }
-    return null
-}
-
-/** 在一段文本里取结果行紧跟着的【原因】(两行相邻才认)。 */
-function readReasonAfterResultIn(text, resultMarker) {
-    const lines = String(text ?? '').split(/\r?\n/)
-    for (let i = 0; i < lines.length - 1; i++) {
-        if (!lines[i].includes(resultMarker)) continue
-        const index = lines[i + 1].indexOf('【原因】')
-        if (index === -1) return null
-        const value = lines[i + 1].slice(index + '【原因】'.length).trim()
-        return value && !NO_REASON.test(value) ? value : null
-    }
-    return null
-}
-
-/**
- * 漫画相关的三个事实,各自读自己那段流程的结果行。
- * 2026-10-12 修正:旧实现把 manga 系在与漫画无关的 task352 上(投币选视频时排行榜风控),
- * 于是日志里「漫画签到 成功」被报成「漫画:签到失败」—— 消息必须来自该流程自己的输出。
- */
-export function readMangaFacts(stdout = '') {
-    const signText = segment(stdout, '开始 漫画签到')
-    const readText = segment(stdout, '开始 漫画阅读')
-    const benefitText = segment(stdout, '开始 领取大会员漫画权益')
-
-    // 段内出现「不能重复签到」这类字样时,即使响应码非 0 也当「已经做过」
-    const judge = (text, marker) => {
-        if (text === null) return 'unknown'
-        const result = verdict(readResultAfterIn(text, marker))
-        if (result !== 'unknown' && ALREADY.test(text)) return 'already'
-        return result
-    }
-
-    let benefit = null
-    if (benefitText !== null) {
-        const result = verdict(readResultAfterIn(benefitText, '【领取结果】'))
-        benefit = {
-            status: result === 'failed' && ALREADY.test(benefitText) ? 'already' : result,
-            reason: readReasonAfterResultIn(benefitText, '【领取结果】')
-        }
-    }
-    return { sign: judge(signText, '【签到结果】'), read: judge(readText, '【漫画阅读】'), benefit }
-}
+// 日志读取类的能力从这里一并导出,调用方(Task 级历史代码与测试)不用改导入路径。
+export { sanitizeDetail, readMangaFacts } from './log-read.js'
 
 export function detectFeatures(stdout = '') {
     const hit = {}
@@ -139,10 +51,29 @@ export function detectFeatures(stdout = '') {
 
 export function classifyRun({ exitCode = 0, stdout = '', timedOut = false } = {}) {
     const hit = detectFeatures(stdout)
-    const notes = (name, detail) => `${NOTES[name]?.note ?? name} · ${detail}`
-    let failures = Object.entries(hit)
-        .filter(([name]) => name !== 'voucherTaken')   // 69801 是正常结果,不算失败
-        .map(([name, detail]) => ({ kind: name, label: NOTES[name]?.label ?? name, note: notes(name, detail), ignored: name === 'bigPointFlaky' }))
+    const notes = (name, detail) => {
+        const base = NOTES[name]?.note ?? name
+        return detail ? `${base} · ${detail}` : base
+    }
+    // 同一类只报一条:今天「-352」与「投币未达标」就是一件事的两个说法
+    const seen = new Set()
+    let failures = []
+    for (const [name, detail] of Object.entries(hit)) {
+        const kind = KIND[name] ?? name
+        if (kind === 'voucherTaken') continue          // 69801 是正常结果,不算失败
+        if (seen.has(kind)) continue
+        seen.add(kind)
+        const retryable = kind === 'rate-limited'
+        failures.push({
+            kind,
+            label: NOTES[kind]?.label ?? kind,
+            // 风控拦截的文案已自含结论(该接口稍后再试),再拼上游原文只会把用户绕进去
+            note: retryable ? NOTES[kind].note : notes(kind, detail),
+            // 风控拦截不单独否定这一轮:投币真的没投出时,由经验真值的「投币未达标」负责报
+            ignored: kind === 'bigPointFlaky' || retryable,
+            retryable
+        })
+    }
 
     if (timedOut) failures.push({ kind: 'timeout', label: '运行超时', note: 'Console 超过薄壳侧超时被杀 · 可重试' })
     if (exitCode !== 0 && !failures.some((failure) => !failure.ignored)) {
@@ -157,7 +88,9 @@ export function classifyRun({ exitCode = 0, stdout = '', timedOut = false } = {}
         cookieInvalid: has('cookieInvalid'),
         shareFailed: has('shareFailed'),
         watchFailed: has('watchFailed'),
-        task352: has('task352'),
+        task352: has('rate352'),
+        // 风控拦截:与 352 同源,单独给一个布尔位方便编排层把原因并进「投币未达标」
+        rateLimited: Boolean(hit.rate412 || hit.rate352),
         bigPointFlaky: has('bigPointFlaky'),
         guardSkipped: has('guard-skipped'),
         voucherTaken: has('voucherTaken'),
