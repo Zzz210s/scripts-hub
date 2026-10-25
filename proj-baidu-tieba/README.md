@@ -84,8 +84,8 @@ All keys are environment variables and override the same key in `.env`. Common o
 | `TIEBA_FORUMS` | empty | comma-separated forum whitelist; empty means every followed forum |
 | `TIEBA_INTERVAL_MS` | `2000` | delay between accounts, keeps the request rate low |
 | `TIEBA_MAX_ATTEMPTS` | `3` | real runs per logical day |
-| `TIEBA_DETAIL` | `1` | send a second message listing every signed forum with its level · `0` turns it off |
-| `TIEBA_DETAIL_MAX` | `200` | cap on how many forums that message lists · the rest is reported as a count |
+| `TIEBA_DETAIL` | `1` | include the per-forum detail inside the result message, one line per level · `0` leaves only the summary |
+| `TIEBA_DETAIL_MAX` | `200` | cap on how many forums the detail may list · the rest becomes one `另有 N 个未列出` line |
 | `TIEBA_QUIET_START` / `TIEBA_QUIET_END` | `20:00` / `23:00` | quiet hours · skipped without a push |
 | `TIEBA_MIN_FREE_MB` | `800` | memory guard |
 | `TIEBA_DAY_BOUNDARY_HOUR` | `4` | the logical day starts at 04:00, so a small-hours run counts for yesterday |

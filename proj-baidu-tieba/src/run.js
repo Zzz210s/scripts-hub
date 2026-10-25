@@ -16,7 +16,6 @@ import {
   probeCredentials,
   relabelReconcile,
   routeSkip,
-  sendDetails,
   signAll,
   trimAccounts,
   view,
@@ -140,9 +139,17 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
     );
     const ok = reconcileResult.ok === true;
     const exitCode = ok ? 0 : 1;
-    await deliver(buildResult({ date, accounts: outcomes, reconcile: reconcileResult, exitCode, dryRun: false }));
-    // 结果消息之后补一条逐吧明细(一行一个吧 + 等级);开关与分页在 sendDetails / detail.js 里。
-    await sendDetails({ deliver, date, accounts: outcomes, config, sleep: deps.sleep, log });
+    // 逐吧明细并进结果消息(见 messages.js 的 renderDetailSection),每天只发 start 与 result 两条。
+    await deliver(
+      buildResult({
+        date,
+        accounts: outcomes,
+        reconcile: reconcileResult,
+        exitCode,
+        dryRun: false,
+        detail: { enabled: config.detail, maxForums: config.detailMax },
+      }),
+    );
 
     // 8. 落状态与历史:失败尝试已在开跑前记下,这里只在对账通过时补「已完成」。
     if (ok) markDayDone(state, { day, now });

@@ -9,6 +9,7 @@ export const PROGRAM = '百度贴吧签到';
 export const LIMIT_BYTES = 2048;
 
 import { REASONS, SEP, accountFailText, actionText, followUpText, reasonText, reconcileText, safeText } from './message-text.js';
+import { MIN_LINE_BUDGET, renderForumSection } from './detail.js';
 
 // 词表在 message-text.js;这里原样转出,调用方与测试只需认 messages.js 一个入口。
 export { REASONS, accountFailText, actionText, followUpText, reasonText } from './message-text.js';
@@ -141,15 +142,29 @@ export function buildStart({ date, accounts } = {}) {
   return clipHead(headline(accounts, date, '开始运行'), LIMIT_BYTES);
 }
 
-export function buildResult({ date, accounts, reconcile, exitCode, dryRun } = {}) {
+export function buildResult({ date, accounts, reconcile, exitCode, dryRun, detail } = {}) {
   const action = dryRun === true ? '预览,未运行' : reconcile?.ok === true ? '运行成功' : '运行有失败';
   const head = headline(accounts, date, action);
-  // 预览没有真的签到,也就没有对账可言 —— 不把 reconcile 混进逐账号行。
+  // 预览没有真的签到,也就没有对账可言 —— 不把 reconcile 与逐吧明细混进预览。
   if (dryRun === true) return assemble(head, accountLines(accounts, null), ['模式:预览,未运行 · 没有落盘 · 没有发送']);
   const foot = reconcileLines(reconcile);
   const code = num(exitCode);
   if (code !== null && code !== 0) foot.push(`退出码:${code}`);
-  return assemble(head, accountLines(accounts, reconcile), foot);
+  const body = accountLines(accounts, reconcile);
+  const section = renderDetailSection({ head, body, foot, accounts, detail });
+  return assemble(head, [...body, ...section], foot);
+}
+
+/**
+ * 逐吧明细并进结果消息:按剩余字节预算渲染,装不下时由 detail.js 整组丢等级最低的。
+ * 结论行(对账)已经先占位,所以明细只会吃剩下的空间,永远不会把结论挤掉。
+ */
+function renderDetailSection({ head, body, foot, accounts, detail }) {
+  if (detail?.enabled === false) return [];
+  const base = byteLength([head, '', ...body, ...foot].join('\n'));
+  const budget = LIMIT_BYTES - base - 4; // 4 字节余量:装配时的换行与省略标记
+  if (budget < MIN_LINE_BUDGET) return [];
+  return renderForumSection(accounts, { maxForums: detail?.maxForums, budget }).lines;
 }
 
 export function buildSkip({ date, accounts, reason } = {}) {

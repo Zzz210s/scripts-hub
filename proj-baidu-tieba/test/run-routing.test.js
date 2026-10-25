@@ -100,7 +100,7 @@ test('没注入发送器 → 投递结果显式记为失败,不伪装成已发�
     deps: { config, fetchImpl: stub.fetchImpl, sleep: noSleep, log: () => {} },
   });
   assert.equal(result.ok, true); // 签到本身成功
-  assert.equal(result.deliveries.length, 3); // start + result + 逐吧明细,三段都要报失败
+  assert.equal(result.deliveries.length, 2); // start + result,两段都要报失败
   assert.ok(result.deliveries.every((one) => one.ok === false));
   assert.equal(result.lastDelivery.error, '没有注入发送器');
 });
