@@ -50,3 +50,10 @@ test('isRateLimited 只认布尔真值', () => {
     assert.equal(isRateLimited({ rateLimited: undefined }), false)
     assert.equal(isRateLimited(null), false)
 })
+
+// 折叠时不许把「投币之外」的缺失项吃掉(2026-10-25 自检发现:folded 分支只写了投币)
+test('投币与观看同时未达标且被风控拦过时,两项都要出现在同一句里', () => {
+    const failures = buildFailures({ classify: classifyWith(), incomplete: ['watch', 'coins'] })
+    assert.equal(failures.length, 1, JSON.stringify(failures))
+    assert.equal(failures[0].note, '每日任务未完成 · 观看未达标 · 投币被 B站 临时风控拦截 · 下次触发会再试')
+})

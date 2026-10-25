@@ -25,8 +25,11 @@ export function buildFailures({ classify = {}, incomplete = [], voucherFailure =
         .map((failure) => ({ ...failure }))
     if (voucherFailure) failures.push(voucherFailure)
     if (missing.length > 0) {
+        // 折叠时也要把「投币之外」的缺失项带上,不能只说投币把别的漏掉
+        const others = missing.filter((name) => name !== NAMES.coins)
+        const head = others.length ? `${others.join(' ')}未达标 · ` : ''
         const note = folded
-            ? `每日任务未完成 · 投币被 B站 临时风控拦截 · ${RETRY_HINT}`
+            ? `每日任务未完成 · ${head}投币被 B站 临时风控拦截 · ${RETRY_HINT}`
             : `每日任务未完成 · ${missing.join(' ')}未达标`
         failures.push({ kind: 'incomplete', label: '每日任务未完成', note })
     }
