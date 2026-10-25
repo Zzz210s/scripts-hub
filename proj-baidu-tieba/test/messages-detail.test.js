@@ -134,3 +134,16 @@ test('脏吧名也守硬规则:无圆括号、无 emoji', () => {
   assert.equal(hasEmoji(text), false, text);
   assert.ok(text.includes('吧A 外语'), text);
 });
+
+// 回归:账号名本身以「账号」开头时不要再叠前缀,否则真机消息出现过「账号 账号 1」
+test('账号名以「账号」开头时不重复加前缀', () => {
+  const text = buildResult({
+    date: '2026-10-26',
+    accounts: [{ id: 'a', name: '账号 1', ok: true, counts: { signed: 1, already: 0, blocked: 0, tbsStale: 0, failed: 0 }, results: [{ kw: 'x', level: 8, status: 'signed' }] }],
+    reconcile: { ok: true, missingTotal: 0, perAccount: [{ id: 'a', name: '账号 1', ok: true, missing: [], blocked: [] }] },
+    exitCode: 0,
+    detail: { enabled: true, maxForums: 200 }
+  })
+  assert.ok(!text.includes('账号 账号'), `不应出现重复前缀:${text}`)
+  assert.ok(text.includes('账号 1'), '应保留账号名本身')
+})

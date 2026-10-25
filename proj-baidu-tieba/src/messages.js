@@ -77,7 +77,9 @@ function accountLines(accounts, reconcile) {
     const name = safeText(item?.name) || '未命名';
     const parts = countParts(item?.counts);
     if (perAccount) parts.push(`对账 ${verifyWord(verified)}`);
-    lines.push(`账号 ${name}${parts.length ? SEP + parts.join(SEP) : ''}`);
+    // 账号名本身就写「账号 1」时不再叠一层前缀 —— 否则会渲染成「账号 账号 1」(2026-10-26 真机消息)
+    const lead = /^账号/.test(name) ? name : `账号 ${name}`;
+    lines.push(`${lead}${parts.length ? SEP + parts.join(SEP) : ''}`);
     if (item?.emptyForums) lines.push('  关注列表为空,本次没有可签的吧');
     if (item?.incompleteForums) lines.push('  关注列表被截断,可能还有没签的吧');
     if (item?.ok === false) lines.push(`  原因:${safeText(item?.error) || accountFailText(item?.reason)}`);
