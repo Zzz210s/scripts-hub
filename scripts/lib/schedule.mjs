@@ -8,6 +8,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { normalizeLinux, linuxEnabledState } from './schedule-linux.mjs'
+// 时间/描述/期望在 schedule-format.mjs;re-export 让既有 import 路径继续可用。
+export { parseTime, fmtTime, isoDuration, describe, expectation } from './schedule-format.mjs'
+import { fmtTime, parseTime } from './schedule-format.mjs'
 
 export const REPO_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -72,23 +75,6 @@ export function loadSchedule() {
 }
 
 const isInt = (v) => Number.isInteger(v)
-export function parseTime(value) {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || ''))
-    if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null
-    return Number(m[1]) * 60 + Number(m[2])
-}
-export function fmtTime(minutes) {
-    const m = ((minutes % 1440) + 1440) % 1440
-    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
-/** 分钟数 -> Windows 任务的 ISO8601 时长:120 -> PT2H,3 -> PT3M。 */
-export function isoDuration(minutes) {
-    const h = Math.floor(minutes / 60)
-    const m = minutes % 60
-    return `PT${h ? `${h}H` : ''}${m ? `${m}M` : ''}` || 'PT0M'
-}
-
-// [字段, 最小, 最大] —— 整数校验表
 const INT_RULES = [
     ['intervalMinutes', 5, Infinity],
     ['maxAttemptsPerDay', 1, Infinity],
@@ -170,15 +156,6 @@ export function normalize(raw) {
     const timezone = String(raw.timezone || HARD_DEFAULTS.timezone)
     return { version: raw.version ?? 1, timezone, linux, order: Object.keys(resolved).sort((a, b) => resolved[a].order - resolved[b].order), stagger, programs: resolved, notes }
 }
-
-/** 一行话,给人和报告看。 */
-export const describe = (p) =>
-    `${p.startTime} 起每 ${p.intervalMinutes}m,窗口 ${p.windowHours}h(${p.opportunities} 次机会;最多真跑 ${p.maxAttemptsPerDay} 次)` +
-    ` | 登录后 ${p.logonDelayMinutes}m,${p.logonRetryWindowMinutes}m 内每 ${p.logonRetryMinutes}m`
-
-/** 机器可读的期望触发器,deploy-*.sh 拿它与实际任务比对(键与 task_expect 一致)。 */
-export const expectation = (p) =>
-    [`start=${p.startTime}`, `delay=${isoDuration(p.logonDelayMinutes)}`, `interval=${isoDuration(p.intervalMinutes)}`, `duration=${isoDuration(p.windowMinutes)}`].join('\n')
 
 const [, , cmd, arg] = process.argv
 // 只在被直接执行时当 CLI;被 apply-schedule.mjs import 时不动 argv。

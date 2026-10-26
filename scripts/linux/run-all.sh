@@ -47,18 +47,14 @@ enabled_in_schedule() {
     esac
 }
 
-# 每周运行日:programs.<id>.linuxDays 声明后只在那些星期跑。取不到配置时按「该跑」——
-# 宁可多跑一次(程序自己幂等)也不要在闸门坏掉的那天把周更漏掉。
-due_in_schedule() {
-    local id="$1" rc=1
-    [ "$GATE_MODE" = "ok" ] || return 0
-    node "$GATE" due "$SCHEDULE" "$id"
-    rc=$?
-    [ "$rc" -eq 0 ] && return 0
-    [ "$rc" -eq 1 ] && return 1
-    note "[警告] $id 运行日判定失败,退出码 $rc,按今天该跑处理"
-    return 0
-}
+# 守卫函数(体检/跳过措辞/运行日/中断兜底)在同目录的 suite-guards.sh,单独成文件是守 200 行上限。
+# shellcheck source=suite-guards.sh
+GUARDS="$(dirname "$0")/suite-guards.sh"
+if [ ! -f "$GUARDS" ]; then
+    echo "缺守卫库 $GUARDS —— 部署不完整,拒绝在半残状态下编排" >&2
+    exit 1
+fi
+. "$GUARDS"
 
 exec 7>"$SUITE_DIR/state/suite.flock"
 if ! flock -n 7; then

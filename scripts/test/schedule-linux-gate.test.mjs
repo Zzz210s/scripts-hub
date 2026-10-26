@@ -103,6 +103,7 @@ function runSuite(scheduleBody) {
     fs.chmodSync(`${bin}/flock`, 0o755);
     fs.copyFileSync(GATE, `${dir}/program-enabled.mjs`);
     fs.copyFileSync(path.join(REPO_DIR, 'scripts', 'linux', 'run-all.sh'), `${dir}/run-all.sh`);
+    fs.copyFileSync(path.join(REPO_DIR, 'scripts', 'linux', 'suite-guards.sh'), `${dir}/suite-guards.sh`);
     for (const [id, folder] of PROGRAMS) {
         fs.mkdirSync(`${dir}/${folder}`, { recursive: true });
         fs.writeFileSync(`${dir}/${folder}/run.sh`, `#!/bin/sh\necho ${id} >> "${dir}/logs/ran.log"\n`);

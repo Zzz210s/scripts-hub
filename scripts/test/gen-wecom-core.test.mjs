@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { extractBlock, groupForFile, plan, run } from '../gen-wecom-core.mjs'
+import { extractBlock, groupForFile, plan, run, GROUPS } from '../gen-wecom-core.mjs'
 
 const BEGIN = '// >>> demo begin'
 const END = '// <<< demo end'
@@ -95,9 +95,10 @@ test('额外目标按扩展名归组,认不出就报错', () => {
     assert.throws(() => groupForFile('x/mystery.txt'), /无法判断/)
 })
 
-test('仓内 8 份实现与单一源一致(真实落点,兜住手改)', () => {
+test('仓内每份实现与单一源一致(真实落点,兜住手改)', () => {
     const result = run({ write: false })
     assert.equal(result.problems.length, 0)
     assert.deepEqual(result.changed.map(a => a.path), [], '有文件与 scripts/lib 的单一源不一致,跑 node scripts/gen-wecom-core.mjs 注入')
-    assert.equal(result.unchanged.length, 8)
+    // 不写死份数:新增一份实现时改 targets 就够了,别让计数常量成为第二次维护点
+    assert.equal(result.unchanged.length, GROUPS.reduce((n, g) => n + g.targets.length, 0))
 })
