@@ -34,6 +34,7 @@ Windows 侧(`programs.*`,每个程序一个计划任务):
 | `programs.<id>.logonRetryMinutes` / `logonRetryWindowMinutes` | 登录触发的重复间隔 / 总时长 | `10` / `60` |
 | `programs.<id>.actionVbs` | 任务启动的 `run-daily.vbs`;可用 `%REWARDS_DIR%` / `%WEREAD_SIGNIN_DIR%` / `%EPIC_DIR%` / `%BILIBILI_DIR%` 占位符 | 占位符形式 |
 | `programs.<id>.enabled` | `false` = 不注册它的触发 | 微软 / 微信读书 `true`;Epic / B站 / 贴吧默认 `false`,各自人工登录或真机验证后打开 |
+| `programs.<id>.linuxDays` | **Linux 侧每周运行日**:`["fri"]` 这类取值,或 `[5]`(0=周日);不写 = 每天都跑 | Epic `["fri"]`,其余不写 |
 
 Linux 侧(`linux`,单套件;与 `scripts/linux/systemd/` 一致):
 
@@ -96,6 +97,7 @@ Windows 侧,下表是 `config/schedule.json` 的默认值;真实时刻以配置�
 | 网易云音乐签到 | 登录后 38 分钟 · 1 小时内每 10 分钟重试,+ 10:30 起每 120 分钟一次,窗口 14 小时;**默认 `enabled: false`,真机验证后在配置里打开** | `data/state.json` 的逐日 `ok`、尝试次数与熔断标记 · 明细在 `data/history.jsonl` |
 
 - 每个程序占一个 **30 分钟槽位**,新程序顺延 · 08:00 微软 -> 08:30 微信读书 -> 09:00 Epic -> 09:30 B站 -> 10:00 贴吧 -> 10:30 网易云。
+- **每周运行的程序**(Epic 限免)靠 `linuxDays` 收窄:它声明 `["fri"]`,所以 08:00 与 12:00 只有周五那两次会真调它,其余日子 `run-all.sh` 记一行 `Epic 限免 跳过:今天不是运行日`。为什么是周五:Epic 每周四 11:00 美东换挡 = 北京周四 23:00(夏令时)或周五 00:00(冬令时),周五那两次一定覆盖到本周上新。
 - 登录延迟按 **7 分钟步进**错开 · 3 -> 10 -> 17 -> 24 -> 31 -> 38,因为开机瞬间网络与系统未必就绪。
 - 白天用「14 小时时间窗 + 周期重复」给多次机会;错过的靠窗口内下一次补。
 

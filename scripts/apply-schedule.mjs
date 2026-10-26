@@ -13,6 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { loadSchedule, describe } from './lib/schedule.mjs'
+import { linuxDaysText } from './linux/program-enabled.mjs'
 import { loadPrivatePaths, resolveAction, windowsXml, windowsRegisterPs1 } from './lib/schedule-targets.mjs'
 import { suiteTimer, suiteService, suiteOrderText } from './lib/schedule-linux.mjs'
 
@@ -88,7 +89,10 @@ if (emit !== 'systemd') {
 
 if (emit !== 'windows') {
     console.log(`-- Linux/容器:单套件 ${linux.unit}.timer 于 ${linux.times.join(' 与 ')} 触发(Persistent=${linux.persistent}),按 order 顺序跑启用项(run-all.sh 的 linuxEnabled 闸门,与实跑一致)--`)
-    linuxPrograms.forEach((p, i) => console.log(`   ${i + 1}. ${p.id}`))
+    linuxPrograms.forEach((p, i) => {
+        const days = linuxDaysText(p)
+        console.log(`   ${i + 1}. ${p.id}${days ? ' · ' + days : ''}`)
+    })
     files.set(`systemd/${linux.unit}.timer`, suiteTimer(linux))
     files.set(`systemd/${linux.unit}.service`, suiteService(linux))
     files.set('systemd/order.txt', suiteOrderText(linuxPrograms))

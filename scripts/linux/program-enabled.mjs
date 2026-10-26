@@ -5,6 +5,11 @@
 //
 //   node program-enabled.mjs list <schedule.json>            -> 启用的程序 id,按 order 一行一个
 //   node program-enabled.mjs is-enabled <schedule.json> <id> -> 启用退出 0,禁用退出 1
+//   node program-enabled.mjs due <schedule.json> <id> [日期]  -> 今天该不该跑:0 该跑 · 1 不是运行日
+//
+// 每周运行的程序(如 Epic 限免:周四 11:00 美东换挡 = 北京周四 23:00 或周五 00:00)用
+// programs.<id>.linuxDays 声明,取值是星期名或 0-6(0=周日),可多个;不写 = 每天都跑。
+// 日期默认取本机时区的今天,传 YYYY-MM-DD 可伪造,便于测试与补跑核对。
 //
 // 退出码是接口的一部分:0 启用 · 1 明确关闭 · 2 读不到。2 覆盖文件不存在、坏 JSON、程序
 // 条目缺失、enabled/linuxEnabled 取值不是布尔。run-all.sh 只把 0 当「跑」,>=2 一律告警并
@@ -19,7 +24,8 @@
 import fs from 'node:fs';
 
 const USAGE = `用法:node program-enabled.mjs list <schedule.json>
-     node program-enabled.mjs is-enabled <schedule.json> <程序id>`;
+     node program-enabled.mjs is-enabled <schedule.json> <程序id>
+     node program-enabled.mjs due <schedule.json> <程序id> [YYYY-MM-DD]`;
 
 /** 剥掉 _readme 一类注释键;坏 JSON 交给调用方处理。 */
 function readSchedule(file) {
@@ -43,6 +49,45 @@ export function linuxEnabledState(program) {
 /** 布尔视图:只有明确 true 才算启用,null 与 false 都判「不跑」。 */
 export const linuxEnabled = (program) => linuxEnabledState(program) === true;
 
+/** 星期名 -> 0-6(0=周日),与 Date.getDay() 对齐。 */
+const DAY_NAMES = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+const DAY_TEXT = ['日', '一', '二', '三', '四', '五', '六'];
+
+/**
+ * 解析 linuxDays:返回 null 表示「没声明,每天都跑」;返回空 Set 表示取值非法(读不到)。
+ * 非法不回落到「每天跑」—— 一个拼错的星期名不该让周更程序天天跑。
+ */
+export function linuxDaysState(program) {
+    const raw = program?.linuxDays;
+    // null 与 undefined 都算「没声明」(normalize 会把没声明的写成 null,不能当成非法)
+    if (raw === undefined || raw === null) return null;
+    if (!Array.isArray(raw) || raw.length === 0) return new Set();
+    const days = new Set();
+    for (const item of raw) {
+        const key = typeof item === 'string' ? item.trim().toLowerCase() : item;
+        if (typeof key === 'number' && Number.isInteger(key) && key >= 0 && key <= 6) days.add(key);
+        else if (typeof key === 'string' && key in DAY_NAMES) days.add(DAY_NAMES[key]);
+        else return new Set();
+    }
+    return days;
+}
+
+/** 这一天该不该跑:没声明运行日 -> 每天;声明了就按声明。 */
+export function linuxDueOn(program, date = new Date()) {
+    const days = linuxDaysState(program);
+    if (days === null) return true;
+    if (days.size === 0) return false;
+    return days.has(date.getDay());
+}
+
+/** 供日志与干跑用的说明,如「仅周五」;每天跑返回空串。 */
+export function linuxDaysText(program) {
+    const days = linuxDaysState(program);
+    if (days === null) return '';
+    if (days.size === 0) return '运行日取值非法';
+    return '仅周' + [...days].sort((a, b) => a - b).map((day) => DAY_TEXT[day]).join('、周');
+}
+
 /** 启用的程序 id,按 order 排序;没登记在 order 里的接在后面。 */
 export function enabledIds(schedule) {
     const ids = [...new Set([...(schedule.order ?? []), ...Object.keys(schedule.programs ?? {})])];
@@ -58,13 +103,14 @@ export function scheduleProblems(schedule) {
         const entry = schedule.programs[id];
         if (entry === undefined) problems.push(`${id} 在配置里没有条目`);
         else if (linuxEnabledState(entry) === null) problems.push(`${id} 的启用取值必须是布尔`);
+        else if (linuxDaysState(entry)?.size === 0) problems.push(`${id} 的 linuxDays 取值非法,只能是 mon..sun 或 0-6`);
     }
     return problems;
 }
 
 function main(argv) {
-    const [command, file, id] = argv;
-    if (!command || !file || !['list', 'is-enabled'].includes(command)) {
+    const [command, file, id, dayArg] = argv;
+    if (!command || !file || !['list', 'is-enabled', 'due'].includes(command)) {
         console.error(USAGE);
         return 2;
     }
@@ -87,6 +133,19 @@ function main(argv) {
     if (!id) {
         console.error(USAGE);
         return 2;
+    }
+    if (command === 'due') {
+        const program = schedule.programs[id];
+        if (linuxDaysState(program)?.size === 0) {
+            console.error(`[错误] ${id} 的 linuxDays 取值非法`);
+            return 2;
+        }
+        const when = dayArg ? new Date(`${dayArg}T12:00:00`) : new Date();
+        if (Number.isNaN(when.getTime())) {
+            console.error(`[错误] 日期看不懂:${dayArg}`);
+            return 2;
+        }
+        return linuxDueOn(program, when) ? 0 : 1;
     }
     const state = linuxEnabledState(schedule.programs[id]);
     if (state === null) {

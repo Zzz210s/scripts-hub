@@ -3,6 +3,7 @@
 // 纯库 + 一个只读小 CLI(诊断走 stderr,stdout 只放结果):
 //   node scripts/lib/schedule.mjs show | expect <id> | json
 // 生成/注册触发器见 scripts/apply-schedule.mjs;规则见 docs/scheduling-convention.md。
+import { linuxDaysState } from '../linux/program-enabled.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -134,6 +135,9 @@ export function normalize(raw) {
         if (isInt(p.logonRetryWindowMinutes) && isInt(p.logonRetryMinutes) && p.logonRetryWindowMinutes < p.logonRetryMinutes) {
             errors.push(`${id}.logonRetryWindowMinutes 必须 >= logonRetryMinutes`)
         }
+        // 每周运行日:取值非法要在这里就报错,否则「拼错星期名」会让周更程序要么天天跑要么永不跑
+        const days = linuxDaysState(p)
+        if (days?.size === 0) errors.push(`${id}.linuxDays 取值非法,只能是 mon..sun 或 0-6: ${JSON.stringify(p.linuxDays)}`)
         if (errors.length) continue
         const windowMinutes = Math.round(p.windowHours * 60)
         const opportunities = Math.floor((windowMinutes - 1) / p.intervalMinutes) + 1
@@ -157,6 +161,7 @@ export function normalize(raw) {
             actionVbs: String(p.actionVbs || ''),
             enabled: p.enabled !== false,
             linuxEnabled: linuxEnabledState(p),
+            linuxDays: days === null ? null : [...days].sort((a, b) => a - b),
             opportunities
         }
     }

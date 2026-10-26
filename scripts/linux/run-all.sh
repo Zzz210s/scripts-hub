@@ -47,6 +47,19 @@ enabled_in_schedule() {
     esac
 }
 
+# 每周运行日:programs.<id>.linuxDays 声明后只在那些星期跑。取不到配置时按「该跑」——
+# 宁可多跑一次(程序自己幂等)也不要在闸门坏掉的那天把周更漏掉。
+due_in_schedule() {
+    local id="$1" rc=1
+    [ "$GATE_MODE" = "ok" ] || return 0
+    node "$GATE" due "$SCHEDULE" "$id"
+    rc=$?
+    [ "$rc" -eq 0 ] && return 0
+    [ "$rc" -eq 1 ] && return 1
+    note "[警告] $id 运行日判定失败,退出码 $rc,按今天该跑处理"
+    return 0
+}
+
 exec 7>"$SUITE_DIR/state/suite.flock"
 if ! flock -n 7; then
     note "已有一次编排在跑,本次触发跳过"
@@ -71,10 +84,11 @@ for b in $BROKEN; do
 done
 
 # 跳过时的措辞要分清三种原因:入口坏了 / 配置里关了 / 闸门失效时不在固定清单里
-skip_note() {   # $1=显示名 $2=目录名
+skip_note() {   # $1=显示名 $2=目录名 $3=程序 id
     if broken "$2"; then note "$1 跳过:宿主入口不可用"
-    elif [ "$GATE_MODE" = "ok" ]; then note "$1 已关闭(schedule.json),跳过"
-    else note "$1 不在固定四程序清单里,跳过"
+    elif [ "$GATE_MODE" != "ok" ]; then note "$1 不在固定四程序清单里,跳过"
+    elif enabled_in_schedule "$3" >/dev/null 2>&1; then note "$1 跳过:今天不是运行日"
+    else note "$1 已关闭(schedule.json),跳过"
     fi
 }
 
@@ -122,7 +136,7 @@ if enabled_in_schedule microsoft-rewards && ! broken rewards; then
     note "微软积分退出码 $RC_REWARDS"
 else
     RC_REWARDS=0
-    skip_note "微软积分" rewards
+    skip_note "微软积分" rewards microsoft-rewards
 fi
 
 if enabled_in_schedule weread-signin && ! broken weread; then
@@ -132,17 +146,17 @@ if enabled_in_schedule weread-signin && ! broken weread; then
     note "微信读书退出码 $RC_WEREAD"
 else
     RC_WEREAD=0
-    skip_note "微信读书" weread
+    skip_note "微信读书" weread weread-signin
 fi
 
-if enabled_in_schedule epic-free-games && ! broken epic; then
+if enabled_in_schedule epic-free-games && due_in_schedule epic-free-games && ! broken epic; then
     STEP="Epic 限免"
     "$SUITE_DIR/epic/run.sh" 7>&-
     RC_EPIC=$?
     note "Epic 限免退出码 $RC_EPIC"
 else
     RC_EPIC=0
-    skip_note "Epic 限免" epic
+    skip_note "Epic 限免" epic epic-free-games
 fi
 
 if enabled_in_schedule bilibili-tasks && ! broken bilibili; then
@@ -152,7 +166,7 @@ if enabled_in_schedule bilibili-tasks && ! broken bilibili; then
     note "B站任务退出码 $RC_BILIBILI"
 else
     RC_BILIBILI=0
-    skip_note "B站任务" bilibili
+    skip_note "B站任务" bilibili bilibili-tasks
 fi
 
 if enabled_in_schedule baidu-tieba && ! broken tieba; then
@@ -162,7 +176,7 @@ if enabled_in_schedule baidu-tieba && ! broken tieba; then
     note "百度贴吧退出码 $RC_TIEBA"
 else
     RC_TIEBA=0
-    skip_note "百度贴吧" tieba
+    skip_note "百度贴吧" tieba baidu-tieba
 fi
 
 if enabled_in_schedule netease-cloud && ! broken netease; then
@@ -172,7 +186,7 @@ if enabled_in_schedule netease-cloud && ! broken netease; then
     note "网易云退出码 $RC_NETEASE"
 else
     RC_NETEASE=0
-    skip_note "网易云" netease
+    skip_note "网易云" netease netease-cloud
 fi
 
 COMPLETED=1

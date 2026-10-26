@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { enabledIds, linuxEnabled, linuxEnabledState, scheduleProblems } from '../linux/program-enabled.mjs';
+import { enabledIds, linuxDaysState, linuxDaysText, linuxDueOn, linuxEnabled, linuxEnabledState, scheduleProblems } from '../linux/program-enabled.mjs';
 import { loadSchedule, REPO_DIR } from '../lib/schedule.mjs';
 
 const GATE = path.join(REPO_DIR, 'scripts', 'linux', 'program-enabled.mjs');
@@ -134,8 +134,46 @@ test('run-all.sh:缺配置 fail-closed 四程序清单', { skip: !hasBash }, () 
     assert.match(ledger, /调度闸门不可用/);
 });
 
-test('run-all.sh:正常配置按配置跑(六个程序都启用)', { skip: !hasBash }, () => {
-    const { status, ran } = runSuite(fs.readFileSync(path.join(REPO_DIR, 'config', 'schedule.json'), 'utf8'));
+test('run-all.sh:正常配置按配置跑,Epic 只在周五跑', { skip: !hasBash }, () => {
+    const { status, ran, ledger } = runSuite(fs.readFileSync(path.join(REPO_DIR, 'config', 'schedule.json'), 'utf8'));
     assert.equal(status, 0);
-    assert.deepEqual(ran.trim().split('\n'), [...FOUR, 'baidu-tieba', 'netease-cloud']);
+    const expected = new Date().getDay() === 5
+        ? [...FOUR, 'baidu-tieba', 'netease-cloud']
+        : [...FOUR.filter((id) => id !== 'epic-free-games'), 'baidu-tieba', 'netease-cloud'];
+    assert.deepEqual(ran.trim().split('\n'), expected);
+    if (new Date().getDay() !== 5) assert.match(ledger, /Epic 限免 跳过:今天不是运行日/);
+});
+
+// 每周运行(Epic):linuxDays 声明后只在那些星期跑;不声明 = 每天跑;取值非法要响亮失败
+test('linuxDays:周一不跑、周五跑、周六不跑', () => {
+    const program = { enabled: false, linuxEnabled: true, linuxDays: ['fri'] };
+    assert.equal(linuxDueOn(program, new Date('2026-10-26T12:00:00')), false); // 周一
+    assert.equal(linuxDueOn(program, new Date('2026-10-30T12:00:00')), true); // 周五
+    assert.equal(linuxDueOn(program, new Date('2026-10-31T12:00:00')), false); // 周六
+    assert.equal(linuxDaysText(program), '仅周五');
+});
+
+test('linuxDays:接受 0-6 与大小写星期名;不声明按每天;非法取值判读不到', () => {
+    assert.equal(linuxDueOn({ linuxDays: [5] }, new Date('2026-10-30T12:00:00')), true);
+    assert.equal(linuxDueOn({ linuxDays: ['FRI'] }, new Date('2026-10-30T12:00:00')), true);
+    assert.equal(linuxDueOn({ linuxDays: ['mon', 'thu'] }, new Date('2026-10-26T12:00:00')), true);
+    assert.equal(linuxDueOn({}, new Date('2026-10-26T12:00:00')), true);
+    assert.equal(linuxDueOn({ linuxDays: ['friday'] }, new Date('2026-10-30T12:00:00')), false);
+    assert.equal(linuxDaysState({ linuxDays: ['friday'] }).size, 0);
+    assert.deepEqual(
+        scheduleProblems({ order: ['x'], programs: { x: { linuxEnabled: true, linuxDays: ['nope'] } } }),
+        ['x 的 linuxDays 取值非法,只能是 mon..sun 或 0-6']
+    );
+});
+
+test('due 子命令:退出码 0/1/2 三态可区分,且 Epic 在配置里是周五', () => {
+    const { schedule } = loadSchedule();
+    assert.deepEqual(schedule.programs['epic-free-games'].linuxDays, [5]); // 归一成 0-6,fri = 5
+    const file = path.join(tmp(), 'schedule.json');
+    fs.writeFileSync(file, JSON.stringify(schedule));
+    assert.equal(gate(['due', file, 'epic-free-games', '2026-10-30']).status, 0);
+    assert.equal(gate(['due', file, 'epic-free-games', '2026-10-31']).status, 1);
+    const bad = path.join(tmp(), 'bad.json');
+    fs.writeFileSync(bad, JSON.stringify({ order: ['x'], programs: { x: { linuxEnabled: true, linuxDays: ['nope'] } } }));
+    assert.equal(gate(['due', bad, 'x']).status, 2);
 });
