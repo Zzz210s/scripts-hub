@@ -52,7 +52,7 @@
     "times": [
       "08:00",
       "12:00",
-      "20:00"
+      "19:00"
     ],
     "persistent": true,
     "suiteDir": "/srv/apps/automation",

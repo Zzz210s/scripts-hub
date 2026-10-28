@@ -47,3 +47,13 @@ test('quietHours 支持跨零点;shutdownGuard/memorySkip 边界', () => {
     assert.deepEqual(memorySkip(100), { skip: true, reason: 'low-memory', detail: '100MB' })
     assert.deepEqual(memorySkip(900), { skip: false })
 })
+
+// 2026-10-28:套件加了第三次触发 19:00,它必须落在安静时段(20:00-23:00)之前,
+// 否则 B站 到点会直接以 quiet-hours 跳过,第三次机会形同虚设。
+test('19:00 不在安静时段内,20:00 起才安静', () => {
+    const at = (hour) => new Date(2026, 9, 28, hour, 0, 0)
+    assert.equal(quietHours(at(19)), false)
+    assert.equal(quietHours(at(20)), true)
+    assert.equal(quietHours(at(22)), true)
+    assert.equal(quietHours(at(23)), false)
+})
