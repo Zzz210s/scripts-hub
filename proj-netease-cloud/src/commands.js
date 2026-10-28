@@ -8,12 +8,11 @@ import { PATHS } from './crypto.js'
 import { buildResult } from './messages.js'
 import { pace } from './pacing.js'
 import { sendWecom } from './notify.js'
-import { historyFile } from './state.js'
+import { attemptsOn, doneToday, historyFile, readState } from './state.js'
 import { readAccounts, vipWord } from './probe.js'
 import { queryYunbei, renderYunbeiLine } from './yunbei.js'
 
 async function sendViaWecom(text, config, deps) {
-  const { sendWecom } = await import('./notify.js')
   return sendWecom(text, { webhookFile: config.webhookFile, fetchImpl: deps.fetchImpl, sleep: deps.sleep })
 }
 

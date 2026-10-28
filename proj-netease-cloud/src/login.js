@@ -104,3 +104,27 @@ export async function loginWithCookie({ cwd, raw, account = 1, now = new Date(),
   const verified = await verify({ cookie: `MUSIC_U=${parsed.cookie}`, config, deps })
   return { ok: true, step: 'saved', account, cleared: cleared.cleared, verified }
 }
+
+// CLI(宿主侧用):node src/login.js --file <路径> | --cookie "<内容>" [--account N]
+// 只写 .env 与清熔断,**不做自证** —— 宿主机上没有 fetch 依赖的那套 client 上下文;
+// 自证由 `docker compose run --rm -T netease-run check` 在容器里完成。
+// 为什么要有这个入口:容器里 .env 是只读挂载(compose 有意为之),容器写不了,只能宿主写。
+if (process.argv[1] && process.argv[1].endsWith('login.js')) {
+  const argv = process.argv.slice(2)
+  const pick = (flag) => {
+    const index = argv.indexOf(flag)
+    return index >= 0 ? argv[index + 1] : undefined
+  }
+  const account = Number(pick('--account') ?? 1) || 1
+  let raw = pick('--cookie')
+  const file = pick('--file')
+  if (!raw && file) raw = fs.readFileSync(file, 'utf8')
+  const result = await loginWithCookie({ cwd: process.cwd(), raw, account })
+  if (!result.ok) {
+    process.stderr.write(`[失败] ${result.error}\n`)
+    process.exitCode = 1
+  } else {
+    process.stdout.write(`[保存] ACCOUNT_${result.account}_MUSIC_U 已写入 .env · 权限 600\n`)
+    process.stdout.write(`[熔断] ${result.cleared ? '已清掉当天的熔断标记' : '当天本来没有熔断标记'}\n`)
+  }
+}

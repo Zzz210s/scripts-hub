@@ -2,6 +2,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 import { main } from '../src/cli.js'
 import { PATHS } from '../src/crypto.js'
@@ -104,4 +106,27 @@ test('report:当天没有历史记录时返回 0,只提示不发送', async () =
   assert.equal(await io.run(['report']), 0)
   assert.equal(io.sent.length, 0)
   assert.equal(io.logs.some((line) => line.includes('当天还没有运行记录')), true)
+})
+
+// 回归:cli 拆出 commands.js 时漏了 readState 等导入,check 会在容器里直接报 is not defined。
+// 这条用例走一遍 check 的离线路径,锁住 commands.js 的依赖完整。
+test('check 子命令在离线桩下能跑完并打印账号行', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'netease-check-'))
+  fs.mkdirSync(path.join(cwd, 'data'), { recursive: true })
+  fs.writeFileSync(path.join(cwd, '.env'), 'ACCOUNT_1_MUSIC_U=' + 'x'.repeat(40) + '\n')
+  const lines = []
+  const code = await main(['check'], {
+    cwd,
+    log: (line) => lines.push(line),
+    error: (line) => lines.push(line),
+    deps: {
+      fetchImpl: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ code: 200, data: {} }) }),
+      freeMb: () => 4000,
+    },
+  })
+  const text = lines.join('\n')
+  assert.ok(text.includes('网易云音乐签到'), `缺少头部:${text}`)
+  assert.ok(text.includes('账号 1'), `缺少账号行:${text}`)
+  assert.ok(!/is not defined/.test(text), `出现未定义引用:${text}`)
+  assert.equal(typeof code, 'number')
 })
