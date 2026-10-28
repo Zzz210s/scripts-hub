@@ -37,7 +37,8 @@ test('正常一次:先 start 再 result,状态落 success', async () => {
     assert.ok(result.messages[1].includes('投币:3 枚 · 投给关注的 UP · 今日累计 5 枚 · 余额 125.0'))
     assert.ok(result.messages[1].includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 已得 5 · 投币 已得 50 · 共 65 经验'))
     assert.ok(deps.calls.fetch.includes('exp'))
-    assert.deepEqual(deps.calls.spawn[0].env.Ray_DailyTaskConfig__NumberOfCoins, '5')
+    // 投币改由薄壳自己做(见 src/coin.js),Console 侧必须恒为 0,否则会重复投
+    assert.deepEqual(deps.calls.spawn[0].env.Ray_DailyTaskConfig__NumberOfCoins, '0')
     const { state } = loadState(config.stateFile)
     assert.equal(state.lastResult, 'success')
     assert.equal(state.lastRunDay, '2026-10-11')

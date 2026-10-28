@@ -27,6 +27,7 @@ export function assertNoSinks(env, processEnv = process.env) {
 
 /** 设计文档 §6.2/§6.3 的开关矩阵;投币数量与保留值来自薄壳算出的策略。 */
 export function buildConsoleEnv(cfg, { coinTarget } = {}) {
+    // coinTarget 仍由调用方传入(它决定薄壳自己投几枚),这里不再据此开上游投币
     const target = coinTarget ?? { target: cfg.coinMax }
     return {
         Ray_RunTasks: RUN_TASKS,
@@ -43,7 +44,10 @@ export function buildConsoleEnv(cfg, { coinTarget } = {}) {
         Ray_DailyTaskConfig__IsWatchVideo: 'true',
         Ray_DailyTaskConfig__IsShareVideo: 'true',
         Ray_DailyTaskConfig__SelectLike: 'false',
-        Ray_DailyTaskConfig__NumberOfCoins: String(target.target),
+        // 投币由本薄壳的 src/coin.js 负责:上游那条链路的 /x/web-interface/view 在我们这台
+        // 机房 IP 上稳定 -412 request was banned(2026-10-28),同一接口我们自己发就正常。
+        // 这里必须置 0,否则 Console 会再投一遍 —— 重复投币。
+        Ray_DailyTaskConfig__NumberOfCoins: '0',
         Ray_DailyTaskConfig__NumberOfProtectedCoins: String(cfg.coinKeep),
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',

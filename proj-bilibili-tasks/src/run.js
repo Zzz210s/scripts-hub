@@ -5,6 +5,7 @@ import { classifyRun, computeExp, readMangaFacts } from './classify.js'
 import { buildFailures } from './failures.js'
 import { expFromReward, incompleteTasks } from './exp.js'
 import { coinTarget } from './donate.js'
+import { applyPlan } from './coin.js'
 import { dayKey, dateText } from './clock.js'
 import { shouldSkipLocally } from './guards.js'
 import { buildActionMessage, buildResultMessage, buildStartMessage } from './messages.js'
@@ -117,7 +118,7 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
 
         // 6. 券 + 7. 硬币/关注
         const voucher = await handleVoucher({ deps, credential, member, day, log })
-        const donate = await handleDonate({ config, deps, credential, log })
+        let donate = await handleDonate({ config, deps, credential, log })
 
         // 8. Console(开关矩阵注入) -> 归类
         const env = buildConsoleEnv(config, { coinTarget: donate.coin })
@@ -134,8 +135,13 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             return null
         })
 
+        // 8.5 投币改由薄壳自己投(上游那段被 WAF 拦死),实现见 src/coin.js。
+        const readExp = () => (typeof deps.fetchExpReward === 'function' ? deps.fetchExpReward(credential.cookie) : Promise.resolve({ ok: false }))
+        const selfCoin = typeof deps.donateCoins === 'function' ? await deps.donateCoins({ config, credential, balance: donate.result.balance, log, readExp }) : null
+        donate = applyPlan(donate, selfCoin?.plan)
+
         // 每日任务经验:接口真值优先,取不到才回落估算口径(消息里会标注)
-        const reward = typeof deps.fetchExpReward === 'function' ? await deps.fetchExpReward(credential.cookie) : { ok: false }
+        const reward = await readExp()
         const truth = reward?.ok ? expFromReward(reward.data?.data) : null
         const exp = truth ?? computeExp({ classify, target: donate.coin.target })
         // R3:读回校验的完成度。接口取不到时不据此判未完成(降级为按退出码),由 estimated 口径渲染

@@ -38,7 +38,7 @@ test('开关矩阵逐条正确(设计文档 §6.2/§6.3)', () => {
         Ray_DailyTaskConfig__IsWatchVideo: 'true',
         Ray_DailyTaskConfig__IsShareVideo: 'true',
         Ray_DailyTaskConfig__SelectLike: 'false',
-        Ray_DailyTaskConfig__NumberOfCoins: '3',
+        Ray_DailyTaskConfig__NumberOfCoins: '0', // 投币由薄壳自己做,Console 必须关
         Ray_DailyTaskConfig__NumberOfProtectedCoins: '20',
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',

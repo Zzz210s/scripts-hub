@@ -20,7 +20,9 @@ const DONATE_STOP = {
     'below-threshold': (d) => `投币:跳过 · 硬币余额不高于保留值 ${d.threshold}`,
     'no-followings': '投币:跳过 · 关注列表为空',
     'unknown-followings': '投币:跳过 · 无法确认关注列表',
-    'no-balance': '投币:跳过 · 未取到硬币余额'
+    'no-balance': '投币:跳过 · 未取到硬币余额',
+    'exp-full': '投币:今日投币经验已满 · 不投',
+    'exp-unknown': '投币:无法确认今日投币经验 · 本次不投'
 }
 
 export function renderDonateLine(donate = {}) {

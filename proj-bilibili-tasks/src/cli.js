@@ -20,6 +20,7 @@ import { runLogin } from './login.js'
 import { sendWecom } from './notify.js'
 import { buildActionMessage, renderExpLine } from './messages.js'
 import { expFromReward } from './exp.js'
+import { donateForRun } from './coin.js'
 import { sanitizeDetail } from './classify.js'
 import { runOnce } from './run.js'
 import { peerRunning } from './lock.js'
@@ -147,6 +148,8 @@ export async function main(argv = process.argv.slice(2), options = {}) {
             fetchExpReward: (cookie) => fetchExpReward(cookie, { fetchImpl: injected.fetchImpl }),
             fetchFollowingsTotal: (cookie, mid) => fetchFollowingsTotal(cookie, mid, { fetchImpl: injected.fetchImpl }),
             runConsole: (tasks, envMap, runDeps) => runConsole(tasks, envMap, { ...runDeps, spawnImpl: injected.spawnImpl }),
+            // 投币由薄壳自己做(上游那段被 WAF 拦死):run.js 只在注入了这个函数时才投
+            donateCoins: (context) => donateForRun({ ...context, deps: { fetchImpl: injected.fetchImpl, sleep: injected.sleep, intervalMs: injected.coinIntervalMs } }),
             send: async (text) => {
                 const sent = await sendWecom(text, { webhookFile: config.webhookFile, fetchImpl: injected.fetchImpl, sleep: injected.sleep })
                 out(`[通知] 企业微信${sent.ok ? '已发送' : `发送失败:${sent.error}`}`)
