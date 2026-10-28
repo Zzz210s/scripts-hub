@@ -43,7 +43,7 @@ test('开关矩阵逐条正确(设计文档 §6.2/§6.3)', () => {
         Ray_DailyTaskConfig__SupportUpIds: '',
         Ray_Security__RandomSleepMaxMin: '0',
         // 上游默认间隔 20 秒会让请求前的随机睡眠(10-20 秒)计入 30 秒超时预算 → 分享流程超时
-        Ray_Security__IntervalSecondsBetweenRequestApi: '5',
+        Ray_Security__IntervalSecondsBetweenRequestApi: '10',
         Ray_AutoRecoverConfig__IsEnable: 'false',
         // R1:上游 CookieTaskGuard 的 nav 15 秒超时会静默跳过整次任务且退出码仍为 0
         Ray_CookieCheck__AutoCheckEnabled: 'false'
@@ -95,4 +95,13 @@ test('spawn 报错 -> error,不抛', async () => {
     const spawnImpl = () => { const child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill = () => {}; setImmediate(() => child.emit('error', new Error('ENOENT'))); return child }
     const result = await runConsole(RUN_TASKS, {}, { spawnImpl })
     assert.equal(result.error, 'ENOENT')
+})
+
+// 请求间隔可调:2026-10-28 实测 2.5-5 秒的节奏让 /x/web-interface/view 在机房 IP 上吃到 -412,
+// 默认放宽到 10 秒;要覆盖就用 BILIBILI_INTERVAL_SECONDS。
+test('请求间隔默认 10 秒且可用环境变量覆盖', () => {
+    assert.equal(loadConfig({}).intervalSeconds, 10)
+    assert.equal(loadConfig({ BILIBILI_INTERVAL_SECONDS: '18' }).intervalSeconds, 18)
+    const env = buildConsoleEnv(loadConfig({ BILIBILI_INTERVAL_SECONDS: '18' }), { coinTarget: { target: 5 } })
+    assert.equal(env.Ray_Security__IntervalSecondsBetweenRequestApi, '18')
 })

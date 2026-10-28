@@ -52,7 +52,7 @@ export function buildConsoleEnv(cfg, { coinTarget } = {}) {
         // 且 GET/POST 都算),延迟计入 30 秒预算 —— 日志里请求间隔正是 12-19 秒。
         // 本机/容器到 api.bilibili.com 实测 0.12-0.16 秒,所以降间隔才是正解,不是加超时。
         // 5 秒(随机 2.5-5)给 30 秒预算留 4 倍余量,仍远慢于人手点击的频率。
-        Ray_Security__IntervalSecondsBetweenRequestApi: '5',
+        Ray_Security__IntervalSecondsBetweenRequestApi: String(cfg.intervalSeconds ?? 10),
         Ray_AutoRecoverConfig__IsEnable: 'false',
         // R1:上游 CookieTaskGuard 在 .NET 侧 nav 慢时会 15 秒超时 -> 抛 InvalidOperationException
         // -> 整次运行被静默跳过,而退出码仍是 0(2026-10-11 实测:同容器 node 调 nav 214ms,

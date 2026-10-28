@@ -29,6 +29,10 @@ export function loadConfig(env = process.env) {
         upstreamCommit: env.BILIBILI_UPSTREAM_COMMIT || '2db0fc613f',
         coinKeep: nonNeg(env.BILIBILI_COIN_KEEP, 20),       // coinTarget 的 threshold
         coinMax: int(env.BILIBILI_COIN_MAX, 5),             // coinTarget 的 max
+        // 每次 B站 API 请求前的随机等待上限(秒)。上游默认 5;实测 2.5-5 秒的节奏会让
+        // /x/web-interface/view 在机房 IP 上被判 -412 request was banned(2026-10-28),
+        // 放宽到 10 秒(随机 5-10)可以提高投币任务的通过率,代价是单次运行多几分钟。
+        intervalSeconds: int(env.BILIBILI_INTERVAL_SECONDS, 10),
         consoleTimeoutMinutes: int(env.BILIBILI_CONSOLE_TIMEOUT_MINUTES, 20),
         maxAttempts: int(env.BILIBILI_MAX_ATTEMPTS, 2),
         dayBoundaryHour: nonNeg(env.BILIBILI_DAY_BOUNDARY_HOUR, 4),
