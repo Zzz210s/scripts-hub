@@ -17,7 +17,7 @@ test('默认值', () => {
     assert.equal(cfg.coinKeep, 20)
     assert.equal(cfg.coinMax, 5)
     assert.equal(cfg.consoleTimeoutMinutes, 20)
-    assert.equal(cfg.maxAttempts, 2)
+    assert.equal(cfg.maxAttempts, 3)
     assert.equal(cfg.consoleDir, '/app')
     assert.equal(cfg.consoleDll, '/app/Ray.BiliBiliTool.Console.dll')
     assert.equal(cfg.dayBoundaryHour, 4)

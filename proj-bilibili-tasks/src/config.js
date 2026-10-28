@@ -34,7 +34,7 @@ export function loadConfig(env = process.env) {
         // 放宽到 10 秒(随机 5-10)可以提高投币任务的通过率,代价是单次运行多几分钟。
         intervalSeconds: int(env.BILIBILI_INTERVAL_SECONDS, 10),
         consoleTimeoutMinutes: int(env.BILIBILI_CONSOLE_TIMEOUT_MINUTES, 20),
-        maxAttempts: int(env.BILIBILI_MAX_ATTEMPTS, 2),
+        maxAttempts: int(env.BILIBILI_MAX_ATTEMPTS, 3),  // 与三次触发对齐:投币会被间歇 -412 拦,多一次机会
         dayBoundaryHour: nonNeg(env.BILIBILI_DAY_BOUNDARY_HOUR, 4),
         minFreeMb: int(env.BILIBILI_FREE_MEM_MB, 800),
         // App 侧凭据(大积分「补领」用)。没有这个文件就完全不尝试,消息也不变。
