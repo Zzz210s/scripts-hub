@@ -29,7 +29,8 @@ proj-bilibili-tasks/
   scripts/windows/          Windows 备用入口
 ```
 
-- 薄壳负责:守卫、券流程、投币策略、退出码/stdout 特征归类、通知、本地状态。
+- 薄壳负责:守卫、券流程、**投币本身**(`src/coin.js`:查已投 → 逐条间隔 ≥1.5 秒投出 → 按经验真值校验)、退出码/stdout 特征归类、通知、本地状态。
+  为什么投币自己投:上游 Console 的投币链路要逐条打 `GET /x/web-interface/view`,这个机房 IP 在 2026-10-28 被它稳定回 `-412 request was banned`,把间隔放宽到 10 秒也没用;而我们自己发同样的请求是 200,`coin/add` 也通。所以 Console 的投币被置 `NumberOfCoins=0`,改由薄壳用更轻的调用序列执行。
 - 上游 Console 负责:启用任务的 B站接口调用。它以子进程方式运行,任务清单固定,
   每个任务都有显式的开/关矩阵。
 - 上游源码不入库。镜像构建时按 `VENDOR_COMMIT.txt` 与
@@ -135,3 +136,13 @@ node src/cli.js cookies        # 只打印账号,绝不打印 cookie 值
 
 GPL-3.0-only。镜像按 `VENDOR_COMMIT.txt` 记录的固定 commit 从上游构建;上游来源、许可与我们的
 改动声明见 `NOTICE`。镜像自用,不对外分发。
+
+### 投币为什么自己做
+
+上游 Console 的投币是一串「查已投 → 取视频详情 → 投币」的循环,其中 `GET /x/web-interface/view`
+在机房 IP 上会被 B站 WAF 稳定拦成 `-412 request was banned`(2026-10-28 实测:连续一小时、间隔从 5 秒
+放到 10 秒也一样)。而同样请求由薄壳发出是 `200`,投币接口 `coin/add` 也正常。
+
+所以 `Ray_DailyTaskConfig__NumberOfCoins` 恒置 `0`(Console 不投),改由 `src/coin.js` 执行:
+按 `exp/reward` 的今日投币经验算缺口 → 从排行榜取候选 → 每条先用 `archive/coins` 查已投(幂等)
+→ `coin/add` 逐条投、间隔 ≥1.5 秒 → 达标即停。经验取不到时**不投**(宁可少投,不重复投)。
