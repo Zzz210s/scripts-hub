@@ -61,7 +61,7 @@ test('R5 取不到后值 -> 回落为目标值', async () => {
     let reads = 0
     const deps = makeDeps({ fetchCoin: async () => { reads += 1; return reads === 1 ? { ok: true, data: { money: 128 } } : { ok: false, error: '网络' } } })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('投币:目标 ≤5 枚 · 投给关注的 UP · 今日累计 5 枚 · 余额 128.0'), result.messages[1])
+    assert.ok(result.messages[1].includes('投币:目标 ≤1 枚 · 投给关注的 UP · 今日累计 5 枚 · 余额 128.0'), result.messages[1])
 })
 
 test('R6 大积分失败不算整体失败,文案指向上游已知问题', async () => {

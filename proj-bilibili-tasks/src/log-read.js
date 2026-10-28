@@ -91,7 +91,9 @@ export function readMangaFacts(stdout = '') {
 
     // 段内出现「不能重复签到」这类字样时,即使响应码非 0 也当「已经做过」
     const judge = (text, marker) => {
-        if (text === null) return 'unknown'
+        // 段落整个不存在 = 这个任务这次没跑(没启用/被跳过),别报「结果未知」——那会让
+        // 一个没发生的事看起来像出了事。只有跑了但读不出结果才算 unknown。
+        if (text === null) return 'skipped'
         const result = verdict(readResultAfterIn(text, marker))
         if (result !== 'unknown' && ALREADY.test(text)) return 'already'
         return result
@@ -105,5 +107,9 @@ export function readMangaFacts(stdout = '') {
             reason: readReasonAfterResultIn(benefitText, '【领取结果】')
         }
     }
-    return { sign: judge(signText, '【签到结果】'), read: judge(readText, '【漫画阅读】'), benefit }
+    // 签到段没跑但阅读段跑了?那只报阅读;两个都没跑就是 skipped
+    const sign = judge(signText, '【签到结果】')
+    const read = judge(readText, '【漫画阅读】')
+    const both = sign === 'skipped' && read === 'skipped'
+    return { skipped: both, sign, read, benefit }
 }

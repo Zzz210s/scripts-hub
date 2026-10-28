@@ -15,7 +15,7 @@ test('默认值', () => {
     const cfg = loadConfig({})
     assert.equal(cfg.root, ROOT)
     assert.equal(cfg.coinKeep, 20)
-    assert.equal(cfg.coinMax, 5)
+    assert.equal(cfg.coinMax, 1)
     assert.equal(cfg.consoleTimeoutMinutes, 20)
     assert.equal(cfg.maxAttempts, 3)
     assert.equal(cfg.consoleDir, '/app')

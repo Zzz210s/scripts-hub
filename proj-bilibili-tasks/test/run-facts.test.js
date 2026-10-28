@@ -27,7 +27,8 @@ test('exp/reward 取不到 -> 回落估算并明确标注', async () => {
     const { config } = setup()
     const deps = makeDeps({ fetchExpReward: async () => ({ ok: false, error: 'HTTP 500' }) })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 已得 5 · 投币 已得 50 · 共 65 经验 · 按计划口径估算'), result.messages[1])
+    // 投币目标默认改成 1 枚后,回落口径的投币经验是 10(1 枚 x 10)
+    assert.ok(result.messages[1].includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 已得 5 · 投币 已得 10 · 共 25 经验 · 按计划口径估算'), result.messages[1])
 })
 
 test('失败原因行不出现裸日志与圆括号', async () => {

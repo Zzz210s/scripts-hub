@@ -129,7 +129,7 @@ const MANGA_OK = [
 ].join('\n')
 
 test('漫画:各自读自己流程的结果行', () => {
-    assert.deepEqual(readMangaFacts(MANGA_OK), { sign: 'ok', read: 'ok', benefit: null })
+    assert.deepEqual(readMangaFacts(MANGA_OK), { skipped: false, sign: 'ok', read: 'ok', benefit: null })
 })
 
 test('漫画签到失败如实报告', () => {
@@ -137,8 +137,12 @@ test('漫画签到失败如实报告', () => {
     assert.equal(readMangaFacts(out).sign, 'failed')
 })
 
-test('没有漫画段时是 unknown,不冒充成功', () => {
-    assert.deepEqual(readMangaFacts('  [1 INF] 别的日志'), { sign: 'unknown', read: 'unknown', benefit: null })
+test('没有漫画段时是 skipped(整行不出现),不报「结果未知」', () => {
+    // 2026-10-28 真机:任务没跑时消息里出现「漫画:签到结果未知」—— 把没发生的事报成了异常
+    const facts = readMangaFacts('  [1 INF] 别的日志')
+    assert.equal(facts.skipped, true)
+    assert.equal(facts.sign, 'skipped')
+    assert.equal(facts.read, 'skipped')
 })
 
 test('漫画权益:原因 null 归一为没有原因', () => {
@@ -194,4 +198,24 @@ test('权益已领取也识别为 already', () => {
         '  [4 WRN] 本月已领取过'
     ].join('\n')
     assert.equal(readMangaFacts(out).benefit.status, 'already')
+})
+
+// 2026-10-28 真机:漫画签到返回 {"code":1,"msg":"不能重复签到~"} + 【签到结果】失败 + 【原因】null,
+// 应判「今日已签到」;而任务整个没跑时应判 skipped(那时整行不出现),不再出现「结果未知」。
+test('漫画:不能重复签到判 already,任务没跑判 skipped 且不渲染', async () => {
+    const dup = [
+        '  [12:08:49 INF] ---开始 漫画签到 ---',
+        '  [12:08:54 DBG] 返回Content：{"code":1,"msg":"不能重复签到~"}',
+        '  [12:08:54 INF] 【签到结果】失败',
+        '  [12:08:54 INF] 【原因】null',
+        '  [12:08:54 INF] -------结束-------',
+        '  [12:08:58 INF] ---开始 漫画阅读 ---',
+        '  [12:08:58 INF] 【漫画阅读】成功'
+    ].join('\n')
+    const facts = readMangaFacts(dup)
+    assert.equal(facts.sign, 'already')
+    assert.equal(facts.read, 'ok')
+    const { renderMangaLine } = await import('../src/messages.js')
+    assert.equal(renderMangaLine(facts), '漫画:今日已签到 · 阅读成功')
+    assert.equal(renderMangaLine(readMangaFacts('nothing here')), '')
 })
