@@ -128,6 +128,12 @@ async function runLogin({ cwd, now, deps, argv, log, err }) {
     deps: { ...deps, verify: deps.verify ?? verifyCookie }
   })
   if (!result.ok) {
+    // 容器里 .env 是只读挂载:写不进去不是用户的错,直接告诉他去哪儿写
+    if (/EROFS|EACCES|read-only/i.test(String(result.error))) {
+      err('[失败] 这个环境里 .env 是只读的(容器挂载就是这样)')
+      err('      请在宿主上跑:cd /srv/apps/automation/netease && ./set-cookie.sh')
+      return 1
+    }
     err(`[失败] ${result.error}`)
     return 1
   }
