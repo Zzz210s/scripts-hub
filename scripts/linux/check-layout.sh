@@ -31,6 +31,15 @@ PROGRAMS=(
 
 echo "== 布局体检: $SUITE_DIR"
 
+# 共用骨架:六个程序的 run.sh 都靠它(断 stdin / 锁 fd / 看门狗 / 兜底提醒)
+if [ ! -f "$SUITE_DIR/run-lib.sh" ]; then
+    bad "缺 run-lib.sh · 所有 run.sh 都会起不来"
+elif ! grep -q '</dev/null' "$SUITE_DIR/run-lib.sh"; then
+    bad "run-lib.sh 里没有断 stdin 的写法 · 交互式调用会挂住"
+else
+    ok "run-lib.sh 在位且断开了 stdin"
+fi
+
 for f in compose.yaml run-all.sh schedule.json program-enabled.mjs alert-fail.mjs; do
     [ -f "$SUITE_DIR/$f" ] && ok "套件文件 $f" || bad "缺套件文件 $f"
 done
@@ -49,10 +58,10 @@ for row in "${PROGRAMS[@]}"; do
         bad "$dir: run.sh 不可执行 · 调度会拿到退出码 126"
     else
         ok "$dir: run.sh 存在且可执行"
-        # 一次性容器等 stdin 会挂住:入口必须把 stdin 断开
-        grep -q '</dev/null >>' "$root/run.sh" \
-            && ok "$dir: run.sh 已断开 stdin" \
-            || bad "$dir: run.sh 的 docker compose run 没接 </dev/null · 交互式调用会挂住"
+        # 骨架(断 stdin / 看门狗 / 兜底提醒)在套件根目录的 run-lib.sh,run.sh 只声明变量再调它
+        grep -q 'run-lib\.sh' "$root/run.sh" \
+            && ok "$dir: run.sh 走共用骨架" \
+            || bad "$dir: run.sh 没 source run-lib.sh · 骨架是不是又被抄回单个文件了"
     fi
     grep -q "^  $svc:" "$SUITE_DIR/compose.yaml" 2>/dev/null \
         && ok "$dir: compose 服务 $svc 在位" \

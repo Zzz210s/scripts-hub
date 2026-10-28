@@ -18,6 +18,16 @@ STATE="$ROOT/logs/last-run.state"
 LOCK="$ROOT/logs/run.lock"
 NOTIFIED="$ROOT/logs/skip.notified"   # 只给"需要你处理"用;正常跳过不再推送
 WATCHDOG_MIN="${REWARDS_RUN_TIMEOUT_MIN:-150}"
+
+# 容器跑一次 + 看门狗 + 兜底提醒的骨架与其它五个程序共用(2026-10-29 合并)。
+# rewards 自己的守卫(当天完成/凭据/并行度)仍留在本文件里,这里只借骨架。
+PROG_TITLE="微软积分"
+PROG_DIR="$ROOT"
+PROG_SERVICE="rewards-run"
+PROG_TIMEOUT_MIN="$WATCHDOG_MIN"
+RP_LOCK_FD=8          # 本文件的 flock 用 fd 8(历史原因),库要按同一个 fd 释放
+# shellcheck source=/dev/null
+. "$SUITE_DIR/run-lib.sh"
 mkdir -p "$ROOT/logs" "$ROOT/config" "$ROOT/sessions" "$SUITE_DIR/state"
 
 REALDAY="$(date +%F)"
@@ -86,26 +96,8 @@ flog "=== run start, attempt $RUNS of max 3 today ==="
 flog "free memory ${FREE_MB}MB -> clusters=$CLUSTERS"
 
 # ---- 跑一次(容器内),带看门狗 ----
-COMPOSE="$SUITE_DIR/compose.yaml"
-docker compose -f "$COMPOSE" run --rm -T rewards-run </dev/null >> "$LOG" 2>&1 &
-RUNPID=$!
-(
-    exec 8>&-          # 别继承锁 fd:脚本退出后这个 sleep 还在,会一直占着锁
-    exec </dev/null >/dev/null 2>&1   # 同理:别让这个 sleep 占住调用方的通道
-    sleep $((WATCHDOG_MIN * 60))
-    if kill -0 "$RUNPID" 2>/dev/null; then
-        echo "[WATCHDOG] run killed after $WATCHDOG_MIN minutes" >> "$LOG"
-        # 注意:compose run 的一次性容器名是自动生成的(automation-<svc>-run-<hash>),
-        # 不能按 "docker rm -f rewards-run" 删 —— 按 compose 的 service 标签删才命中。
-        docker ps -aq --filter "label=com.docker.compose.service=rewards-run" | xargs -r docker rm -f >/dev/null 2>&1
-        kill "$RUNPID" 2>/dev/null
-    fi
-) &
-WDPID=$!
-wait "$RUNPID"; CODE=$?
-pkill -P "$WDPID" 2>/dev/null   # sleep 是它的子进程,父先死会留孤儿
-kill "$WDPID" 2>/dev/null
-wait "$WDPID" 2>/dev/null
+# 容器里跑一次(断 stdin、锁 fd 不继承、看门狗先杀 sleep 再杀子 shell —— 都在 run-lib.sh 里)
+rp_run_container
 
 # ---- 归类:退出码与日志标记都要看(脚本登录失败也可能退 0) ----
 DONE=0; FAIL=0
