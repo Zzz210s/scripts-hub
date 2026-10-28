@@ -94,7 +94,13 @@ export async function loginWithCookie({ cwd, raw, account = 1, now = new Date(),
   const parsed = parseCookieInput(raw)
   if (!parsed.ok) return { ok: false, step: 'parse', error: parsed.error }
   const fsImpl = deps.fsImpl ?? fs
-  const saved = saveCookieToEnv({ cwd, cookie: parsed.cookie, account, fsImpl })
+  let saved
+  try {
+    saved = saveCookieToEnv({ cwd, cookie: parsed.cookie, account, fsImpl })
+  } catch (error) {
+    // 容器里 .env 是只读挂载(compose 有意为之),写失败要如实返回而不是抛穿 —— 调用方据此给提示
+    return { ok: false, step: 'save', error: error?.message ?? String(error) }
+  }
   const cleared = clearCircuitFor({ cwd, now, fsImpl })
   const verify = deps.verify
   if (typeof verify !== 'function') {
