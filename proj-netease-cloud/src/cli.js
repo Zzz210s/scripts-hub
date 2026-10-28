@@ -17,6 +17,8 @@ import { loadConfig } from './config.js'
 import { PATHS } from './crypto.js'
 import { buildResult } from './messages.js'
 import { pace } from './pacing.js'
+import { loginWithCookie } from './login.js'
+import { runCheck, runProbe, runReport } from './commands.js'
 import { runOnce } from './run.js'
 import { attemptsOn, doneToday, historyFile, readState } from './state.js'
 import { readAccounts, vipWord } from './probe.js'
@@ -28,6 +30,8 @@ const USAGE = `用法:node src/cli.js <命令> [--dry]
   check          只读体检:每个账号的 VIP 乐签状态与云贝余额
   probe          只读探针:VIP 状态读回与云贝查询,绝不调用签到接口
   report [--dry] 把当天的运行结果汇总出来;--dry 只打印
+  login --file <路径> | --cookie <内容>
+                 换新的 MUSIC_U:写进 .env、清当天的熔断标记,再用只读接口自证
   help           显示本帮助`
 
 /** 可用内存:优先 /proc/meminfo,非 Linux 回落到系统空闲内存。 */
@@ -42,87 +46,6 @@ function freeMemoryMb() {
 }
 
 /** 企业微信发送走延迟 import:Task 10 才落地 notify.js,注入 send 时这里永不执行。 */
-async function sendViaWecom(text, config, deps) {
-  const { sendWecom } = await import('./notify.js')
-  return sendWecom(text, { webhookFile: config.webhookFile, fetchImpl: deps.fetchImpl, sleep: deps.sleep })
-}
-
-/** 历史文件里当天最后一条记录;没有就返回 null。坏行跳过,不让一行脏数据废掉报告。 */
-function lastEntryForDay(day, dir, fsImpl = fs) {
-  const file = historyFile(dir)
-  if (!fsImpl.existsSync(file)) return null
-  const rows = fsImpl.readFileSync(file, 'utf8').split('\n').filter((row) => row.trim())
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    try {
-      const entry = JSON.parse(rows[index])
-      if (entry.day === day) return entry
-    } catch {
-      /* 坏行跳过 */
-    }
-  }
-  return null
-}
-
-/** check:只读,不写状态不发送。任何账号读不到就给 1,便于部署侧巡检。 */
-async function runCheck({ config, deps, now, log }) {
-  log(`网易云音乐签到 · 只读体检 · ${dateText(now)}`)
-  if (config.accounts.length === 0) {
-    log('没有配置任何账号 · 请把 ACCOUNT_1_MUSIC_U 写进 .env')
-    return 1
-  }
-  const allOk = await readAccounts({ config, deps, log, verbose: false })
-  const day = logicalDay(now, config.boundaryHour)
-  const { state } = readState(config.stateDir, { fsImpl: deps.fsImpl })
-  log(`当天状态 · ${doneToday(state, day) ? '已完成' : '未完成'} · 尝试 ${attemptsOn(state, day)}/${config.maxAttempts}`)
-  return allOk ? 0 : 1
-}
-
-/** probe:只读探针入口。只有查询,没有签到调用,也不落状态。 */
-async function runProbe({ config, deps, now, log }) {
-  log(`网易云音乐签到 · 只读探针 · ${dateText(now)}`)
-  if (config.accounts.length === 0) {
-    log('没有配置任何账号 · 请把 ACCOUNT_1_MUSIC_U 写进 .env')
-    return 1
-  }
-  const allOk = await readAccounts({ config, deps, log, verbose: true })
-  log(allOk ? '[探针] 只读链路全部可用 · 未发送任何签到请求' : '[探针] 有接口未通过 · 详见上面逐接口结果')
-  return allOk ? 0 : 1
-}
-
-/** report:把当天最后一条运行记录按 result 模板重渲染;--dry 只打印。 */
-async function runReport({ config, deps, now, dry, log }) {
-  const day = logicalDay(now, config.boundaryHour)
-  const entry = lastEntryForDay(day, config.stateDir, deps.fsImpl)
-  if (!entry) {
-    log(`当天还没有运行记录 · ${day}`)
-    return 0
-  }
-  const text = buildResult({
-    date: entry.date ?? dateText(now),
-    accounts: entry.accounts ?? [],
-    exitCode: entry.exitCode ?? 0,
-    dryRun: false,
-  })
-  if (dry) {
-    log(text)
-    return 0
-  }
-  let sent
-  try {
-    sent = await deps.send(text)
-  } catch (error) {
-    sent = { ok: false, error: error?.message ?? String(error) }
-  }
-  if (sent?.ok === false) {
-    // errcode 是「需要人工处理」与限流的唯一信号,最后一环不能丢。
-    const code = sent.errcode === undefined ? '' : ` · errcode ${sent.errcode}`
-    log(`[通知] 企业微信发送失败 · ${sent.error}${code}`)
-  } else {
-    log('[通知] 企业微信已发送')
-  }
-  return 0
-}
-
 export async function main(argv = process.argv.slice(2), options = {}) {
   const flags = new Set(argv.filter((arg) => arg.startsWith('-')))
   const command = argv.find((arg) => !arg.startsWith('-')) ?? 'run'
@@ -155,6 +78,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
   if (command === 'check') return runCheck({ config, deps: readDeps, now, log })
   if (command === 'probe') return runProbe({ config, deps: readDeps, now, log })
   if (command === 'report') return runReport({ config, deps, now, dry, log })
+  if (command === 'login') return runLogin({ cwd, now, deps: readDeps, argv, log, err })
   err(USAGE)
   return 2
 }
@@ -170,4 +94,58 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     })
 }
 
-export { freeMemoryMb, lastEntryForDay }
+export { freeMemoryMb }
+export { lastEntryForDay } from './commands.js'
+
+/**
+ * login 子命令:从 --file 或 --cookie 取内容,交给 login.js 落盘并自证。
+ * 不读 stdin —— 容器里 `docker compose run` 会吞掉 stdin(踩过),所以入口只认参数与文件。
+ */
+async function runLogin({ cwd, now, deps, argv, log, err }) {
+  const valueOf = (flag) => {
+    const index = argv.indexOf(flag)
+    return index >= 0 ? argv[index + 1] : undefined
+  }
+  let raw = valueOf('--cookie')
+  const file = valueOf('--file')
+  if (!raw && file) {
+    try {
+      raw = fs.readFileSync(file, 'utf8')
+    } catch (error) {
+      err(`[失败] 读不到 ${file}:${error.message}`)
+      return 1
+    }
+  }
+  if (!raw) {
+    err('用法:login --file <含 cookie 或整条 cURL 的文件> | --cookie "<内容>"')
+    err('提示:MUSIC_U 约一周失效一次;换完会自动清掉当天的熔断标记')
+    return 2
+  }
+  const result = await loginWithCookie({
+    cwd,
+    raw,
+    now,
+    deps: { ...deps, verify: deps.verify ?? verifyCookie }
+  })
+  if (!result.ok) {
+    err(`[失败] ${result.error}`)
+    return 1
+  }
+  log(`[保存] ACCOUNT_${result.account}_MUSIC_U 已写入 .env · 权限 600`)
+  log(`[熔断] ${result.cleared ? '已清掉当天的熔断标记' : '当天本来没有熔断标记'}`)
+  const verified = result.verified
+  if (verified?.ok === true) {
+    log(`[自证] 只读接口可用 · VIP 乐签状态:${verified.state ?? '已读取'}`)
+    return 0
+  }
+  err(`[自证] 新 cookie 仍不可用:${verified?.error ?? '未知原因'}`)
+  return 1
+}
+
+/** 默认自证:只读查一次 VIP 乐签状态,绝不调用签到接口。 */
+async function verifyCookie({ cookie, deps }) {
+  const { readVipState } = await import('./vip.js')
+  const state = await readVipState({ cookie, deps })
+  if (state?.ok === false) return { ok: false, error: state.error ?? '请求失败' }
+  return { ok: true, state: state?.todaySigned === true ? '今天已签' : '今天未签' }
+}
