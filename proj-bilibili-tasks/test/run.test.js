@@ -34,7 +34,7 @@ test('正常一次:先 start 再 result,状态落 success', async () => {
     assert.equal(result.messages.length, 2)
     assert.ok(result.messages[0].includes(' · 开始运行'))
     assert.ok(result.messages[1].includes(' · 运行成功'))
-    assert.ok(result.messages[1].includes('投币:3 枚 · 投给关注的 UP · 余额 125.0'))
+    assert.ok(result.messages[1].includes('投币:3 枚 · 投给关注的 UP · 今日累计 5 枚 · 余额 125.0'))
     assert.ok(result.messages[1].includes('每日任务:登录 已得 5 · 观看 已得 5 · 分享 已得 5 · 投币 已得 50 · 共 65 经验'))
     assert.ok(deps.calls.fetch.includes('exp'))
     assert.deepEqual(deps.calls.spawn[0].env.Ray_DailyTaskConfig__NumberOfCoins, '5')

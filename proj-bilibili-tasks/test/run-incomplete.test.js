@@ -52,7 +52,8 @@ test('R5 差值为 0 -> 报 0 枚未投出', async () => {
     const { config } = setup()
     const deps = makeDeps({ fetchCoin: async () => ({ ok: true, data: { money: 128 } }) })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('投币:0 枚 · 未投出 · 余额 128.0'), result.messages[1])
+    // 差值 0(本次没投),但接口说当日已得 50 经验 = 5 枚 -> 补一句今日累计
+    assert.ok(result.messages[1].includes('投币:0 枚 · 未投出 · 今日累计 5 枚 · 余额 128.0'), result.messages[1])
 })
 
 test('R5 取不到后值 -> 回落为目标值', async () => {
@@ -60,7 +61,7 @@ test('R5 取不到后值 -> 回落为目标值', async () => {
     let reads = 0
     const deps = makeDeps({ fetchCoin: async () => { reads += 1; return reads === 1 ? { ok: true, data: { money: 128 } } : { ok: false, error: '网络' } } })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('投币:目标 ≤5 枚 · 投给关注的 UP · 余额 128.0'), result.messages[1])
+    assert.ok(result.messages[1].includes('投币:目标 ≤5 枚 · 投给关注的 UP · 今日累计 5 枚 · 余额 128.0'), result.messages[1])
 })
 
 test('R6 大积分失败不算整体失败,文案指向上游已知问题', async () => {
@@ -68,7 +69,7 @@ test('R6 大积分失败不算整体失败,文案指向上游已知问题', asyn
     const line = '[12:30:26 INF] 领取任务失败：{"Code":6007000,"Message":"请将客户端更新至最新版本"}'
     const deps = makeDeps({ runConsole: async () => ({ code: 0, stdout: line, stderr: '', timedOut: false }) })
     const result = await runOnce({ config, deps, now: NOW })
-    assert.ok(result.messages[1].includes('大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务'), result.messages[1])
+    assert.ok(result.messages[1].includes('大积分:日常领取失败 · 该任务仅限手机端 App · 上游 open #1195'), result.messages[1])
     assert.ok(result.messages[1].includes(' · 运行成功'), result.messages[1])
 })
 

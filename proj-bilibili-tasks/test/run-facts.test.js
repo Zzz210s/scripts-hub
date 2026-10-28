@@ -52,6 +52,5 @@ test('实际投币数取「接口经验」与「余额差值」的较大者', as
     })
     const result = await runOnce({ config, deps, now: NOW })
     const text = result.messages.join(String.fromCharCode(10))
-    assert.match(text, /投币:1 枚/, text)
-    assert.doesNotMatch(text, /投币:0 枚/)
+    assert.match(text, /投币:0 枚 · 未投出 · 今日累计 1 枚/, text)
 })

@@ -146,14 +146,15 @@ export async function runOnce({ config, deps = {}, now = new Date() }) {
             const after = await deps.fetchCoin(credential.cookie)
             const afterMoney = after?.ok ? after.data.money : null
             donate.result.balanceAfter = afterMoney
-            const byBalance = afterMoney !== null && Number.isFinite(Number(donate.result.balance))
+            donate.result.actual = afterMoney !== null && Number.isFinite(Number(donate.result.balance))
                 ? Math.max(0, Math.round((Number(donate.result.balance) - Number(afterMoney)) * 10) / 10)
                 : null
-            // 余额差值会被别的设备/手动投币污染,而接口的「今日投币经验」是权威口径:
-            // 10 经验 = 1 枚。两个口径取较大者 —— 宁可报多,不把真投出去的抹成 0
-            // (2026-10-28 实测:接口说投币已得 10 经验,余额差值却算出 0 枚)。
-            const byExp = truth && Number.isFinite(Number(truth.coinsExp)) ? Math.floor(Number(truth.coinsExp) / 10) : null
-            donate.result.actual = byExp === null ? byBalance : Math.max(byExp, byBalance ?? 0)
+            // 余额差值只反映「本次」;接口的「今日投币经验」是全天累计的权威口径(10 经验 = 1 枚)。
+            // 两者不一致时都要报出来:2026-10-28 实测本轮差值 0、接口说当日已得 10 经验,
+            // 只报「0 枚 未投出」会让人以为一枚都没投成。
+            donate.result.todayTotal = truth && Number.isFinite(Number(truth.coinsExp))
+                ? Math.floor(Number(truth.coinsExp) / 10)
+                : null
         }
 
         // 9. result(券结果并入这一条)

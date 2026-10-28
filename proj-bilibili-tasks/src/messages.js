@@ -34,11 +34,16 @@ export function renderDonateLine(donate = {}) {
     // null / undefined / '' 都不算数字 —— 否则会渲染出 “余额 0.0” 这种没取到的假数字
     const hasBalance = balance !== null && balance !== undefined && balance !== '' && Number.isFinite(Number(balance))
     const tail = hasBalance ? ` · 余额 ${Number(balance).toFixed(1)}` : ''
+    // 今日累计与本次不同时补一句:差值只算本次,接口的今日经验才是全天口径
+    const total = donate.todayTotal !== null && donate.todayTotal !== undefined && Number(donate.todayTotal) > 0
+        && Number(donate.todayTotal) !== Number(donate.actual)
+        ? ` · 今日累计 ${Number(donate.todayTotal)} 枚`
+        : ''
     const actual = donate.actual === null || donate.actual === undefined ? NaN : Number(donate.actual)
     if (Number.isFinite(actual)) {
-        return actual === 0 ? `投币:0 枚 · 未投出${tail}` : `投币:${actual} 枚 · 投给关注的 UP${tail}`
+        return actual === 0 ? `投币:0 枚 · 未投出${total}${tail}` : `投币:${actual} 枚 · 投给关注的 UP${total}${tail}`
     }
-    return `投币:目标 ≤${donate.target} 枚 · 投给关注的 UP${tail}`
+    return `投币:目标 ≤${donate.target} 枚 · 投给关注的 UP${total}${tail}`
 }
 
 const dateOf = (seconds) => {
@@ -75,7 +80,7 @@ export const renderMangaBenefitLine = (benefit) => {
     if (!benefit || benefit.status !== 'failed' || !benefit.reason) return ''
     return `漫画权益:领取失败${SEP}${benefit.reason}`
 }
-export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 上游 open #1195 · 不影响其它任务' : '')
+export const renderBigPointLine = (bigPoint) => (bigPoint === 'failed' ? '大积分:日常领取失败 · 该任务仅限手机端 App · 上游 open #1195' : '')
 
 // 大积分「补领」:只有真的领到了才报数;接口返回成功但状态没变时如实写成「无效果」
 // (2026-10-12 实测:照 App 抓包形状请求会返回 code=0,但 state/积分不变)。
