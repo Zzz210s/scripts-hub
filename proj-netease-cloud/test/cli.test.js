@@ -130,3 +130,25 @@ test('check 子命令在离线桩下能跑完并打印账号行', async () => {
   assert.ok(!/is not defined/.test(text), `出现未定义引用:${text}`)
   assert.equal(typeof code, 'number')
 })
+
+// 回归:cl 拆出 commands.js 后 sendViaWecom 不再定义在 cli.js 里,漏导入会让消息静默发不出去
+// (2026-10-28 真机:签到成功但企业微信两条都没发,日志只有 sendViaWecom is not defined)
+test('run 成功后会真的调用发送器,不会因为引用丢失而静默失败', async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'netease-send-'))
+  fs.writeFileSync(path.join(cwd, '.env'), 'ACCOUNT_1_MUSIC_U=' + 'y'.repeat(40) + '\n')
+  const sent = []
+  await main(['run'], {
+    cwd,
+    now: new Date('2026-10-28T12:00:00+08:00'),
+    log: () => {},
+    error: () => {},
+    deps: {
+      fetchImpl: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ code: 200, data: true }) }),
+      freeMb: () => 4000,
+      readState: () => ({ state: { days: {} }, warnings: [] }),
+      send: async (text) => { sent.push(text); return { ok: true } },
+    },
+  })
+  assert.ok(sent.length >= 1, '至少要发出一条消息')
+  assert.ok(!/is not defined/.test(sent.join('\n')))
+})
