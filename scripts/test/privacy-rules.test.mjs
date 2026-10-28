@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { CREDENTIAL_RULES, FORBIDDEN_PATH_RULES, allowPlaceholder, rulesWithPrivate } from '../lib/privacy-rules.mjs'
+import { CREDENTIAL_RULES, FORBIDDEN_PATH_RULES, allowPlaceholder, allowedEmail, rulesWithPrivate } from '../lib/privacy-rules.mjs'
 
 const hits = (line, rules = CREDENTIAL_RULES) =>
     rules.filter(([, re, allow]) => {
@@ -69,4 +69,12 @@ test('私有清单里的标识会变成规则', () => {
     const literal = rules.find(([name]) => name.includes('示例昵称'))
     assert.ok(literal, '私有标识应生成一条字面量规则')
     assert.equal(literal[3], '示例昵称')
+})
+
+// 2026-10-29:文档与本机脚本里写 SSH 地址 `git@github.com:owner/repo.git` 时,
+// 邮箱规则把它当成个人邮箱拦下来。它是协议写法,不是标识,应当放行。
+test('git@github.com 是 SSH 地址,不算邮箱泄漏', () => {
+    assert.equal(allowedEmail('git@github.com'), true)
+    assert.equal(allowedEmail('git@github.com:Zzz210s/scripts-hub.git'), true)
+    assert.equal(allowedEmail('someone@github.com'), false)
 })

@@ -10,7 +10,8 @@
 
 const BS = String.fromCharCode(92)
 
-export const ALLOWED_EMAILS = [/^zzz210s@qq\.com$/]
+// git@github.com 是 SSH 地址不是邮箱:2026-10-29 写 GitHub 通路的文档与本机脚本时被误判成邮箱
+export const ALLOWED_EMAILS = [/^zzz210s@qq\.com$/, /^git@github\.com$/]
 // 明确公开、不构成隐私的值(Epic 官方文档里的 OAuth client secret,免费游戏工具普遍使用)
 export const ALLOWED_CREDENTIAL_VALUES = [/^0a2449a2-001a-451e-afec-3e812901c4d7$/]
 export const ALLOWED_EMAIL_DOMAINS = ['example.com', 'example.org', 'example.net', 'x.com']

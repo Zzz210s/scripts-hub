@@ -526,3 +526,16 @@ run-lib.sh      93 行:rp_prepare / rp_run_container / rp_report / run_program
 `<程序>/run.sh check` 这类只读子命令仍可用 —— `run_program "$@"` 会把子命令透传进容器。
 `check-layout.sh` 现在检查「run.sh 是否 source 了 run-lib.sh」以及「run-lib.sh 是否仍在位」,
 不再逐个 grep `</dev/null`(那已经收进库了)。
+
+## 13. GitHub 通路(无代理)
+
+服务器上 `github.com:443` 的 git 走不通(2026-10-29 实测 TLS 被中断),但 SSH 与 codeload 通。
+统一入口 `github.sh`,手术级说明见 config-ai 的 `docs/git-github-index.md`:
+
+```bash
+/srv/apps/automation/github.sh status          # 四条通路逐条探测
+/srv/apps/automation/github.sh pull ~/config-ai # 公开仓走镜像、私有仓走 SSH
+```
+
+服务器已生成账号级 SSH key 并加入 GitHub(`tencent-cloud-automation-20261029`),`origin` 已改为
+`git@github.com:...`,所以 `git pull` / `git push` 直接可用,不需要任何代理。
