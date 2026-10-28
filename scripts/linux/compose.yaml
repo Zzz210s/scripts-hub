@@ -119,6 +119,9 @@ services:
       BILIBILI_BUSY_PEERS: /peers/rewards/run.lock
     volumes:
       - ./bilibili/data:/opt/bili/data
+      # 薄壳 src 走挂载而不是烘进镜像:它迭代最频繁,而 .NET Console 的镜像要拉 190MB 基础镜像
+      # (机房到 mcr 只有 ~0.05MB/s,一次 40 分钟)。改一行 src 不该付这个代价。
+      - ./bilibili/src:/opt/bili/src:ro
       - ./bilibili/logs:/opt/bili/logs
       # 上游 Console 的 Verbose 文件日志(Serilog File sink -> /app/Logs;按天滚,文件名 log<日期>.txt)。
       # 不挂出来的话容器一退就没了,排障时先看这里(2026-10-11 起)。
