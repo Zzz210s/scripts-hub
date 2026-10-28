@@ -40,3 +40,18 @@ test('失败原因行不出现裸日志与圆括号', async () => {
     assert.ok(!detail.includes('INF') && !detail.includes('{'), detail)
     assert.ok(!/[()（）]/.test(result.messages[1]), result.messages[1])
 })
+
+// 回归:余额差值会被别处投币污染。2026-10-28 实测接口说「投币已得 10 经验」,
+// 而余额差值算出 0 枚,消息写成「投币:0 枚 · 未投出」—— 与事实相反。
+test('实际投币数取「接口经验」与「余额差值」的较大者', async () => {
+    const { config } = setup()
+    const deps = makeDeps({
+        // 投币前 244.6,投币后仍是 244.6(差值为 0),但接口说今天投币已得 10 经验 = 1 枚
+        fetchCoin: async () => ({ ok: true, data: { money: 244.6 } }),
+        fetchExpReward: async () => ({ ok: true, data: { code: 0, data: { login: true, watch: true, share: true, coins: 10 } } })
+    })
+    const result = await runOnce({ config, deps, now: NOW })
+    const text = result.messages.join(String.fromCharCode(10))
+    assert.match(text, /投币:1 枚/, text)
+    assert.doesNotMatch(text, /投币:0 枚/)
+})
