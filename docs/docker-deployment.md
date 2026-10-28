@@ -511,3 +511,18 @@ systemd automation-suite.timer(08:00 主力 + 12:00 兜底,Persistent=true)
 - **开关只有一处**:`config/schedule.json` 的 `linuxEnabled`(缺省回落 `enabled`);`run-all.sh` 用 `program-enabled.mjs` 读它,读不到时 fail-closed 只跑固定四程序并把贴吧/网易云排除。
 - **12:00 那次是兜底**:当天已完成的程序会一秒跳过,所以重复触发不产生重复动作。
 - 核对方法:`/srv/apps/automation/check-layout.sh`(布局)、`node program-enabled.mjs list schedule.json`(启用清单)、`systemctl list-timers automation-suite.timer`(下次触发),以及 `logs/suite.log` 里每天那两段「编排开始 / 编排结束」。
+
+### 宿主侧运行器的共用骨架(2026-10-29)
+
+六个程序的 `<程序>/run.sh` 不再各抄一份骨架:轮转日志、flock 单实例、`docker compose run`
+(断 stdin、锁 fd 不继承)、看门狗(先杀 sleep 再杀子 shell)、兜底提醒都在套件根目录的
+`run-lib.sh`。单个 `run.sh` 只剩声明:程序名、目录、compose 服务名、看门狗超时。
+
+```
+run.sh          18 行:SUITE_DIR + PROG_* 四个变量 + source run-lib.sh + run_program "$@"
+run-lib.sh      93 行:rp_prepare / rp_run_container / rp_report / run_program
+```
+
+`<程序>/run.sh check` 这类只读子命令仍可用 —— `run_program "$@"` 会把子命令透传进容器。
+`check-layout.sh` 现在检查「run.sh 是否 source 了 run-lib.sh」以及「run-lib.sh 是否仍在位」,
+不再逐个 grep `</dev/null`(那已经收进库了)。
