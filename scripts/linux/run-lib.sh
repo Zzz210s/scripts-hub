@@ -27,13 +27,12 @@ rp_prepare() {
     : "${PROG_DIR:?需要 PROG_DIR}" "${PROG_SERVICE:?需要 PROG_SERVICE}"
     LOG="$PROG_DIR/logs/last-run.log"
     RLOG="$PROG_DIR/logs/runner.log"
-    RP_LOCK_FD="${RP_LOCK_FD:-9}"
     mkdir -p "$PROG_DIR/logs" "$PROG_DIR/data" "$PROG_DIR/secrets" "$SUITE_DIR/state"
 
     # 单实例:与容器内程序的锁互为双保险。容器内那把在跨容器场景不提供互斥(每次运行都是
     # 新容器,hostname 与 pid 命名空间都不同),宿主这把 flock 才是真正的保证。
-    eval "exec ${RP_LOCK_FD}>\"\$SUITE_DIR/state/${PROG_DIR##*/}.flock\""
-    if ! flock -n "$RP_LOCK_FD"; then
+    exec 9>"$SUITE_DIR/state/${PROG_DIR##*/}.flock"
+    if ! flock -n 9; then
         echo "[$(date +%F) $(date +%H:%M:%S)] another run is still in progress, skipped" >> "$LOG"
         return 1
     fi
@@ -50,11 +49,12 @@ rp_run_container() {
     local compose="$SUITE_DIR/compose.yaml"
     local minutes="${PROG_TIMEOUT_MIN:-20}"
     # 子命令透传:run.sh check / report 这类只读入口照旧可用(不带参数 = 跑一次任务)
-    docker compose -f "$compose" run --rm -T "$PROG_SERVICE" "$@" </dev/null >> "$LOG" 2>&1 \
-        "${RP_LOCK_FD}>&-" &
+    # 注意 `9>&-` 必须写成**不带引号的字面量**:加引号后 bash 会把它当成一个普通参数传下去,
+    # 容器里就变成 `node src/cli.js 9>&-` → 打印用法并以 2 退出(2026-10-29 六程序全挂的根因)。
+    docker compose -f "$compose" run --rm -T "$PROG_SERVICE" "$@" </dev/null >> "$LOG" 2>&1 9>&- &
     local runpid=$!
     (
-        eval "exec ${RP_LOCK_FD}>&-"
+        exec 9>&-
         exec </dev/null >/dev/null 2>&1
         sleep $((minutes * 60))
         if kill -0 "$runpid" 2>/dev/null; then

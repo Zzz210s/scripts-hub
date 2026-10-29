@@ -16,8 +16,11 @@ test('run-lib.sh 存在,并保留两个踩过的坑的修法', () => {
     assert.match(lib, /run --rm -T "\$PROG_SERVICE" "\$@" <\/dev\/null/, '缺 </dev/null')
     // 看门狗先杀 sleep 再杀子 shell,否则留下 PPID=1 的孤儿
     assert.match(lib, /pkill -P "\$wdpid"/, '缺 pkill -P')
-    // 锁 fd 不能被子进程继承
-    assert.match(lib, /"\$\{RP_LOCK_FD\}>&-"/, '缺锁 fd 释放')
+    // 锁 fd 不能被子进程继承;而且必须是**不带引号**的 `9>&-`:
+    // 带引号时 bash 会把它当普通参数传给 docker compose,容器里就变成 `node src/cli.js 9>&-`
+    // → 打印用法、退出码 2 —— 2026-10-29 六个程序 08:00 与 12:00 全部因此失败。
+    assert.match(lib, /2>&1 9>&- &/, '锁 fd 关闭必须是字面量重定向,不能被引号包成参数')
+    assert.doesNotMatch(lib, /"\$\{[A-Z_]+\}>&-"/, '锁 fd 关闭被引号包成参数了(会把 9>&- 传进容器)')
     // 兜底提醒的判据:非 0 且没有 [完成]
     assert.match(lib, /grep -q "\\\[完成\\\]"/, '缺 [完成] 判据')
 })

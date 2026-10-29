@@ -25,7 +25,6 @@ PROG_TITLE="微软积分"
 PROG_DIR="$ROOT"
 PROG_SERVICE="rewards-run"
 PROG_TIMEOUT_MIN="$WATCHDOG_MIN"
-RP_LOCK_FD=8          # 本文件的 flock 用 fd 8(历史原因),库要按同一个 fd 释放
 # shellcheck source=/dev/null
 . "$SUITE_DIR/run-lib.sh"
 mkdir -p "$ROOT/logs" "$ROOT/config" "$ROOT/sessions" "$SUITE_DIR/state"
@@ -39,8 +38,8 @@ note() { echo "[$REALDAY $CLOCK] $*" >> "$RLOG"; }
 flog() { echo "[$REALDAY $CLOCK] $*" >> "$LOG"; }
 
 # ---- 单实例锁 ----
-exec 8>"$SUITE_DIR/state/rewards.flock"
-if ! flock -n 8; then
+exec 9>"$SUITE_DIR/state/rewards.flock"
+if ! flock -n 9; then
     flog "another run is still in progress, skipped"
     exit 0
 fi
