@@ -40,6 +40,17 @@ else
     ok "run-lib.sh 在位且断开了 stdin"
 fi
 
+# 锁 fd 的关闭必须是字面量重定向 `9>&-`。写成 "${RP_LOCK_FD}>&-" 时,引号让 bash 把 `9>&-`
+# 当成**普通参数**传给 docker compose,容器里就变成 `node src/cli.js 9>&-` → 打印用法、退出 2。
+# 2026-10-29 08:00 与 12:00 两个档期,B站 / 贴吧 / 网易云因此全挂(六程序共用一个骨架,一处错全挂)。
+if grep -qE '"\$\{[A-Z_]+\}>&-"' "$SUITE_DIR/run-lib.sh"; then
+    bad "run-lib.sh 的锁 fd 关闭被引号包成了参数 · 容器会收到 9>&- 这个参数并打印用法、退出 2"
+elif ! grep -q '9>&-' "$SUITE_DIR/run-lib.sh"; then
+    bad "run-lib.sh 里找不到 9>&- · 锁 fd 会被子进程继承,脚本退出后看门狗 sleep 仍占着锁"
+else
+    ok "run-lib.sh 的锁 fd 用字面量重定向关闭"
+fi
+
 for f in compose.yaml run-all.sh schedule.json program-enabled.mjs alert-fail.mjs; do
     [ -f "$SUITE_DIR/$f" ] && ok "套件文件 $f" || bad "缺套件文件 $f"
 done
