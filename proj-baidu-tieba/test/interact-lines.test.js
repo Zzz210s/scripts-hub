@@ -35,6 +35,13 @@ test('跳过与失败各自成词,风控停下要说清原因', () => {
   assert.match(lines[0], /风控中途停下:需要验证码/);
 });
 
+test('点赞被限流要在消息里写出来,不能让人以为点赞正常', () => {
+    const lines = interactLines({
+        'acct-1': { stats: stats({ posts: 45, likes: 18, likesThrottled: 2 }), expGained: 45 },
+    });
+    assert.match(lines[0], /点赞限流 2/);
+});
+
 test('没有列表时明确说未执行,不静默省略', () => {
   const lines = interactLines({ 'acct-2': { ok: false, error: '这一轮没有可用的关注列表', stats: null } });
   assert.match(lines[0], /未执行/);

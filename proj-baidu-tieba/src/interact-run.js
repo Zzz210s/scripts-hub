@@ -99,6 +99,8 @@ export function interactLines(perAccount = {}) {
     // 经验增量在 entry 上(由互动之后重读会话算出来),不在 stats 里 —— 它是真值不是累加。
     const gained = Number.isFinite(entry?.expGained) ? entry.expGained : null;
     if (gained !== null) parts.push(`经验 +${gained}`);
+    // 点赞被限流是「慢一点」不是失败,但必须让人看见,否则会以为点赞没生效。
+    if (stats.likesThrottled) parts.push(`点赞限流 ${stats.likesThrottled}`);
     if (stats.skipped) parts.push(`跳过 ${stats.skipped}`);
     if (stats.failures.length) parts.push(`失败 ${stats.failures.length}`);
     if (stats.risk) parts.push(`风控中途停下:${stats.risk}`);

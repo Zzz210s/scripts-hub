@@ -88,6 +88,7 @@ webhook 地址写进 `secrets/wecom-webhook.txt`,一行,权限 600。没有它�
 | `TIEBA_INTERACT_PER_FORUM` | `4` | 每吧每天回帖条数上限 · 上界 `4` 因为第 5 条起不再给经验 |
 | `TIEBA_INTERACT_MAX_POSTS` | `544` | 全局回帖上限 · 136 个吧 × 4 条 |
 | `TIEBA_INTERACT_MAX_LIKES` | `136` | 全局点赞上限 · 每个吧最多 1 个 |
+| `TIEBA_INTERACT_MAX_FORUMS` | `45` | 单轮最多处理多少个吧 · 136 个吧正好一天三次跑完;一口气几百条会被判发帖太快 |
 | `TIEBA_INTERACT_INTERVAL_MS` | `3000` | 每次回帖与点赞之间的间隔 |
 | `TIEBA_INTERACT_CONTENT` | `+3` | 回帖内容 · 按需求就是字面 `+3` |
 
