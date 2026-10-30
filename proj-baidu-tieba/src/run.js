@@ -9,7 +9,7 @@ import { checkLocalGuards, checkOnlineGuards } from './guards.js';
 import { acquireLock, releaseLock } from './lock.js';
 import { buildResult, buildStart } from './messages.js';
 import { makeSkipper } from './run-skip.js';
-import { interactAll, interactFailureSamples, interactHistory, interactLines, interactPreview } from './interact-run.js';
+import { interactAll, interactFailureSamples, interactHistory, interactLines, interactPreview, makeProgressFlush } from './interact-run.js';
 import {
   labelMap,
   lastDelivery,
@@ -22,7 +22,7 @@ import {
   view,
   warnFailedDeliveries,
 } from './run-support.js';
-import { appendHistory, attemptsOn, doneToday, interactOn, markDayDone, readState, recordAttempts, recordInteract, writeState } from './state.js';
+import { appendHistory, attemptsOn, doneToday, interactOn, markDayDone, readState, recordAttempts, writeState } from './state.js';
 import { reconcile } from './verify.js';
 
 export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = false, deps = {} } = {}) {
@@ -124,24 +124,14 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
           config,
           deps,
           // 今天每个吧已经发过几条:一天三次触发,不能每次都给同一个吧发满 4 条。
-          postedToday: interactOn(state, day)
+          postedToday: interactOn(state, day),
+          onProgress: makeProgressFlush({ state, day, config, deps, now }),
+          log
         })
       : {};
     const interactReport = config.interact ? interactLines(interact) : [];
-    if (config.interact) {
-      // 记账要在写状态之前完成:发送失败、进程被杀都不该让「已经发过几条」丢掉。
-      const counts = {};
-      for (const entry of Object.values(interact)) {
-        for (const [kw, count] of Object.entries(entry?.stats?.perForum ?? {})) {
-          counts[kw] = (counts[kw] ?? 0) + count;
-        }
-      }
-      recordInteract(state, { day, counts });
-    }
     for (const line of interactReport) log(`[互动] ${line}`);
-    // 失败条数对人没信息量,原文才有 —— 抽样三条写进日志。
     for (const sample of interactFailureSamples(interact)) log(`[互动] 失败样本 · ${sample}`);
-
     const ok = reconcileResult.ok === true;
     const exitCode = ok ? 0 : 1;
     // 逐吧明细与互动行都并进结果消息(见 messages.js),每天只发 start 与 result 两条。

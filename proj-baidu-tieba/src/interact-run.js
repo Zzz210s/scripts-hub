@@ -4,7 +4,9 @@
 // 主干挤到 200 行以上;规则是自研文件不超 200 行,所以这里按职责再切一刀。
 
 import { runInteract } from './interact.js';
-import { fetchSession } from './client.js';
+import { recordInteract, writeState } from './state.js';
+import { fetchSession, fetchTbs } from './client.js';
+import { gapToNextLevel } from './exp.js';
 import { SEP } from './message-text.js';
 
 /**
@@ -13,7 +15,18 @@ import { SEP } from './message-text.js';
  * 只对**这轮签到成功拿到会话**的账号跑:拿不到列表就无从安排,硬发只会瞎猜。
  * 经验增量不在这里算 —— 由调用方在互动之后重读会话比对,这样数字是真值而不是累加出来的。
  */
-export async function interactAll({ accounts, forumsAfter, credentials, config, deps, postedToday = {} }) {
+/**
+ * 造一个「互动进度落盘」回调:每处理几个吧就把当天已发条数写进状态。
+ * 看门狗强杀容器时,已经发出去的帖子不会变成无账可查 —— 否则下一次触发会重复发。
+ */
+export function makeProgressFlush({ state, day, config, deps, now }) {
+  return async ({ counts }) => {
+    recordInteract(state, { day, counts });
+    writeState(state, config.stateDir, now, { fsImpl: deps.fsImpl });
+  };
+}
+
+export async function interactAll({ accounts, forumsAfter, credentials, config, deps, postedToday = {}, onProgress, log }) {
   const perAccount = {};
   for (const account of accounts) {
     const credential = credentials.find((item) => item.id === account.id);
@@ -22,18 +35,32 @@ export async function interactAll({ accounts, forumsAfter, credentials, config, 
       perAccount[account.id] = { ok: false, error: '这一轮没有可用的关注列表', stats: null };
       continue;
     }
-    const forums = (session.forums ?? []).filter(
-      (forum) => !config.filter || config.filter.includes(forum.kw)
-    );
+    // 排序决定「今天先照顾谁」:还没发满的吧排前面,其次缺口大的排前面。
+    // 这样三次触发天然把 136 个吧分摊掉,而不是每次都在前 45 个吧上打转。
+    const forums = (session.forums ?? [])
+      .filter((forum) => !config.filter || config.filter.includes(forum.kw))
+      .sort(
+        (a, b) =>
+          (postedToday[a.kw] ?? 0) - (postedToday[b.kw] ?? 0) ||
+          (gapToNextLevel(b.level, b.exp) ?? 0) - (gapToNextLevel(a.level, a.exp) ?? 0)
+      );
     const stats = await runInteract({
       forums,
       tbs: credential.tbs,
       cookie: account.cookie,
       options: {
+        onProgress: onProgress ? (payload) => onProgress({ ...payload, accountId: account.id }) : undefined,
+        log,
+        // 每进一个吧就换一枚 tbs:实测那枚会失效,继续用只会拿到「用户没有权限」。
+        refreshTbs: async () => {
+          const fresh = await fetchTbs({ cookie: account.cookie, deps });
+          return fresh.ok ? fresh.tbs : null;
+        },
         postedToday,
         perForum: config.interactPerForum,
         maxPosts: config.interactMaxPosts,
         maxLikes: config.interactMaxLikes,
+        maxForumsPerRun: config.interactMaxForums,
         intervalMs: config.interactIntervalMs,
         content: config.interactContent
       },

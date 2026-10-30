@@ -53,3 +53,9 @@ test('硬规则:不含圆括号与 emoji', () => {
     assert.doesNotMatch(line, /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
   }
 });
+
+test('单轮吧数上限与贴吧实测节奏有关:默认 45 = 136 个吧分三次跑完', async () => {
+    const { DEFAULTS } = await import('../src/interact-plan.js');
+    assert.equal(DEFAULTS.maxForumsPerRun, 45);
+    assert.equal(DEFAULTS.perForum, 4);
+});

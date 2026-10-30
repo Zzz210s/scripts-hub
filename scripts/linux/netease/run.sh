@@ -6,6 +6,7 @@
 set -uo pipefail
 
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
+set -a; [ -f "$SUITE_DIR/suite.env" ] && . "$SUITE_DIR/suite.env"; set +a   # 手工跑单个 run.sh 时也要拿到看门狗时长等参数
 PROG_TITLE="网易云"
 PROG_DIR="$SUITE_DIR/netease"
 PROG_SERVICE="netease-run"

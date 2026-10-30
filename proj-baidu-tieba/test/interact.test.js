@@ -208,28 +208,60 @@ test('逐吧条数会被回报,供状态层累加', async () => {
     assert.deepEqual(stats.perForum, { a: 3, b: 4 });
 });
 
-test('帖子被删不算风控:换个帖子继续,连续失败计数要退回去', async () => {
-    let n = 0;
-    const { api } = fakeApi({
-        postReply: async () => {
-            n++;
-            // 前两条是「帖子不存在」,第三条正常成功
-            return n <= 2
+test('一个吧连错两次就跳过它,但整轮不因此停下', async () => {
+    const { api, calls } = fakeApi({
+        postReply: async ({ kw, tid }) => {
+            calls.replies.push({ kw, tid });
+            return kw === 'bad'
                 ? { ok: false, error: '帖子已被删除', reason: 'rejected', risk: null }
                 : { ok: true, error: null, reason: 'ok', risk: null };
         }
     });
     const stats = await runInteract({
-        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        forums: [
+            { kw: 'bad', fid: 1, level: 8, exp: 583 },
+            { kw: 'good', fid: 2, level: 5, exp: 97 },
+        ],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.stopReason, null);
+    assert.equal(stats.perForum.bad, undefined); // 两次都失败,这个吧被跳过
+    assert.equal(calls.replies.filter((one) => one.kw === 'bad').length, 2);
+    assert.equal(stats.perForum.good, 3); // 下一个吧照常跑完
+});
+
+test('连续三个吧一个活都没干成才整体收手', async () => {
+    const { api } = fakeApi({
+        postReply: async () => ({ ok: false, error: '接口返回 no=271', reason: 'rejected', risk: null })
+    });
+    const stats = await runInteract({
+        forums: Array.from({ length: 10 }, (_, i) => ({ kw: `f${i}`, fid: i, level: 8, exp: 583 })),
         tbs: 'tbs',
         cookie: 'BDUSS=x',
         options: { maxConsecutiveFailures: 3 },
         deps: { api, sleep: noSleep }
     });
-    assert.equal(stats.risk, null);
-    assert.equal(stats.stopReason, null);
-    assert.equal(stats.posts, 2); // 4 条计划里,前两条换帖子后成功
-    assert.equal(stats.failures.length, 2);
+    assert.equal(stats.stopReason, 'too-many-failures');
+    assert.equal(stats.posts, 0);
+    // 每个坏吧只试两次就放弃,不会把一个吧刷成十几次请求
+    for (const kw of ['f0', 'f1', 'f2']) {
+        assert.equal(stats.failures.filter((one) => one.kw === kw).length, 2);
+    }
+});
+
+test('单轮吧数上限生效:剩下的留给下一次触发', async () => {
+    const { api, calls } = fakeApi();
+    const stats = await runInteract({
+        forums: Array.from({ length: 10 }, (_, i) => ({ kw: `f${i}`, fid: i, level: 5, exp: 97 })),
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { maxForumsPerRun: 3 },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.stopReason, 'forum-budget');
+    assert.equal(calls.threads.length, 3);
 });
 
 test('失败样本最多留三条,留着给日志定位', async () => {
@@ -237,12 +269,118 @@ test('失败样本最多留三条,留着给日志定位', async () => {
         postReply: async () => ({ ok: false, error: '接口返回 no=7', reason: 'rejected', risk: null })
     });
     const stats = await runInteract({
-        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        forums: Array.from({ length: 4 }, (_, i) => ({ kw: `f${i}`, fid: i, level: 8, exp: 583 })),
         tbs: 'tbs',
         cookie: 'BDUSS=x',
-        options: { maxConsecutiveFailures: 3 },
         deps: { api, sleep: noSleep }
     });
     assert.equal(stats.failureSamples.length, 3);
-    assert.match(stats.failureSamples[0], /^a:/);
+    assert.match(stats.failureSamples[0], /^f0:/);
+});
+
+test('已经点过赞算完成,不再占点赞预算', async () => {
+    const { api } = fakeApi({
+        likeThread: async () => ({ ok: true, already: true, error: null, reason: 'ok', risk: null })
+    });
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 5, exp: 97 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.likes, 0);
+    assert.equal(stats.alreadyLiked, 1);
+});
+
+test('列表拿不到就跳过这个吧,不当成发帖失败刷屏', async () => {
+    const { api } = fakeApi({
+        fetchThreads: async () => ({ ok: false, tids: [], error: '超时', reason: 'network' })
+    });
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.posts, 0);
+    assert.equal(stats.failures.length, 1);
+    assert.match(stats.failures[0].error, /列表/);
+});
+
+test('全局回帖预算封顶:超过就不再发', async () => {
+    const { api } = fakeApi();
+    const stats = await runInteract({
+        forums: Array.from({ length: 3 }, (_, i) => ({ kw: `f${i}`, fid: i, level: 8, exp: 583 })),
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { maxPosts: 5, intervalMs: 0 },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.posts, 5);
+    assert.equal(stats.stopReason, 'post-budget');
+});
+
+test('默认参数就是实测出来的那几个数', () => {
+    assert.equal(DEFAULTS.perForum, 4);
+    assert.equal(DEFAULTS.content, '+3');
+    assert.equal(DEFAULTS.maxConsecutiveFailures, 3);
+});
+
+test('今天已经发过的条数要从预算里扣掉 —— 一天三次触发不该把同一个吧刷到 12 条', async () => {
+    const { api, calls } = fakeApi();
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { perForum: 4, postedToday: { a: 3 } },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.posts, 1);
+    assert.equal(calls.replies.length, 1);
+
+    // 已经发满 4 条的,再触发就直接跳过,一次请求都不发
+    const full = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { perForum: 4, postedToday: { a: 4 } },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(full.posts, 0);
+    assert.equal(calls.replies.length, 1);
+});
+
+test('逐吧条数会被回报,供状态层累加', async () => {
+    const { api } = fakeApi();
+    const stats = await runInteract({
+        forums: [
+            { kw: 'a', fid: 1, level: 5, exp: 97 },
+            { kw: 'b', fid: 2, level: 8, exp: 583 },
+        ],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        deps: { api, sleep: noSleep }
+    });
+    assert.deepEqual(stats.perForum, { a: 3, b: 4 });
+});
+
+test('点赞被限流不算失败:退避后继续,连续两次就停掉点赞,回帖照跑', async () => {
+    let likeCalls = 0;
+    const { api } = fakeApi({
+        likeThread: async () => {
+            likeCalls++;
+            return { ok: false, already: false, error: '您操作的太频繁了', reason: 'rejected', risk: null };
+        }
+    });
+    const stats = await runInteract({
+        forums: Array.from({ length: 4 }, (_, i) => ({ kw: `f${i}`, fid: i, level: 5, exp: 97 })),
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { throttleBackoffMs: 0 },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.failures.length, 0); // 限流不进失败清单
+    assert.equal(stats.likesThrottled, 2); // 到 2 次就停
+    assert.equal(likeCalls, 2);
+    assert.equal(stats.posts, 12); // 回帖全跑完
 });
