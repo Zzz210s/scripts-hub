@@ -108,3 +108,48 @@ export async function likeThread({ tid, tbs, cookie, deps } = {}) {
     risk: RISK_PATTERN.test(message) ? message : null
   };
 }
+
+/**
+ * 水楼标题特征。宁可漏也不能错:发错帖子比不发更糟,所以只认明确写着「水」的标题。
+ * 2026-10-30 在 20 个吧上扫过:约五分之一有这种贴(如 `打卡贴（水贴专用）` · `+3。。。`)。
+ */
+const WATER_TITLE = /(水楼|水经验|水贴|水帖|经验\+?3|\+3|刷经验|经验贴|经验楼|打卡水|专用水)/;
+
+/**
+ * 在吧里找「水经验专门贴」。返回 `{ ok, tid, title }`;找不到时 `tid` 为 null。
+ *
+ * 只能靠自己翻帖子列表:真机实测 2026-10-30,web 站内搜索直接回 403 百度安全验证,
+ * 客户端两个搜索端点都回 200 空体 —— 搜索这条路走不通,翻页是唯一可行且无害的手段。
+ */
+export async function findWaterThread({ kw, pages = 3, pageSize = 30, cookie, deps } = {}) {
+  let best = null;
+  for (let page = 0; page < Math.max(1, pages); page++) {
+    const params = {
+      kw: String(kw ?? ''),
+      rn: String(pageSize),
+      pn: String(page * pageSize),
+      _client_type: '2',
+      _client_version: '12.0.0'
+    };
+    params.sign = clientSign(params);
+    const res = await request(`${LIST_URL}?${new URLSearchParams(params)}`, {
+      cookie,
+      deps,
+      headers: { 'User-Agent': CLIENT_UA }
+    });
+    if (!res.ok) return { ok: false, tid: null, title: null, error: res.error, reason: res.reason };
+    const list = res.data?.thread_list;
+    if (!Array.isArray(list)) return { ok: false, tid: null, title: null, error: '响应里没有 thread_list', reason: 'parse' };
+    for (const item of list) {
+      const title = String(item?.title ?? '');
+      const tid = String(item?.id ?? item?.tid ?? '');
+      if (!WATER_TITLE.test(title) || !/^\d{6,}$/.test(tid)) continue;
+      // 命中多个时取回复数最多的那个:老水楼比新建的更稳,不容易被删。
+      const replies = Number(item?.reply_num) || 0;
+      if (!best || replies > best.replies) best = { tid, title, replies };
+    }
+    // 第一页就找到且回复数过千,不用再往下翻 —— 再翻只是多花请求。
+    if (best && best.replies > 1000) break;
+  }
+  return { ok: true, tid: best?.tid ?? null, title: best?.title ?? null, replies: best?.replies ?? 0, error: null, reason: 'ok' };
+}

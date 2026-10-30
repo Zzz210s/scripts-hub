@@ -22,7 +22,7 @@ import {
   view,
   warnFailedDeliveries,
 } from './run-support.js';
-import { appendHistory, attemptsOn, doneToday, interactOn, markDayDone, readState, recordAttempts, writeState } from './state.js';
+import { appendHistory, attemptsOn, doneToday, interactOn, markDayDone, readState, recordAttempts, recordWater, waterOn, writeState } from './state.js';
 import { reconcile } from './verify.js';
 
 export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = false, deps = {} } = {}) {
@@ -125,6 +125,12 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
           deps,
           // 今天每个吧已经发过几条:一天三次触发,不能每次都给同一个吧发满 4 条。
           postedToday: interactOn(state, day),
+          // 今天已经定位到的水楼;没定位过的才翻列表,省得一天翻三遍。
+          waterToday: waterOn(state, day),
+          onWater: async (kw, tid) => {
+            recordWater(state, { day, kw, tid });
+            writeState(state, config.stateDir, now, { fsImpl: deps.fsImpl });
+          },
           onProgress: makeProgressFlush({ state, day, config, deps, now }),
           log
         })

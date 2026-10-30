@@ -91,6 +91,7 @@ webhook 地址写进 `secrets/wecom-webhook.txt`,一行,权限 600。没有它�
 | `TIEBA_INTERACT_MAX_FORUMS` | `45` | 单轮最多处理多少个吧 · 136 个吧正好一天三次跑完;一口气几百条会被判发帖太快 |
 | `TIEBA_INTERACT_INTERVAL_MS` | `3000` | 每次回帖与点赞之间的间隔 |
 | `TIEBA_INTERACT_CONTENT` | `+3` | 回帖内容 · 按需求就是字面 `+3` |
+| `TIEBA_WATER_PAGES` | `3` | 找水楼时翻几页列表 · 前 `3×30` 条里按标题找 `水楼/水贴/经验+3` 这类,找不到就这个吧不发 |
 
 ## 部署到服务器
 

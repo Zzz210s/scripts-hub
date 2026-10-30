@@ -44,11 +44,12 @@ test('整轮计划给出总量,并跳过没有吧名的条目', () => {
 
 /** 造一个假接口,记录每次调用,让用例能断言「发了几条、发给哪个吧」。 */
 function fakeApi(overrides = {}) {
-    const calls = { threads: [], replies: [], likes: [] };
+    const calls = { waters: [], replies: [], likes: [] };
     const api = {
-        fetchThreads: async ({ kw }) => {
-            calls.threads.push(kw);
-            return { ok: true, tids: [`${kw}-1`, `${kw}-2`, `${kw}-3`, `${kw}-4`, `${kw}-5`], reason: 'ok' };
+        // 找水楼:默认每个吧都有一个,回复数过千(真实水楼的量级)
+        findWaterThread: async ({ kw }) => {
+            calls.waters.push(kw);
+            return { ok: true, tid: `${kw}-water`, title: `${kw} 水经验专用贴`, replies: 12000, reason: 'ok' };
         },
         postReply: async ({ kw, tid }) => {
             calls.replies.push({ kw, tid });
@@ -80,7 +81,9 @@ test('一轮跑完:按计划发帖、每吧点一个赞,间隔等待可注入', 
     assert.equal(stats.likes, 2);
     assert.equal(stats.failures.length, 0);
     assert.equal(calls.replies.filter((one) => one.kw === 'a').length, 3);
-    assert.deepEqual(calls.likes, ['a-1', 'b-1']);
+    // 四条都发在同一个水楼里,不再到处挑帖子
+    assert.deepEqual([...new Set(calls.replies.map((one) => one.tid))], ['a-water', 'b-water']);
+    assert.deepEqual(calls.likes, ['a-water', 'b-water']);
 });
 
 test('风控一出现就整体收手,不再发下一个吧', async () => {
@@ -103,7 +106,7 @@ test('风控一出现就整体收手,不再发下一个吧', async () => {
     });
     assert.equal(stats.risk, '需要验证码');
     assert.equal(stats.posts, 1);
-    assert.deepEqual(calls.threads, ['a']); // 第二个吧根本没去拉列表
+    assert.deepEqual(calls.waters, ['a']); // 第二个吧根本没去找水楼
 });
 
 test('连续失败达到阈值就停,不把整轮拖成几千次请求', async () => {
@@ -136,9 +139,9 @@ test('已经点过赞算完成,不再占点赞预算', async () => {
     assert.equal(stats.alreadyLiked, 1);
 });
 
-test('列表拿不到就跳过这个吧,不当成发帖失败刷屏', async () => {
+test('找水楼的请求失败就跳过这个吧,不当成发帖失败刷屏', async () => {
     const { api } = fakeApi({
-        fetchThreads: async () => ({ ok: false, tids: [], error: '超时', reason: 'network' })
+        findWaterThread: async () => ({ ok: false, tid: null, error: '超时', reason: 'network' })
     });
     const stats = await runInteract({
         forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
@@ -148,7 +151,7 @@ test('列表拿不到就跳过这个吧,不当成发帖失败刷屏', async () =
     });
     assert.equal(stats.posts, 0);
     assert.equal(stats.failures.length, 1);
-    assert.match(stats.failures[0].error, /列表/);
+    assert.match(stats.failures[0].error, /找水楼/);
 });
 
 test('全局回帖预算封顶:超过就不再发', async () => {
@@ -261,7 +264,7 @@ test('单轮吧数上限生效:剩下的留给下一次触发', async () => {
         deps: { api, sleep: noSleep }
     });
     assert.equal(stats.stopReason, 'forum-budget');
-    assert.equal(calls.threads.length, 3);
+    assert.equal(calls.waters.length, 3);
 });
 
 test('失败样本最多留三条,留着给日志定位', async () => {
@@ -292,9 +295,9 @@ test('已经点过赞算完成,不再占点赞预算', async () => {
     assert.equal(stats.alreadyLiked, 1);
 });
 
-test('列表拿不到就跳过这个吧,不当成发帖失败刷屏', async () => {
+test('找水楼的请求失败就跳过这个吧,不当成发帖失败刷屏', async () => {
     const { api } = fakeApi({
-        fetchThreads: async () => ({ ok: false, tids: [], error: '超时', reason: 'network' })
+        findWaterThread: async () => ({ ok: false, tid: null, error: '超时', reason: 'network' })
     });
     const stats = await runInteract({
         forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
@@ -304,7 +307,7 @@ test('列表拿不到就跳过这个吧,不当成发帖失败刷屏', async () =
     });
     assert.equal(stats.posts, 0);
     assert.equal(stats.failures.length, 1);
-    assert.match(stats.failures[0].error, /列表/);
+    assert.match(stats.failures[0].error, /找水楼/);
 });
 
 test('全局回帖预算封顶:超过就不再发', async () => {
@@ -383,4 +386,44 @@ test('点赞被限流不算失败:退避后继续,连续两次就停掉点赞,�
     assert.equal(stats.likesThrottled, 2); // 到 2 次就停
     assert.equal(likeCalls, 2);
     assert.equal(stats.posts, 12); // 回帖全跑完
+});
+
+test('没有水楼的吧一条都不发,只记一笔', async () => {
+    const { api, calls } = fakeApi({
+        findWaterThread: async ({ kw }) => ({ ok: true, tid: null, title: null, replies: 0, reason: 'ok' })
+    });
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.noWater, 1);
+    assert.equal(stats.posts, 0);
+    assert.equal(stats.likes, 0);
+    assert.equal(calls.replies.length, 0);
+    assert.equal(stats.failures.length, 0); // 没水楼不是失败
+});
+
+test('今天已经定位过的水楼不再重复翻列表,直接复用', async () => {
+    const { api, calls } = fakeApi();
+    const saved = {};
+    await runInteract({
+        forums: [
+            { kw: 'a', fid: 1, level: 5, exp: 97 },
+            { kw: 'b', fid: 2, level: 5, exp: 97 },
+        ],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: {
+            // a 已有缓存,b 是空串(今天确认过没有水楼)
+            waterToday: { a: 'a-water', b: '' },
+            saveWater: async (kw, tid) => {
+                saved[kw] = tid;
+            },
+        },
+        deps: { api, sleep: noSleep }
+    });
+    assert.deepEqual(calls.waters, []); // 一次列表都没翻
+    assert.equal(saved.b, undefined);
 });

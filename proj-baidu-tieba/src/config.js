@@ -31,6 +31,8 @@ export const DEFAULTS = {
   // 单轮最多处理多少个吧。一天三次触发,45 × 3 刚好覆盖 136 个吧;
   // 一口气发几百条会被贴吧判「发帖太快」(no=271 / 8009 都是这个)。
   interactMaxForums: 45,
+  // 找水楼翻几页列表:前 3 页(90 条)能覆盖到老水楼,再翻收益很小。
+  interactWaterPages: 3,
 };
 
 /** 读 .env;不存在或读不动一律当空(容器挂载点缺失时 Docker 会把它建成目录,见 loadConfig)。 */
@@ -150,6 +152,7 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     interactIntervalMs: int(pick(merged, 'TIEBA_INTERACT_INTERVAL_MS', null), DEFAULTS.interactIntervalMs, 0),
     interactContent: String(pick(merged, 'TIEBA_INTERACT_CONTENT', DEFAULTS.interactContent)),
     interactMaxForums: int(pick(merged, 'TIEBA_INTERACT_MAX_FORUMS', null), DEFAULTS.interactMaxForums, 0),
+    interactWaterPages: int(pick(merged, 'TIEBA_WATER_PAGES', null), DEFAULTS.interactWaterPages, 1),
     dryRun: merged.TIEBA_DRY_RUN === '1',
   };
 }

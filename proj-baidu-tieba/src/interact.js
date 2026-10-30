@@ -8,7 +8,7 @@
 // 所以每吧一次、按留痕对待,不参与经验预算。
 
 import { DEFAULTS, planForForum } from './interact-plan.js';
-import { fetchThreads, likeThread, postReply } from './interact-api.js';
+import { findWaterThread, likeThread, postReply } from './interact-api.js';
 
 /** 这些错误说明「这个帖子没了」,换一个帖子继续就行,不该计入连续失败 —— 否则
  *  某个吧的头几个帖子恰好被删,整轮就会被误判成风控而停下(2026-10-30 就这么停过一次)。 */
@@ -25,14 +25,10 @@ const sumExp = (forums) =>
     return Number.isFinite(value) ? sum + value : sum;
   }, 0);
 
-/**
- * 跑一轮互动。永不抛:任何一步失败都进 `failures`,风控一出现就整体收手。
- *
- * `deps` 里可注入 `sleep` / `api`(测试用),默认走真实接口与真实等待。
- */
+/** 跑一轮互动。永不抛:失败进 `failures`,风控一出现就整体收手。`deps` 可注入 `sleep` / `api` 供测试。 */
 export async function runInteract({ forums = [], tbs, cookie, options = {}, deps = {} } = {}) {
   const opts = { ...DEFAULTS, ...options };
-  const api = deps.api ?? { fetchThreads, likeThread, postReply };
+  const api = deps.api ?? { findWaterThread, likeThread, postReply };
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   // 一轮互动要跑三十多分钟。没有逐吧日志的话,中途卡住只能干瞪眼 —— 2026-10-30 就卡过一次。
   const say = typeof opts.log === 'function' ? opts.log : () => {};
@@ -76,6 +72,8 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
     likesThrottled: 0,
     alreadyLiked: 0,
     skipped: 0,
+    // 今天没有水楼、所以不发的吧数
+    noWater: 0,
     unknownExp: 0,
     failures: [],
     // 前几条失败原文:消息里只报条数,日志里要能看见到底哪一步崩的。
@@ -119,22 +117,28 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
       stats.stopReason = 'forum-budget';
       break;
     }
-    // 一条回帖挂一个帖子,所以先取够帖子;取不到就整吧跳过,不硬发到列表之外。
     say(`[互动] ${forum.kw} Lv${forum.level} exp=${forum.exp} 差 ${plan.gap} → ${plan.replies} 条`);
-    await refresh();
-    const list = await api.fetchThreads({ kw: forum.kw, limit: Math.max(plan.replies, 1), cookie, deps });
-    if (!list.ok) {
-      fail(forum.kw, `列表:${list.error ?? list.reason}`);
-      continue;
+    // 一律发在「水经验专门贴」里。找不到就不发 —— 需求就是宁可漏,也不去别人的正常帖子里灌水。
+    const cached = opts.waterToday?.[forum.kw];
+    let tid = typeof cached === 'string' && cached ? cached : null;
+    if (cached === undefined) {
+      await refresh();
+      const found = await api.findWaterThread({ kw: forum.kw, pages: opts.waterPages, cookie, deps });
+      if (!found.ok) {
+        fail(forum.kw, `找水楼:${found.error ?? found.reason}`);
+        continue;
+      }
+      tid = found.tid;
+      // 空串记下「今天确认没有水楼」,省得每次触发都重翻三页列表。
+      await opts.saveWater?.(forum.kw, tid ?? '');
+      if (tid) say(`[互动] ${forum.kw} 水楼「${String(found.title).slice(0, 18)}」回复 ${found.replies} · tid=${tid}`);
     }
-    if (!list.tids.length) {
-      fail(forum.kw, '列表:这个吧没有可回复的帖子');
+    if (!tid) {
+      stats.noWater++;
       continue;
     }
 
     for (let index = 0; index < plan.replies && stats.posts < opts.maxPosts; index++) {
-      const tid = list.tids[index];
-      if (!tid) break;
       const post = () =>
         api.postReply({ kw: forum.kw, fid: forum.fid, tid, content: opts.content, tbs: tbsNow, cookie, deps });
       let result = await post();
@@ -167,7 +171,7 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
 
     // 点赞:每吧一个,挂在列表第一个帖子上。已经点过也算完成,不重复消耗预算。
     if (!likeOff && stats.likes + stats.alreadyLiked < opts.maxLikes) {
-      const like = () => api.likeThread({ tid: list.tids[0], tbs: tbsNow, cookie, deps });
+      const like = () => api.likeThread({ tid, tbs: tbsNow, cookie, deps });
       let liked = await like();
       if (!liked.ok && STALE_TBS.test(String(liked.error)) && (await refresh())) liked = await like();
       if (liked.ok) {

@@ -26,7 +26,18 @@ export function makeProgressFlush({ state, day, config, deps, now }) {
   };
 }
 
-export async function interactAll({ accounts, forumsAfter, credentials, config, deps, postedToday = {}, onProgress, log }) {
+export async function interactAll({
+  accounts,
+  forumsAfter,
+  credentials,
+  config,
+  deps,
+  postedToday = {},
+  onProgress,
+  waterToday = {},
+  onWater,
+  log
+}) {
   const perAccount = {};
   for (const account of accounts) {
     const credential = credentials.find((item) => item.id === account.id);
@@ -51,6 +62,9 @@ export async function interactAll({ accounts, forumsAfter, credentials, config, 
       options: {
         onProgress: onProgress ? (payload) => onProgress({ ...payload, accountId: account.id }) : undefined,
         log,
+        waterToday,
+        waterPages: config.interactWaterPages,
+        saveWater: onWater,
         // 每进一个吧就换一枚 tbs:实测那枚会失效,继续用只会拿到「用户没有权限」。
         refreshTbs: async () => {
           const fresh = await fetchTbs({ cookie: account.cookie, deps });
@@ -101,6 +115,7 @@ export function interactLines(perAccount = {}) {
     if (gained !== null) parts.push(`经验 +${gained}`);
     // 点赞被限流是「慢一点」不是失败,但必须让人看见,否则会以为点赞没生效。
     if (stats.likesThrottled) parts.push(`点赞限流 ${stats.likesThrottled}`);
+    if (stats.noWater) parts.push(`无水楼 ${stats.noWater}`);
     if (stats.skipped) parts.push(`跳过 ${stats.skipped}`);
     if (stats.failures.length) parts.push(`失败 ${stats.failures.length}`);
     if (stats.risk) parts.push(`风控中途停下:${stats.risk}`);

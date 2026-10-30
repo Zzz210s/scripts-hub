@@ -25,6 +25,9 @@ export function emptyState(now = new Date()) {
     // 互动记账:{ 'YYYY-MM-DD': { 吧名: 今天已发条数 } }。
     // 没有它,一天三次触发就会给同一个吧发 12 条 —— 而经验只认前 4 条,后 8 条纯属白担风控。
     interact: {},
+    // 水楼定位结果:{ 'YYYY-MM-DD': { 吧名: tid | '' } }。空串表示今天确认过「这个吧没有水楼」,
+    // 存下来是为了别每次触发都翻三页列表(136 个吧 × 3 页 × 3 次 = 一天四百多个请求)。
+    water: {},
   };
 }
 
@@ -54,6 +57,17 @@ export function normalize(value) {
       interact[day] = counts;
     }
   }
+  const water = {};
+  if (isObject(value.water)) {
+    for (const [day, entry] of Object.entries(value.water)) {
+      if (!isObject(entry)) continue;
+      const found = {};
+      for (const [kw, tid] of Object.entries(entry)) {
+        if (typeof tid === 'string' && (tid === '' || /^\d{6,}$/.test(tid))) found[kw] = tid;
+      }
+      water[day] = found;
+    }
+  }
   return {
     version: STATE_VERSION,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
@@ -62,6 +76,7 @@ export function normalize(value) {
     lastResult: value.lastResult === 'success' || value.lastResult === 'failure' ? value.lastResult : null,
     days,
     interact,
+    water,
   };
 }
 
@@ -100,15 +115,26 @@ export function pruneDays(state, keep = DAYS_KEEP) {
   if (keys.length > keep) {
     for (const day of keys.slice(0, keys.length - keep)) delete state.days[day];
   }
-  if (state.interact) {
-    const days = Object.keys(state.interact).sort();
-    for (const day of days.slice(0, Math.max(0, days.length - keep))) delete state.interact[day];
+  for (const map of [state.interact, state.water]) {
+    if (!map) continue;
+    const days = Object.keys(map).sort();
+    for (const day of days.slice(0, Math.max(0, days.length - keep))) delete map[day];
   }
   return state;
 }
 
 /** 今天这个吧已经发过几条(互动预算要用它扣减)。 */
 export const interactOn = (state, day) => state?.interact?.[day] ?? {};
+
+/** 今天已经定位到的水楼(值可能是空串,表示确认过没有)。 */
+export const waterOn = (state, day) => state?.water?.[day] ?? {};
+
+/** 记下某个吧的水楼 tid;`''` 表示今天确认没有水楼,别再翻第二遍。 */
+export function recordWater(state, { day, kw, tid } = {}) {
+  if (!kw) return state;
+  ((state.water ??= {})[day] ??= {})[kw] = typeof tid === 'string' ? tid : '';
+  return state;
+}
 
 /** 累加今天的互动条数。只增不减:预算是「发过多少」,不是「还剩多少」。 */
 export function recordInteract(state, { day, counts = {} } = {}) {

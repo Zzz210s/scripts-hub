@@ -23,6 +23,8 @@ export const DEFAULTS = Object.freeze({
   maxLikeThrottles: 2,
   // 限流后的退避时长。实测连点二十来个赞就会撞上「您操作的太频繁了」。
   throttleBackoffMs: 20000,
+  // 找水楼时翻几页列表。实测 20 个吧里约 1/5 有水楼,3 页(90 条)能覆盖到老水楼。
+  waterPages: 3,
   content: '+3'
 });
 
