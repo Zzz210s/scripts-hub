@@ -207,3 +207,42 @@ test('逐吧条数会被回报,供状态层累加', async () => {
     });
     assert.deepEqual(stats.perForum, { a: 3, b: 4 });
 });
+
+test('帖子被删不算风控:换个帖子继续,连续失败计数要退回去', async () => {
+    let n = 0;
+    const { api } = fakeApi({
+        postReply: async () => {
+            n++;
+            // 前两条是「帖子不存在」,第三条正常成功
+            return n <= 2
+                ? { ok: false, error: '帖子已被删除', reason: 'rejected', risk: null }
+                : { ok: true, error: null, reason: 'ok', risk: null };
+        }
+    });
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { maxConsecutiveFailures: 3 },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.risk, null);
+    assert.equal(stats.stopReason, null);
+    assert.equal(stats.posts, 2); // 4 条计划里,前两条换帖子后成功
+    assert.equal(stats.failures.length, 2);
+});
+
+test('失败样本最多留三条,留着给日志定位', async () => {
+    const { api } = fakeApi({
+        postReply: async () => ({ ok: false, error: '接口返回 no=7', reason: 'rejected', risk: null })
+    });
+    const stats = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs',
+        cookie: 'BDUSS=x',
+        options: { maxConsecutiveFailures: 3 },
+        deps: { api, sleep: noSleep }
+    });
+    assert.equal(stats.failureSamples.length, 3);
+    assert.match(stats.failureSamples[0], /^a:/);
+});

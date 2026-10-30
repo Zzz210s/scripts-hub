@@ -103,3 +103,8 @@ export function interactHistory(interact = {}) {
     ])
   );
 }
+
+/** 失败原文抽样:消息里只报条数,日志里要能看见到底哪一步崩的。 */
+export function interactFailureSamples(interact = {}) {
+  return Object.values(interact).flatMap((entry) => entry?.stats?.failureSamples ?? []);
+}

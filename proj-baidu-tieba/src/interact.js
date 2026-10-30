@@ -10,12 +10,18 @@
 import { gapToNextLevel } from './exp.js';
 import { fetchThreads, likeThread, postReply } from './interact-api.js';
 
+/** 这些错误说明「这个帖子没了」,换一个帖子继续就行,不该计入连续失败 —— 否则
+ *  某个吧的头几个帖子恰好被删,整轮就会被误判成风控而停下(2026-10-30 就这么停过一次)。 */
+const STALE_THREAD = /(帖子不存在|帖子已被删除|已被删除|不存在|已被关闭|没有权限)/;
+
 export const DEFAULTS = Object.freeze({
   perForum: 4,
   maxPosts: 544,
   maxLikes: 136,
   intervalMs: 3000,
   maxConsecutiveFailures: 3,
+  // 间隔抖动:[0.7, 1.3] 倍。整点整秒地发几百条是机器人特征,抖动让节奏更像人。
+  jitter: true,
   content: '+3'
 });
 
@@ -59,6 +65,10 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
   const opts = { ...DEFAULTS, ...options };
   const api = deps.api ?? { fetchThreads, likeThread, postReply };
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const paced = (options) =>
+    options.jitter && options.intervalMs > 0
+      ? Math.round(options.intervalMs * (0.7 + Math.random() * 0.6))
+      : options.intervalMs;
   const stats = {
     posts: 0,
     likes: 0,
@@ -66,6 +76,8 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
     skipped: 0,
     unknownExp: 0,
     failures: [],
+    // 前几条失败原文:消息里只报条数,日志里要能看见到底哪一步崩的。
+    failureSamples: [],
     risk: null,
     stopReason: null,
     perForum: {},
@@ -75,6 +87,12 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
   let consecutive = 0;
   const fail = (kw, error) => {
     stats.failures.push({ kw, error });
+    if (stats.failureSamples.length < 3) stats.failureSamples.push(`${kw}:${error}`);
+    // 帖子没了 != 我被限流:前者换个帖子就好,不该把整轮打死。
+    if (STALE_THREAD.test(String(error))) {
+      consecutive = Math.max(0, consecutive - 1);
+      return false;
+    }
     consecutive++;
     return consecutive >= opts.maxConsecutiveFailures;
   };
@@ -131,7 +149,7 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
         stats.stopReason = 'too-many-failures';
         break;
       }
-      if (opts.intervalMs > 0) await sleep(opts.intervalMs);
+      if (opts.intervalMs > 0) await sleep(paced(opts));
     }
     if (stats.risk || stats.stopReason) break;
 
@@ -149,7 +167,7 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
         stats.stopReason = 'too-many-failures';
         break;
       }
-      if (opts.intervalMs > 0) await sleep(opts.intervalMs);
+      if (opts.intervalMs > 0) await sleep(paced(opts));
     }
   }
   return stats;

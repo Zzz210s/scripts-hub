@@ -9,7 +9,7 @@ import { checkLocalGuards, checkOnlineGuards } from './guards.js';
 import { acquireLock, releaseLock } from './lock.js';
 import { buildResult, buildStart } from './messages.js';
 import { makeSkipper } from './run-skip.js';
-import { interactAll, interactHistory, interactLines, interactPreview } from './interact-run.js';
+import { interactAll, interactFailureSamples, interactHistory, interactLines, interactPreview } from './interact-run.js';
 import {
   labelMap,
   lastDelivery,
@@ -139,20 +139,15 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
       recordInteract(state, { day, counts });
     }
     for (const line of interactReport) log(`[互动] ${line}`);
+    // 失败条数对人没信息量,原文才有 —— 抽样三条写进日志。
+    for (const sample of interactFailureSamples(interact)) log(`[互动] 失败样本 · ${sample}`);
 
     const ok = reconcileResult.ok === true;
     const exitCode = ok ? 0 : 1;
-    // 逐吧明细并进结果消息(见 messages.js 的 renderDetailSection),每天只发 start 与 result 两条。
+    // 逐吧明细与互动行都并进结果消息(见 messages.js),每天只发 start 与 result 两条。
+    const resultDetail = { enabled: config.detail, maxForums: config.detailMax };
     await deliver(
-      buildResult({
-        date,
-        accounts: outcomes,
-        reconcile: reconcileResult,
-        exitCode,
-        dryRun: false,
-        detail: { enabled: config.detail, maxForums: config.detailMax },
-        interactLines: interactReport,
-      }),
+      buildResult({ date, accounts: outcomes, reconcile: reconcileResult, exitCode, dryRun: false, detail: resultDetail, interactLines: interactReport })
     );
 
     // 8. 落状态与历史:失败尝试已在开跑前记下,这里只在对账通过时补「已完成」。
