@@ -15,11 +15,15 @@ import {
   emptyState,
   historyFile,
   isDayDone,
+  interactOn,
+  pruneDays,
   readState,
   recordAttempts,
+  recordInteract,
   setPaused,
   stateFile,
   writeState,
+  normalize,
 } from '../src/state.js';
 
 /** 每个用例一个临时目录,避免互相污染。 */
@@ -166,4 +170,33 @@ test('appendHistory:目录不存在也能建出来', () => {
   const dir = path.join(tmpDir(), 'data', 'nested');
   appendHistory({ day: '2026-10-11' }, dir, { now: new Date('2026-10-11T09:00:00') });
   assert.equal(fs.existsSync(historyFile(dir)), true);
+});
+
+test('互动记账:按天按吧累加,非法值一律丢弃', () => {
+  const state = emptyState();
+  recordInteract(state, { day: '2026-10-30', counts: { '2ch': 4, asoul: 2 } });
+  recordInteract(state, { day: '2026-10-30', counts: { asoul: 2, bad: 'x', zero: 0 } });
+  assert.deepEqual(interactOn(state, '2026-10-30'), { '2ch': 4, asoul: 4 });
+  assert.deepEqual(interactOn(state, '2026-10-31'), {});
+});
+
+test('互动记账过盘:只保留正整数条数,坏结构不影响签到用的 days', () => {
+  const loaded = normalize({
+    days: { '2026-10-30': { attempts: 1, ok: true, checkedAt: null } },
+    interact: { '2026-10-30': { '2ch': 4, asoul: -1, junk: 'x' }, broken: 5 },
+  });
+  assert.deepEqual(loaded.interact, { '2026-10-30': { '2ch': 4 } });
+  assert.equal(loaded.days['2026-10-30'].ok, true);
+});
+
+test('pruneDays 同时裁剪互动记账,不留无限增长的历史', () => {
+  const state = emptyState();
+  for (let i = 0; i < 5; i++) {
+    const day = `2026-09-0${i + 1}`;
+    state.days[day] = { attempts: 1, ok: false, checkedAt: null };
+    recordInteract(state, { day, counts: { '2ch': 1 } });
+  }
+  pruneDays(state, 2);
+  assert.deepEqual(Object.keys(state.days).sort(), ['2026-09-04', '2026-09-05']);
+  assert.deepEqual(Object.keys(state.interact).sort(), ['2026-09-04', '2026-09-05']);
 });

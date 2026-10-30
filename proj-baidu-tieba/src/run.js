@@ -7,7 +7,9 @@ import { dateText, logicalDay } from './clock.js';
 import { loadConfig } from './config.js';
 import { checkLocalGuards, checkOnlineGuards } from './guards.js';
 import { acquireLock, releaseLock } from './lock.js';
-import { buildResult, buildSkip, buildStart } from './messages.js';
+import { buildResult, buildStart } from './messages.js';
+import { makeSkipper } from './run-skip.js';
+import { interactAll, interactHistory, interactLines, interactPreview } from './interact-run.js';
 import {
   labelMap,
   lastDelivery,
@@ -15,13 +17,12 @@ import {
   peerOf,
   probeCredentials,
   relabelReconcile,
-  routeSkip,
   signAll,
   trimAccounts,
   view,
   warnFailedDeliveries,
 } from './run-support.js';
-import { appendHistory, attemptsOn, doneToday, markDayDone, readState, recordAttempts, writeState } from './state.js';
+import { appendHistory, attemptsOn, doneToday, interactOn, markDayDone, readState, recordAttempts, recordInteract, writeState } from './state.js';
 import { reconcile } from './verify.js';
 
 export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = false, deps = {} } = {}) {
@@ -39,32 +40,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
   const deliveries = [];
   const deliver = makeDeliver(deps, { messages, deliveries });
 
-  const skip = async (reason, detail = '', accountsForMessage = view(accounts)) => {
-    const routed = routeSkip({ reason, date, accounts: accountsForMessage });
-    if (routed.silent) {
-      log(buildSkip({ date, accounts: accountsForMessage, reason }));
-    } else {
-      log(`[跳过] ${reason}${detail ? ` · ${detail}` : ''}`);
-      // --dry 时把将要推送的内容打印出来,但不发送。
-      for (const text of routed.messages) {
-        if (dry) log(text);
-        else await deliver(text);
-      }
-    }
-    warnFailedDeliveries(log, deliveries);
-    return {
-      skipped: true,
-      ok: false,
-      dryRun: dry,
-      perAccount: [],
-      reconcile: null,
-      exitCode: 0,
-      reason,
-      detail,
-      messages: routed.messages,
-      deliveries,
-    };
-  };
+  const skip = makeSkipper({ date, accounts, log, dry, deliver, deliveries });
 
   // 1. 本地守卫:不联网、秒级返回。dry 也走这一段,因为它决定会推送什么。
   const peer = peerOf(deps, config, now);
@@ -94,6 +70,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
       buildResult({ date, accounts: view(accounts), reconcile: null, exitCode: 0, dryRun: true }),
     ];
     for (const text of planned) log(text);
+    if (config.interact) log(interactPreview(config));
     return {
       skipped: false,
       ok: false,
@@ -137,6 +114,32 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
       }),
       labels,
     );
+    // 6.5 每日互动:签到与对账都做完之后再发回帖 / 点赞。放在对账之后是有意的 ——
+    // 对账是「今天签全了没有」的唯一权威,互动是锦上添花,不能因为它失败而改变签到结论。
+    const interact = config.interact
+      ? await interactAll({
+          accounts,
+          forumsAfter,
+          credentials,
+          config,
+          deps,
+          // 今天每个吧已经发过几条:一天三次触发,不能每次都给同一个吧发满 4 条。
+          postedToday: interactOn(state, day)
+        })
+      : {};
+    const interactReport = config.interact ? interactLines(interact) : [];
+    if (config.interact) {
+      // 记账要在写状态之前完成:发送失败、进程被杀都不该让「已经发过几条」丢掉。
+      const counts = {};
+      for (const entry of Object.values(interact)) {
+        for (const [kw, count] of Object.entries(entry?.stats?.perForum ?? {})) {
+          counts[kw] = (counts[kw] ?? 0) + count;
+        }
+      }
+      recordInteract(state, { day, counts });
+    }
+    for (const line of interactReport) log(`[互动] ${line}`);
+
     const ok = reconcileResult.ok === true;
     const exitCode = ok ? 0 : 1;
     // 逐吧明细并进结果消息(见 messages.js 的 renderDetailSection),每天只发 start 与 result 两条。
@@ -148,6 +151,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
         exitCode,
         dryRun: false,
         detail: { enabled: config.detail, maxForums: config.detailMax },
+        interactLines: interactReport,
       }),
     );
 
@@ -164,6 +168,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
         exitCode,
         accounts: trimAccounts(outcomes),
         reconcile: reconcileResult,
+        interact: interactHistory(interact),
       },
       config.stateDir,
       { now, fsImpl: deps.fsImpl },
@@ -180,6 +185,7 @@ export async function runOnce({ cwd = process.cwd(), now = new Date(), dryRun = 
       reason: reconcileResult.reason,
       messages,
       deliveries,
+      interact,
       lastDelivery: lastDelivery(deliveries),
     };
   } finally {

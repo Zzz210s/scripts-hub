@@ -84,6 +84,12 @@ webhook 地址写进 `secrets/wecom-webhook.txt`,一行,权限 600。没有它�
 | `TIEBA_STATE_DIR` / `TIEBA_LOCK_DIR` | `data` / `logs` | 状态与锁的位置 |
 | `BUSY_PEERS` | 空 | 逗号分隔的同伴锁文件,用于错峰判定 |
 | `TIEBA_DRY_RUN` | 空 | 置 `1` 强制预览,连 `report` 也预览 |
+| `TIEBA_INTERACT` | `1` | 每日互动开关 · 置 `0` 只签到不回帖不点赞 |
+| `TIEBA_INTERACT_PER_FORUM` | `4` | 每吧每天回帖条数上限 · 上界 `4` 因为第 5 条起不再给经验 |
+| `TIEBA_INTERACT_MAX_POSTS` | `544` | 全局回帖上限 · 136 个吧 × 4 条 |
+| `TIEBA_INTERACT_MAX_LIKES` | `136` | 全局点赞上限 · 每个吧最多 1 个 |
+| `TIEBA_INTERACT_INTERVAL_MS` | `3000` | 每次回帖与点赞之间的间隔 |
+| `TIEBA_INTERACT_CONTENT` | `+3` | 回帖内容 · 按需求就是字面 `+3` |
 
 ## 部署到服务器
 

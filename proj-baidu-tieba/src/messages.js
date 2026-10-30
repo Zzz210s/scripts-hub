@@ -144,7 +144,7 @@ export function buildStart({ date, accounts } = {}) {
   return clipHead(headline(accounts, date, '开始运行'), LIMIT_BYTES);
 }
 
-export function buildResult({ date, accounts, reconcile, exitCode, dryRun, detail } = {}) {
+export function buildResult({ date, accounts, reconcile, exitCode, dryRun, detail, interactLines } = {}) {
   const action = dryRun === true ? '预览,未运行' : reconcile?.ok === true ? '运行成功' : '运行有失败';
   const head = headline(accounts, date, action);
   // 预览没有真的签到,也就没有对账可言 —— 不把 reconcile 与逐吧明细混进预览。
@@ -152,7 +152,10 @@ export function buildResult({ date, accounts, reconcile, exitCode, dryRun, detai
   const foot = reconcileLines(reconcile);
   const code = num(exitCode);
   if (code !== null && code !== 0) foot.push(`退出码:${code}`);
-  const body = accountLines(accounts, reconcile);
+  // 互动行并进正文:它是对账之外的附加动作,失败不该改变「签全了没有」的结论,
+  // 所以只作为一行事实陈述,不参与 foot 里的对账结论。
+  const extra = (Array.isArray(interactLines) ? interactLines : []).filter((line) => safeText(line));
+  const body = [...accountLines(accounts, reconcile), ...extra];
   const section = renderDetailSection({ head, body, foot, accounts, detail });
   return assemble(head, [...body, ...section], foot);
 }

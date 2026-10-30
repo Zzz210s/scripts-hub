@@ -21,6 +21,13 @@ export const DEFAULTS = {
   // (一个账号关注上千个吧时消息会拆成十几条)。
   detail: true,
   detailMax: 200,
+  // 每日互动:每吧回帖条数上限 / 全局回帖上限 / 全局点赞上限 / 间隔 / 内容。
+  // 真机实测每吧每天只给 4 点经验(第 5 条起 +0),所以 4 是有效上限,再高纯属浪费。
+  interactPerForum: 4,
+  interactMaxPosts: 544,
+  interactMaxLikes: 136,
+  interactIntervalMs: 3000,
+  interactContent: '+3',
 };
 
 /** 读 .env;不存在或读不动一律当空(容器挂载点缺失时 Docker 会把它建成目录,见 loadConfig)。 */
@@ -131,6 +138,14 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     detail: String(pick(merged, 'TIEBA_DETAIL', '1')) !== '0',
     // 下界 1:0 会让明细只剰一句「另有 N 个未列出」,没意义。
     detailMax: int(pick(merged, 'TIEBA_DETAIL_MAX', null), DEFAULTS.detailMax, 1),
+    // 互动默认开;显式 `0` 才关。回帖是有副作用的行为,关掉它应该只用一条环境变量。
+    interact: String(pick(merged, 'TIEBA_INTERACT', '1')) !== '0',
+    // 上界 4:实测第 5 条起不给经验,写再大也只是多发垃圾。
+    interactPerForum: Math.min(int(pick(merged, 'TIEBA_INTERACT_PER_FORUM', null), DEFAULTS.interactPerForum, 0), 4),
+    interactMaxPosts: int(pick(merged, 'TIEBA_INTERACT_MAX_POSTS', null), DEFAULTS.interactMaxPosts, 0),
+    interactMaxLikes: int(pick(merged, 'TIEBA_INTERACT_MAX_LIKES', null), DEFAULTS.interactMaxLikes, 0),
+    interactIntervalMs: int(pick(merged, 'TIEBA_INTERACT_INTERVAL_MS', null), DEFAULTS.interactIntervalMs, 0),
+    interactContent: String(pick(merged, 'TIEBA_INTERACT_CONTENT', DEFAULTS.interactContent)),
     dryRun: merged.TIEBA_DRY_RUN === '1',
   };
 }

@@ -22,13 +22,16 @@ export function emptyState(now = new Date()) {
     lastRunDay: null,
     lastResult: null,
     days: {}, // { 'YYYY-MM-DD': { attempts, ok, checkedAt } }
+    // 互动记账:{ 'YYYY-MM-DD': { 吧名: 今天已发条数 } }。
+    // 没有它,一天三次触发就会给同一个吧发 12 条 —— 而经验只认前 4 条,后 8 条纯属白担风控。
+    interact: {},
   };
 }
 
 const isObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 /** 逐字段白名单归一:磁盘上的任何垃圾都不该带进内存。 */
-function normalize(value) {
+export function normalize(value) {
   const days = {};
   if (isObject(value.days)) {
     for (const [day, entry] of Object.entries(value.days)) {
@@ -40,6 +43,17 @@ function normalize(value) {
       };
     }
   }
+  const interact = {};
+  if (isObject(value.interact)) {
+    for (const [day, entry] of Object.entries(value.interact)) {
+      if (!isObject(entry)) continue;
+      const counts = {};
+      for (const [kw, count] of Object.entries(entry)) {
+        if (Number.isFinite(count) && count > 0) counts[kw] = count;
+      }
+      interact[day] = counts;
+    }
+  }
   return {
     version: STATE_VERSION,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
@@ -47,6 +61,7 @@ function normalize(value) {
     lastRunDay: typeof value.lastRunDay === 'string' ? value.lastRunDay : null,
     lastResult: value.lastResult === 'success' || value.lastResult === 'failure' ? value.lastResult : null,
     days,
+    interact,
   };
 }
 
@@ -82,8 +97,26 @@ export const isDayDone = doneToday;
 /** days 只留最近 keep 天(按 YYYY-MM-DD 字典序即时间序),防止长期运行无限膨胀。 */
 export function pruneDays(state, keep = DAYS_KEEP) {
   const keys = Object.keys(state.days).sort();
-  if (keys.length <= keep) return state;
-  for (const day of keys.slice(0, keys.length - keep)) delete state.days[day];
+  if (keys.length > keep) {
+    for (const day of keys.slice(0, keys.length - keep)) delete state.days[day];
+  }
+  if (state.interact) {
+    const days = Object.keys(state.interact).sort();
+    for (const day of days.slice(0, Math.max(0, days.length - keep))) delete state.interact[day];
+  }
+  return state;
+}
+
+/** 今天这个吧已经发过几条(互动预算要用它扣减)。 */
+export const interactOn = (state, day) => state?.interact?.[day] ?? {};
+
+/** 累加今天的互动条数。只增不减:预算是「发过多少」,不是「还剩多少」。 */
+export function recordInteract(state, { day, counts = {} } = {}) {
+  const dayMap = ((state.interact ??= {})[day] ??= {});
+  for (const [kw, count] of Object.entries(counts)) {
+    if (!kw || !Number.isFinite(count) || count <= 0) continue;
+    dayMap[kw] = (dayMap[kw] ?? 0) + count;
+  }
   return state;
 }
 

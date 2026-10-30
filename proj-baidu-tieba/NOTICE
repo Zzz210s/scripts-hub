@@ -40,3 +40,30 @@
 
 `test/fixtures/real/` 下的两份是 **2026-10-14 真机响应的脱敏件**:结构、字段名、枚举取值与
 真实响应一致,`uid` 已换成占位值,不含 cookie 或昵称。
+
+## 每日互动:回帖与点赞(2026-10-30 真机实测)
+
+`任务:除签到外,每天还发 4 条「+3」回帖、点 1 个赞` 这个需求靠两个新接口,形状全部实测:
+
+| 动作 | 请求 | 关键参数 | 实测结论 |
+| --- | --- | --- | --- |
+| 拉帖子列表 | `GET https://c.tieba.baidu.com/c/f/frs/page` | `kw` `rn` `pn` `_client_type=2` `_client_version=12.0.0` `sign` | 不带 `sign` 回 `error_code:110001`;带上回 289 KB JSON,`thread_list[].id` 即 tid |
+| 回帖 | `POST https://tieba.baidu.com/f/commit/post/add` | `ie=utf-8` `kw` `fid` `tid` `content` `tbs` | 回 `{"no":0,"err_code":0,"data":{…}}`;**`data.experience` 恒为 0,不能当经验增量** |
+| 点赞 | `POST https://c.tieba.baidu.com/c/c/agree/opAgree` | `obj_id` `thread_id` `obj_type=3` `agree_type=1` `tbs` `_client_type` `_client_version` `sign` | 回 `error_code:"0"`;重复点回 `3280001` 您已经点过赞了;少了 `thread_id` 或 `obj_type` 换成别的值都回 `300000` |
+
+**客户端签名**:参数按键名升序拼 `k=v`,末尾拼 `tiebaclient!!!`,MD5 转大写。`sign` 自身不参与。
+
+**经验规则(逐条实测出来的,不是查文档)**:
+
+| 观察 | 数字 |
+| --- | --- |
+| 一条回帖给多少经验 | **+1**,不是 +3 |
+| 每吧每天回帖上限 | **4 条**有效(第 5 条起 +0,实测 832→833→834→835→836→836) |
+| 点赞给多少经验 | **0**(动作前后都是 836) |
+| 签到给多少经验 | 本次未单独隔离测量,沿用贴吧公开口径 2~8 |
+
+**等级门槛**:`user_exp` 是累计经验,等级由它落在哪一档决定。门槛表 `[5,15,30,50,100,200,500,1000,…]`
+用 136 个关注吧的 `(level, exp)` 逐条校验过,四种等级零违反 —— 所以在 `src/exp.js` 里写死。
+
+**风控信号**:回帖响应里 `data.vcode.need_vcode=1`,或文案命中「验证码 / 操作频繁 / 安全验证」,
+一律整轮停下。移动 web 的 `/mo/q/m` 直连会回 403 百度安全验证页,不要走那条路。

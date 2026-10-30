@@ -16,7 +16,7 @@ const session = ({ forums = [], tbs = 'ITB_TBS_SAMPLE', uid = '1000000000', no =
 test('fetchFollowedForums:映射 is_sign/is_forbidden,并带上 count 与 hasMore', async () => {
   const { calls, fetchImpl } = stub(jsonReply(session({
     forums: [
-      { forum_id: 11, forum_name: '吧一', is_sign: 1, user_level: '8' },
+      { forum_id: 11, forum_name: '吧一', is_sign: 1, user_level: '8', user_exp: '832' },
       { forum_id: 12, forum_name: '吧二', is_sign: 0, is_forbidden: 1, user_level: '12' },
       { forum_id: 13, forum_name: '吧三' },
     ],
@@ -26,9 +26,10 @@ test('fetchFollowedForums:映射 is_sign/is_forbidden,并带上 count 与 hasMor
   assert.equal(result.count, 3);
   assert.equal(result.hasMore, false); // 单次全量返回,不存在翻页
   assert.deepEqual(result.forums, [
-    { fid: 11, kw: '吧一', level: 8, isSign: true, isForbidden: false },
-    { fid: 12, kw: '吧二', level: 12, isSign: false, isForbidden: true },
-    { fid: 13, kw: '吧三', level: null, isSign: false, isForbidden: false },
+    { fid: 11, kw: '吧一', level: 8, exp: 832, isSign: true, isForbidden: false },
+    // 没有 user_exp 时是 null 而不是 0 —— 0 会被互动层读成「离升级还差满档」或「已满级」
+    { fid: 12, kw: '吧二', level: 12, exp: null, isSign: false, isForbidden: true },
+    { fid: 13, kw: '吧三', level: null, exp: null, isSign: false, isForbidden: false },
   ]);
   assert.equal(calls[0].url, SESSION_URL);
   assert.equal(calls[0].options.method, 'GET');

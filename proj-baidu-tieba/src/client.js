@@ -35,6 +35,13 @@ function toFlag(value) {
  * 吧等级:`like_forum[].user_level` 是字符串(如 `"8"`)。转不成非负整数就给 null ——
  * 消息层渲染成 `Lv?`,绝不拿经验值或其它数字顶替。
  */
+/** 累计经验:`user_exp` 是字符串(如 `"832"`)。转不成非负整数给 null。 */
+function toExp(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function toLevel(value) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = Number(value);
@@ -89,6 +96,9 @@ export async function fetchSession({ cookie, deps } = {}) {
     fid: item?.forum_id ?? null,
     kw: item?.forum_name ?? null,
     level: toLevel(item?.user_level),
+    // 累计经验:互动计划要拿它算「距下一级还差多少」。转不成整数给 null,绝不拿 0 顶替 ——
+    // 0 会让「差 1000 点」误判成「已经满级」。
+    exp: toExp(item?.user_exp),
     isSign: toFlag(item?.is_sign),
     isForbidden: toFlag(item?.is_forbidden),
   }));

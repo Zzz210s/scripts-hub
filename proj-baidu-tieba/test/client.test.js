@@ -13,13 +13,13 @@ const SESSION_URL = 'https://tieba.baidu.com/mo/q/newmoindex';
 const session = ({ tbs = 'TBS_SAMPLE', uid = '1000000000', forums = [] } = {}) => ({ no: 0, error: 'success', data: { uid, tbs: tbs.slice(-16), itb_tbs: tbs, like_forum: forums } });
 
 test('fetchSession:GET /mo/q/newmoindex,带 cookie/UA/Referer,tbs 取 itb_tbs', async () => {
-  const body = session({ tbs: 'ITB_TBS_SAMPLE', forums: [{ forum_id: 11, forum_name: '吧一', is_sign: 1, user_level: '8' }] });
+  const body = session({ tbs: 'ITB_TBS_SAMPLE', forums: [{ forum_id: 11, forum_name: '吧一', is_sign: 1, user_level: '8', user_exp: '832' }] });
   const { calls, fetchImpl } = stub(jsonReply(body));
   const result = await fetchSession({ cookie: 'BDUSS=BDUSS_SAMPLE; STOKEN=x', deps: { fetchImpl } });
   assert.equal(result.ok, true);
   assert.equal(result.tbs, 'ITB_TBS_SAMPLE');
   assert.equal(result.uid, '1000000000');
-  assert.deepEqual(result.forums, [{ fid: 11, kw: '吧一', level: 8, isSign: true, isForbidden: false }]);
+  assert.deepEqual(result.forums, [{ fid: 11, kw: '吧一', level: 8, exp: 832, isSign: true, isForbidden: false }]);
   assert.equal(result.count, 1);
   assert.equal(calls[0].url, SESSION_URL);
   assert.equal(calls[0].options.method, 'GET');
