@@ -47,7 +47,8 @@ if (!session.ok) {
   process.exit(1);
 }
 const all = session.forums ?? [];
-const picked = wanted.length ? all.filter((forum) => wanted.includes(forum.kw)) : all.slice(0, 2);
+// --forums all = 全部关注吧(用来先看清整天要发多少条再决定跑不跑);不写 = 只看前两个。
+const picked = wanted.includes('all') ? all : wanted.length ? all.filter((forum) => wanted.includes(forum.kw)) : all.slice(0, 2);
 console.log(`账号 uid=${session.uid} · 关注 ${all.length} 个吧 · 本轮处理 ${picked.length} 个`);
 for (const forum of picked) {
   const plan = planForForum(forum);
