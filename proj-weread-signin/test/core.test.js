@@ -64,7 +64,9 @@ test('buildReport 含今日/累计/剩余天数/可失败天数', () => {
         accountName: 'TestReader'
     })
     assert.match(text, /TestReader/)
-    assert.match(text, /阅读:今日 40 分钟 · 目标 66 分钟 · 还差 26 分钟/)
+    // 首行改成总进度:没有挑战数据时回落计划口径
+    // 这个夹具没有挑战数据、deficitMinutes 未给(默认 0)→ 走「已达标」兜底
+    assert.match(text, /^进度:已达标 · 今日 40 分钟$/m)
     assert.match(text, /挑战:累计 5\.0 \/ 30\.0 小时 · 剩 25 天 · 有效 5\/29 · 还可漏 3 天/)
     assert.doesNotMatch(text, /本次:|上报 40 分钟|5 次请求/)
     assert.match(text, /福利:暂无可领/)

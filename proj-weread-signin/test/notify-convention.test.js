@@ -31,7 +31,7 @@ test('结果消息是 标题行 + 空行 + 正文', () => {
         const lines = text.split('\n')
         assert.match(lines[0], /^微信读书签到 · TestReader · 2026-10-03 · \S+$/)
         assert.equal(lines[1], '')
-        assert.match(lines[2], /^阅读:/)
+        assert.match(lines[2], /^进度:/)
     }
 })
 

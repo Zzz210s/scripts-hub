@@ -46,6 +46,11 @@ export async function finishRun(ctx) {
 
     // 循环结束后用最终官方进度补记一次 minutes/done(不再累加 attempts —— 每个会话已经计过)
     const state = recordMinutes(stateIn, { minutes: after, targetMinutes: planNow.targetMinutes })
+    // until-done 口径下,「今天完成」= 挑战缺口清零,而不是「今天读到了今日份」。
+    // 否则窗口一关(安静时段)就写成 done,23:00 之后 timer 再来会被 done 挡住 —— 2026-10-31 实测。
+    if (refreshedPlan?.goalMode === 'until-done') {
+        state.done = (refreshedPlan.deficitMinutes ?? 1) <= 0
+    }
     writeState(state, path.join(cwd, 'data'))
 
     const nextState = state

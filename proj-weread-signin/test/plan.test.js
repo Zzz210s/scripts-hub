@@ -163,6 +163,8 @@ test('回归:统计说达标、挑战说差 11 分钟时,以挑战为准并且�
 })
 
 test('回归:最后一天缺口大于每日上限时,目标顶到上限并明确标记做不到', () => {
+    // 这里的 remainingDays 来自挑战的 remainDays+1 = 1,容量就是一天
+
     const plan = planDay({
         now: LAST_DAY,
         config: { ...config, dailyCapMinutes: 120 },
@@ -257,7 +259,8 @@ test('默认按全缺口排,不按天分摊', () => {
     // 1830 分钟全缺口,受每日上限 600 截断
     assert.equal(plan.deficitMinutes, 1830)
     assert.equal(plan.targetMinutes, 600)
-    assert.equal(plan.unreachable, true) // 一天读不完,要后续多轮接着来
+    // 一天读不完不等于补不完:30 天 × 600 分钟的容量远大于 1830,所以不该报补不完
+    assert.equal(plan.unreachable, false)
 })
 
 test('缺口小于上限时,目标就是缺口本身', () => {

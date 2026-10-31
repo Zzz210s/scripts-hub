@@ -46,7 +46,7 @@ const stats = (todaySeconds) => ({
  * 造一次运行:每次读统计按 afterList 依次给值(开始前那次给 beforeSeconds)。
  * runBot 的次数与每次写回的目标都记下来,便于断言"每个会话前都重算目标"。
  */
-async function runLoop({ beforeSeconds = 600, afterList = [], botList = [], failStatsFrom, env = {} } = {}) {
+async function runLoop({ beforeSeconds = 600, afterList = [], botList = [], failStatsFrom, env = {}, challenge = null } = {}) {
     const cwd = fixture(env)
     const botCalls = []
     const targets = []
@@ -68,6 +68,7 @@ async function runLoop({ beforeSeconds = 600, afterList = [], botList = [], fail
                 if (failStatsFrom !== undefined && index >= failStatsFrom) return { ok: false, error: 'HTTP 503' }
                 return stats(afterList[index - 1] ?? beforeSeconds)
             },
+            readChallengeOnly: async () => challenge ?? { ok: false, list: [] },
             collectRewards: async () => ({ reader: null, weekly: null, challenge: null, balance: null, memberCard: null })
         }
     })
@@ -145,4 +146,23 @@ test('直到缺口补完才停:每轮都按剩余缺口排,不按天分摊', asy
     // 缺口 630-10=620 分钟,受窗口与上限约束,至少跑两轮而不是读满 30 分钟就停
     assert.ok(result.sessions >= 2, `应至少跑 2 个会话,实际 ${result.sessions}`)
     assert.ok(botCalls.length >= 2)
+})
+
+// 2026-10-31 实测:窗口一关(20:00 安静时段)就把当天写成 done,23:00 之后 timer 再来被挡住。
+// until-done 口径下,done 只能是「挑战缺口清零」。
+test('until-done:缺口没清零时,窗口关闭也不把当天记成已完成', async () => {
+    const challenge = {
+        ok: true,
+        list: [{ id: 'x', status: 1, isPaid: true, done: false, remainDays: 28, targetSeconds: 108000, readSeconds: 3600, readDays: 2, targetDays: 29, startTime: 1793376000, endTime: 1795968000 }]
+    }
+    const { cwd } = await runLoop({
+        beforeSeconds: 3600,
+        afterList: [6000],
+        challenge,
+        env: { READ_UNTIL_DONE: '1', DAILY_CAP_MINUTES: '600', MAX_SESSIONS_PER_RUN: '1' }
+    })
+    const state = JSON.parse(fs.readFileSync(path.join(cwd, 'data', 'state.json'), 'utf8'))
+    // 该轮跑了且读了,但挑战缺口还在 → 不能写成完成
+    assert.ok(state.todayMinutes > 0)
+    assert.equal(state.done, false)
 })

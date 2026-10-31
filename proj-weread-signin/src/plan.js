@@ -104,8 +104,10 @@ export function planDay(input) {
                 ? remainingMinutes
                 : Math.ceil(remainingMinutes / remainingDays) + config.slackMinutes
     const planned = clamp(plannedRaw, config.minValidMinutes, config.dailyCapMinutes)
-    // 分摊算出来的量超过了今天能读的上限:寄希望于「明天补」,而明天可能已经不存在。
-    const unreachable = plannedRaw > config.dailyCapMinutes
+    // 「补不完」只按**剩余天数 × 每日上限**判:一天读不完不等于整个挑战没救 ——
+    // 用户要的就是「插空一直跑」,天数够就不该报补不完(2026-10-31 那条误报)。
+    const capacityMinutes = config.dailyCapMinutes * remainingDays
+    const unreachable = remainingMinutes > capacityMinutes
 
     // 「今天可达」:已经读到的 + 本次窗口内还能读的。窗口(安静时段 / 关机避让 / 剩余次数)不够时
     // 目标按可达值下调,缺口由后面的日子按 剩余量/剩余天数 自然分摊;有效日下限不可破。

@@ -9,6 +9,24 @@ function hoursFromSeconds(seconds) {
 }
 
 /**
+ * 总进度行:优先用挑战接口的秒数(与完赛判定同一本账),没有挑战数据才回落计划的分钟数。
+ * 形如 `进度:3.3 / 30.0 小时 · 差 26.7 小时 · 今日 204 分钟`。
+ */
+export function renderProgressLine(challenge, plan) {
+    const active = (challenge?.list ?? [])[0]
+    const todayMinutes = Number(plan?.todayMinutes) || 0
+    if (active && Number(active.targetSeconds) > 0) {
+        const done = Number(active.readSeconds) || 0
+        const target = Number(active.targetSeconds) || 0
+        const left = Math.max(0, target - done)
+        const tail = left <= 0 ? '已达标' : `差 ${hoursFromSeconds(left)} 小时`
+        return `进度:${hoursFromSeconds(done)} / ${hoursFromSeconds(target)} 小时 · ${tail} · 今日 ${todayMinutes} 分钟`
+    }
+    const fields = (plan?.deficitMinutes ?? 0) <= 0 ? '已达标' : `差 ${plan.deficitMinutes} 分钟`
+    return `进度:${fields} · 今日 ${todayMinutes} 分钟`
+}
+
+/**
  * 挑战行:有接口数据时每条挑战一行,且两条都顶格(第一条带「挑战:」,第二条不带前缀);
  * 否则回落累计口径。文案不用圆括号,补充说明一律用 · 分隔。
  * 奖励明细(达标奖/超额奖)不再进日报 —— 太啰嗦,且挑战详情接口本身就能查到。
@@ -76,8 +94,9 @@ export function buildReport(options) {
         : (run.ok ? '运行成功' : '运行有失败')
     const lines = [`微信读书签到 · ${accountName ?? '微信读书'} · ${date} · ${headline}`, '']
 
-    const gap = plan.targetMinutes - plan.todayMinutes
-    lines.push(`阅读:今日 ${plan.todayMinutes} 分钟 · 目标 ${plan.targetMinutes} 分钟 · ${gap <= 0 ? '已达标' : `还差 ${gap} 分钟`}`)
+    // 首行报**总进度**:签到是每天的事,阅读时长看的是挑战累计够了没有。
+    // 2026-10-31 用户要求把「今日 X 分钟 / 目标 Y 分钟」换成总进度。
+    lines.push(renderProgressLine(challenge, plan))
 
     if (run) {
         // 「本次」行只报需要你看的状态:凭据续期与计入异常 / 读回失败。
@@ -103,7 +122,9 @@ export function buildReport(options) {
     }
     if (plan.progressSource === 'stats') lines.push('注意:挑战接口没读到,今日目标按统计口径算,可能偏乐观')
     // 窗口不够时目标被下调,缺口会落到后面几天 —— 这正是「每天都差一点」的开端,必须说出来。
-    if (plan.windowCapped) lines.push(`注意:今日窗口只够 ${plan.windowMinutes} 分钟,目标已下调,缺口会摊到后面几天`)
+    if (plan.windowCapped) {
+        lines.push(`注意:本轮窗口只够 ${plan.windowMinutes} 分钟,下一轮 timer 会接着补 · 时长达标前一直插空跑`)
+    }
     if (config.windowAssumed) lines.push('提醒:挑战起止日期用的是默认值,请核对')
     return lines.join('\n').trimEnd()
 }

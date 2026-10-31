@@ -158,3 +158,18 @@ test('窗口不够导致目标下调时要明说,别让人以为今天真达标�
     })
     assert.match(text, /窗口只够 25 分钟/)
 })
+
+// 2026-10-31 用户要求:首行报「总进度」而不是今天的配额。
+test('首行是总进度:优先挑战接口的累计秒数', () => {
+    const text = buildReport({
+        plan: { todayMinutes: 204, targetMinutes: 254, deficitMinutes: 1632, minutesSoFar: 198, progressSource: 'challenge', remainingDays: 29, validNeeded: 0, failableDays: 1 },
+        run: { ok: true },
+        config: { dailyCapMinutes: 600, requiredMinutes: 1800, requiredValidDays: 29, marginMinutes: 30 },
+        date: '2026-10-31',
+        accountName: '账号 1',
+        challenge: { ok: true, list: [{ id: 'readchallenge4', isPaid: true, totalDays: 30, readSeconds: 198 * 60, targetSeconds: 108000, readDays: 1, targetDays: 29, remainDays: 29, canMiss: 1, done: false }] }
+    })
+    const first = text.split('\n')[2]
+    assert.match(first, /^进度:3\.3 \/ 30\.0 小时 · 差 26\.7 小时 · 今日 204 分钟$/)
+    assert.doesNotMatch(text, /阅读:今日/)
+})
