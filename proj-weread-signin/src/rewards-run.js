@@ -4,12 +4,36 @@ import path from 'node:path'
 
 import { callWithRefresh, credentialsPath, ensureAppToken, tokenPath } from './app-auth.js'
 import { shouldNotifyOnce } from './notify-policy.js'
+import { collectChallenge } from './challenge.js'
 import { collectChallengeAndBalance, logChallenge } from './rewards-coins.js'
 import { collectWeekly } from './weekly.js'
 import { verifyWeekly } from './weekly-verify.js'
 import { claimWelfareOnce, logWelfare, redactError, welfareSafely } from './welfare-run.js'
 
 export { balanceRecord, challengeLogLine, challengeRecord, logChallenge, memberCardRecord } from './rewards-coins.js'
+
+/**
+ * 只读一次挑战详情,供计划层当作进度真值。绝不抛:失败给 `{ ok:false }`,
+ * 调用方按「没有挑战数据」回落到统计口径。
+ */
+export async function readChallengeOnly({ cwd, config, deps = {} }) {
+    const ensureToken = deps.ensureAppToken ?? ensureAppToken
+    const fetchImpl = deps.fetchImpl ?? globalThis.fetch
+    const readChallenges = deps.collectChallenge ?? collectChallenge
+    const tokenArgs = {
+        curlFile: path.join(cwd, config.curlFile),
+        tokenFile: tokenPath(cwd),
+        credentialsFile: credentialsPath(cwd)
+    }
+    try {
+        const token = await ensureToken(tokenArgs)
+        if (!token.ok) return { ok: false, reason: 'no-credentials', list: [] }
+        const step = await callWithRefresh({ token, tokenArgs, ensureToken, fn: t => readChallenges({ token: t, fetchImpl }) })
+        return step.result ?? { ok: false, reason: 'empty', list: [] }
+    } catch (error) {
+        return { ok: false, reason: 'error', list: [], error: error?.message ?? String(error) }
+    }
+}
 
 const WEEKLY_LOG_PREFIX = '[WEEKLY]'
 

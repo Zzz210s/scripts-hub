@@ -30,6 +30,18 @@ export function minutesInWindow(buckets, startDay, today = localDay()) {
     return Math.round(seconds / 60)
 }
 
+/**
+ * 从挑战接口反推挑战窗口(本地日期)。挑战换了,窗口就自动跟着换 ——
+ * 靠 .env 手写 CHALLENGE_START / ENDS_ON 迟早过期,过期后有效天数与分桶统计都算错。
+ */
+export function windowFromChallenge(challenge) {
+    const start = Number(challenge?.startTime) || 0
+    const end = Number(challenge?.endTime) || 0
+    if (!start || !end) return null
+    // endTime 是最后一刻之后的第一秒,所以末日要退一天。
+    return { start: localDay(new Date(start * 1000)), end: localDay(new Date((end - 1) * 1000)) }
+}
+
 export function splitSections(totalMinutes, sectionMinutes) {
     const sections = []
     let left = Math.max(0, totalMinutes)
@@ -42,28 +54,53 @@ export function splitSections(totalMinutes, sectionMinutes) {
 }
 
 /**
+ * 进度真值:有挑战接口就只用它。
+ *
+ * 2026-10-30 那次就是这么栽的 —— 统计接口(buckets)给出的累计比挑战的 `readTime` 多出
+ * 十几分钟,计划层于是以为「剩 0 分钟」,当天只安排 5 分钟;真实进度差 11 分钟,挑战失败。
+ * 统计口径和挑战口径不是同一套账,计划只能认挑战自己的那本。
+ *
  * @param {object} input
  * @param {Date} input.now 当前时间
  * @param {object} input.config 挑战与运行参数(见 config.js)
  * @param {Array<{day:string, seconds:number}>} input.buckets 官方分桶
  * @param {number} input.todaySeconds 今天已计入的秒数
  * @param {number} [input.attempts] 今天已经尝试过几次(算剩余窗口用)
+ * @param {object} [input.challenge] 进行中的挑战(来自 /challenge/detail)
  */
 export function planDay(input) {
-    const { now, config, buckets, todaySeconds, attempts = 0 } = input
+    const { now, config, buckets, todaySeconds, attempts = 0, challenge = null } = input
     const today = localDay(now)
     const startDay = config.challengeStart
     const endDay = config.challengeEndsOn
-    const minutesSoFar = minutesInWindow(buckets, startDay, today)
     const todayMinutes = Math.round(todaySeconds / 60)
 
-    const remainingMinutes = Math.max(0, config.requiredMinutes - minutesSoFar)
-    const remainingDays = Math.max(1, dayIndex(endDay) - dayIndex(today) + 1)
+    // 挑战接口可用就用它的秒数:它是完赛判定的唯一口径,统计接口多报十几分钟就足以毁掉整个挑战。
+    const fromChallenge = Number(challenge?.targetSeconds) > 0 && Number(challenge?.readSeconds) >= 0
+    // 余量取 30 分钟:比统计口径的误差大一个量级,又不至于把每天的目标抬得离谱。
+    const marginMinutes = Number.isFinite(config.marginMinutes) ? config.marginMinutes : 30
+    const requiredMinutes = fromChallenge
+        ? Math.ceil(Number(challenge.targetSeconds) / 60) + marginMinutes
+        : config.requiredMinutes
+    const minutesSoFar = fromChallenge
+        ? Math.floor(Number(challenge.readSeconds) / 60)
+        : minutesInWindow(buckets, startDay, today)
+    const remainingDays = fromChallenge
+        ? Math.max(1, Number(challenge.remainDays ?? 0) + 1)
+        : Math.max(1, dayIndex(endDay) - dayIndex(today) + 1)
 
-    // 「理想目标」:把剩余量均摊到剩余天数。总量已达标时只保留最小有效时长,维持连续打卡
-    const planned = remainingMinutes <= 0
+    const remainingMinutes = Math.max(0, requiredMinutes - minutesSoFar)
+
+    // 「理想目标」:把剩余量均摊到剩余天数。总量已达标时只保留最小有效时长,维持连续打卡。
+    // 只剩最后一天时不再分摊 —— 剩下的必须今天一次补齐,否则没有明天可以兜。
+    const plannedRaw = remainingMinutes <= 0
         ? config.minValidMinutes
-        : clamp(Math.ceil(remainingMinutes / remainingDays) + config.slackMinutes, config.minValidMinutes, config.dailyCapMinutes)
+        : remainingDays <= 1
+            ? remainingMinutes
+            : Math.ceil(remainingMinutes / remainingDays) + config.slackMinutes
+    const planned = clamp(plannedRaw, config.minValidMinutes, config.dailyCapMinutes)
+    // 分摊算出来的量超过了今天能读的上限:寄希望于「明天补」,而明天可能已经不存在。
+    const unreachable = plannedRaw > config.dailyCapMinutes
 
     // 「今天可达」:已经读到的 + 本次窗口内还能读的。窗口(安静时段 / 关机避让 / 剩余次数)不够时
     // 目标按可达值下调,缺口由后面的日子按 剩余量/剩余天数 自然分摊;有效日下限不可破。
@@ -97,6 +134,11 @@ export function planDay(input) {
 
     return {
         today,
+        // 计划依据的来源与缺口:日报与日志都要能直接看出「按谁的账、差多少」
+        progressSource: fromChallenge ? 'challenge' : 'stats',
+        requiredMinutes,
+        deficitMinutes: remainingMinutes,
+        unreachable,
         targetMinutes,
         todayMinutes,
         minutesSoFar,

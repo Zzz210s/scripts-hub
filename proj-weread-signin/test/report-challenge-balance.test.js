@@ -123,3 +123,38 @@ test('signals 对象与旧的顶层写法等价', () => {
     const viaTopLevel = buildReport({ ...BASE, challenge, balance })
     assert.equal(viaSignals, viaTopLevel)
 })
+
+// 2026-10-30 事故的可视化要求:补不完时必须写在消息里,而不是安静地按上限跑。
+test('补不完时日报要明确警告,并报出还差多少分钟', () => {
+    const text = buildReport({
+        plan: { todayMinutes: 0, targetMinutes: 120, remainingDays: 1, deficitMinutes: 330, unreachable: true, progressSource: 'challenge', validNeeded: 0, failableDays: 0 },
+        run: null,
+        config: { dailyCapMinutes: 120, requiredMinutes: 1800, requiredValidDays: 29 },
+        date: '2026-10-30',
+        accountName: '账号 1'
+    })
+    assert.match(text, /还差 330 分钟/)
+    assert.match(text, /也补不完/)
+})
+
+test('计划回落到统计口径时要在日报里说明,不能假装是挑战真值', () => {
+    const text = buildReport({
+        plan: { todayMinutes: 0, targetMinutes: 60, remainingDays: 10, deficitMinutes: 600, unreachable: false, progressSource: 'stats', validNeeded: 0, failableDays: 2 },
+        run: null,
+        config: { dailyCapMinutes: 120, requiredMinutes: 1800, requiredValidDays: 29 },
+        date: '2026-10-30',
+        accountName: '账号 1'
+    })
+    assert.match(text, /挑战接口没读到/)
+})
+
+test('窗口不够导致目标下调时要明说,别让人以为今天真达标了', () => {
+    const text = buildReport({
+        plan: { todayMinutes: 20, targetMinutes: 40, remainingDays: 8, deficitMinutes: 300, unreachable: false, progressSource: 'challenge', windowCapped: true, windowMinutes: 25, validNeeded: 0, failableDays: 2 },
+        run: null,
+        config: { dailyCapMinutes: 120, requiredMinutes: 1800, requiredValidDays: 29 },
+        date: '2026-10-31',
+        accountName: '账号 1'
+    })
+    assert.match(text, /窗口只够 25 分钟/)
+})

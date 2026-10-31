@@ -3,8 +3,9 @@
 import path from 'node:path'
 
 import { sendWecom } from './notify.js'
-import { localDay, planDay } from './plan.js'
+import { localDay, planDay, windowFromChallenge } from './plan.js'
 import { buildReport } from './report.js'
+import { activeChallenge } from './challenge.js'
 import { balanceRecord, challengeRecord, memberCardRecord, weeklyForReport, weeklyRecord } from './rewards-run.js'
 import { appendHistory, recordMinutes, writeState } from './state.js'
 import { welfareForReport, welfareRecord } from './welfare-run.js'
@@ -32,8 +33,12 @@ export async function finishRun(ctx) {
     // 两处福利:阅读器福利书币 + 阅读时长福利(共用一枚 App 凭据);失败只记进历史与日报
     const { reader: welfare, weekly, challenge, balance, memberCard } = await deps.collectRewards({ cwd, config, bot, deps })
 
+    // 收尾复算也要用挑战真值:否则日报会拿统计口径宣布「已达标」,而挑战其实还差几分钟。
+    const activeNow = activeChallenge(challenge)
+    const windowNow = windowFromChallenge(activeNow)
+    const finishConfig = windowNow ? { ...config, challengeStart: windowNow.start, challengeEndsOn: windowNow.end } : config
     const refreshedPlan = stats.ok
-        ? planDay({ now, config, buckets: stats.buckets, todaySeconds: stats.todaySeconds, attempts: stateIn.attempts })
+        ? planDay({ now, config: finishConfig, buckets: stats.buckets, todaySeconds: stats.todaySeconds, attempts: stateIn.attempts, challenge: activeNow })
         : plan
     const welfareLine = welfareForReport(welfare, { dataDir: path.join(cwd, 'data'), date: localDay(now) })
     const report = buildReport({ plan: refreshedPlan, run, config, date: localDay(now), accountName, welfare: welfareLine, weekly: weeklyForReport(weekly, { dataDir: path.join(cwd, 'data'), date: localDay(now) }), weeklyStatus: weeklyRecord(weekly), challenge, balance, memberCard })

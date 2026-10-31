@@ -16,6 +16,9 @@ export const DEFAULTS = {
     requiredValidDays: 29,
     minValidMinutes: 5,         // 挑战口径:当天 > 5 分钟算有效日
     slackMinutes: 6,            // 统计漏计的余量
+    // 完赛余量:目标按「挑战要求 + 这么多分钟」算。2026-10-30 差 11 分钟失败的教训 ——
+    // 卡着线读,统计口径的毫厘之差就足以毁掉一个 30 天的挑战。
+    marginMinutes: 30,
     dailyCapMinutes: 120,
     sectionMinutes: 30,
     quietStart: '20:00',
@@ -68,6 +71,7 @@ export function loadConfig(envPath = '.env') {
         requiredValidDays: toInt(env.REQUIRED_VALID_DAYS, DEFAULTS.requiredValidDays),
         minValidMinutes: toInt(env.MIN_VALID_MINUTES, DEFAULTS.minValidMinutes),
         slackMinutes: toInt(env.SLACK_MINUTES, DEFAULTS.slackMinutes),
+        marginMinutes: toInt(env.CHALLENGE_MARGIN_MINUTES, DEFAULTS.marginMinutes),
         dailyCapMinutes: toInt(env.DAILY_CAP_MINUTES, DEFAULTS.dailyCapMinutes),
         sectionMinutes: toInt(env.SECTION_MINUTES, DEFAULTS.sectionMinutes),
         quietStart: pick('QUIET_START', DEFAULTS.quietStart),

@@ -10,9 +10,10 @@ import { sendWecom } from './notify.js'
 import { buildReport } from './report.js'
 import { finishRun } from './run-finish.js'
 import { sendSkipNotice, sendStartNotice } from './run-notice.js'
-import { localDay, minutesInWindow, planDay } from './plan.js'
+import { localDay, minutesInWindow } from './plan.js'
+import { makeLivePlanner } from './plan-live.js'
 import { peerBusy } from './peer.js'
-import { balanceRecord, challengeRecord, collectRewards, memberCardRecord, weeklyForReport, weeklyRecord } from './rewards-run.js'
+import { balanceRecord, challengeRecord, collectRewards, memberCardRecord, readChallengeOnly, weeklyForReport, weeklyRecord } from './rewards-run.js'
 import { readStatsWithRetry } from './stats.js'
 import { appendHistory, isPaused, readState, recordMinutes, recordRun, writeState } from './state.js'
 import { welfareForReport, welfareRecord } from './welfare-run.js'
@@ -38,6 +39,7 @@ export async function runOnce(options = {}) {
         ensureAppToken,
         ensureCredential,
         readStatsWithRetry,
+        readChallengeOnly,
         runBot,
         collectRewards,
         ...(options.deps ?? {})
@@ -78,9 +80,9 @@ export async function runOnce(options = {}) {
     const first = await deps.readStatsWithRetry(cwd, config)
     if (first.ok) { stats = { ...first.stats, ok: true } } else { stats.error = first.error }
 
-    const plan = stats.ok
-        ? planDay({ now, config, buckets: stats.buckets, todaySeconds: stats.todaySeconds, attempts: state.attempts })
-        : null
+    // 计划必须以挑战接口的 readSeconds 为准:统计口径会多报,2026-10-30 差 11 分钟就是这么丢的。
+    const replan = makeLivePlanner({ cwd, config, now, deps, getStats: () => (stats.ok ? stats : null), getAttempts: () => state.attempts })
+    const plan = stats.ok ? await replan(stats.todaySeconds) : null
 
     const remote = decideRemote({ credential: credential.ok, credentialDetail: credentialText, stats, plan })
     if (!remote.run) {
@@ -169,9 +171,7 @@ export async function runOnce(options = {}) {
         if (!bot.ok || bot.killed) { stopReason = 'bot-failed'; break }
         if (stats.ok && after >= planNow.targetMinutes) { stopReason = 'done'; break }
 
-        planNow = stats.ok
-            ? planDay({ now, config, buckets: stats.buckets, todaySeconds: stats.todaySeconds, attempts: state.attempts })
-            : planNow
+        planNow = stats.ok ? await replan(stats.todaySeconds) : planNow
         if (planNow.runMinutes <= 0) { stopReason = 'done'; break }
         if (Date.now() - loopStartedAt + planNow.runMinutes * 60000 > budgetMs) { stopReason = 'budget'; break }
 

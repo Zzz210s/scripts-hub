@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { localDay, minutesInWindow, planDay, splitSections } from '../src/plan.js'
+import { activeChallenge } from '../src/challenge.js'
+import { localDay, minutesInWindow, planDay, splitSections, windowFromChallenge } from '../src/plan.js'
 
 const day = iso => Math.floor(new Date(`${iso}T00:00:00`).getTime() / 1000)
 const config = {
@@ -129,4 +130,99 @@ test('splitSections 按单段上限切分', () => {
 test('localDay 用本机时区', () => {
     assert.equal(localDay(new Date('2026-10-03T23:30:00')), '2026-10-03')
     assert.equal(localDay(new Date(day('2026-10-04') * 1000)), '2026-10-04')
+})
+
+// ── 2026-10-30 那次的回归:统计接口以为已经达标,挑战接口还差 11 分钟 ──────────────
+//
+// 当时的现场:挑战 readSeconds=107340 / targetSeconds=108000(差 660 秒 = 11 分钟),
+// remainDays=0 也就是当天是最后一天。计划层信了统计接口,算出「剩 0 分钟」,只安排 5 分钟,
+// 于是这个 30 天挑战以「差 11 分钟」失败。下面三条把这次事故钉死。
+
+const LAST_DAY = new Date('2026-10-30T09:00:00')
+
+test('回归:统计说达标、挑战说差 11 分钟时,以挑战为准并且当天必须补齐', () => {
+    const plan = planDay({
+        now: LAST_DAY,
+        config,
+        // 统计接口给的分桶故意多报:加起来已经超过 1800 分钟
+        buckets: [{ day: '2026-10-30', seconds: 1830 * 60 }],
+        todaySeconds: 0,
+        challenge: { readSeconds: 107340, targetSeconds: 108000, remainDays: 0, readDays: 30, targetDays: 29 }
+    })
+    assert.equal(plan.progressSource, 'challenge')
+    assert.equal(plan.minutesSoFar, 1789) // 107340 / 60 向下取整,不许四舍五入成 1789 以上
+    // 目标 = 1800 + 30 分钟余量 = 1830
+    assert.equal(plan.requiredMinutes, 1830)
+    assert.equal(plan.deficitMinutes, 41)
+    // 最后一天不再分摊:今天就要把缺口补上,而不是按 minValidMinutes 意思一下
+    assert.equal(plan.targetMinutes, 41)
+    assert.equal(plan.runMinutes, 41)
+})
+
+test('回归:最后一天缺口大于每日上限时,目标顶到上限并明确标记做不到', () => {
+    const plan = planDay({
+        now: LAST_DAY,
+        config: { ...config, dailyCapMinutes: 120 },
+        buckets: [],
+        todaySeconds: 0,
+        challenge: { readSeconds: 90000, targetSeconds: 108000, remainDays: 0 }
+    })
+    // 缺口 1830 - 1500 = 330 分钟,一天最多 120
+    assert.equal(plan.unreachable, true)
+    assert.equal(plan.targetMinutes, 120)
+})
+
+test('挑战还剩几天时按剩余天数均摊,余量包含在目标里', () => {
+    const plan = planDay({
+        now: new Date('2026-10-20T09:00:00'),
+        config,
+        buckets: [],
+        todaySeconds: 0,
+        // 还剩 11 天(remainDays=10)
+        challenge: { readSeconds: 800 * 60, targetSeconds: 108000, remainDays: 10 }
+    })
+    // 需求 1830 - 已读 800 = 1030 分钟 / 11 天 = 94 分钟,再加 6 分钟漏计余量
+    assert.equal(plan.remainingDays, 11)
+    assert.equal(plan.targetMinutes, 100)
+})
+
+test('没有挑战数据时回落到统计口径,并如实标出来源', () => {
+    const plan = planDay({ now: LAST_DAY, config, buckets: [{ day: '2026-10-30', seconds: 30 * 60 }], todaySeconds: 30 * 60 })
+    assert.equal(plan.progressSource, 'stats')
+    assert.equal(plan.requiredMinutes, config.requiredMinutes)
+})
+
+test('挑战窗口从接口反推:换了挑战不用再手改 .env', () => {
+    // 2026-10-31 00:00 → 2026-11-30 00:00 的挑战
+    const window = windowFromChallenge({ startTime: 1793376000, endTime: 1795968000 })
+    assert.deepEqual(window, { start: '2026-10-31', end: '2026-11-29' })
+    assert.equal(windowFromChallenge({}), null)
+})
+
+test('已完赛与已过期的挑战不参与计划', () => {
+    const done = activeChallenge({ list: [{ id: 'a', status: 1, isPaid: true, done: true, remainDays: 3, targetSeconds: 108000, readSeconds: 108000 }] })
+    assert.equal(done, null)
+    const expired = activeChallenge({ list: [{ id: 'a', status: 1, isPaid: true, done: false, remainDays: -1, targetSeconds: 108000, readSeconds: 100 }] })
+    assert.equal(expired, null)
+    const live = activeChallenge({ list: [{ id: 'a', status: 1, isPaid: true, done: false, remainDays: 5, targetSeconds: 108000, readSeconds: 100 }] })
+    assert.equal(live.id, 'a')
+})
+
+test('会话循环重算也走挑战真值:统计口径说达标时不提前收工', async () => {
+    const { makeLivePlanner } = await import('../src/plan-live.js')
+    const replan = makeLivePlanner({
+        cwd: '.', config, now: LAST_DAY,
+        deps: {
+            readChallengeOnly: async () => ({
+                ok: true,
+                list: [{ id: 'x', status: 1, isPaid: true, done: false, remainDays: 0, targetSeconds: 108000, readSeconds: 107340, readDays: 30, targetDays: 29, startTime: 1793376000, endTime: 1795968000 }]
+            })
+        },
+        // 统计口径给了很多分钟(足够「达标」),但挑战还差 11 分钟
+        getStats: () => ({ buckets: [{ day: '2026-10-30', seconds: 1900 * 60 }] }),
+        getAttempts: () => 1
+    })
+    const plan = await replan(1900 * 60)
+    assert.equal(plan.progressSource, 'challenge')
+    assert.equal(plan.targetMinutes, 41) // 最后一天必须补齐缺口
 })

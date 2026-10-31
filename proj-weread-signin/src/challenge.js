@@ -59,6 +59,19 @@ export function pickChallenges(list) {
     return [...active.filter(isPaidEntry), ...active.filter(entry => !isPaidEntry(entry))]
 }
 
+/**
+ * 拿「当前还在跑、且没完赛」的那条挑战,优先付费。
+ *
+ * 过滤掉 `done` 与 `remainDays < 0`:已完赛的没必要再读,已过期的追不回来 ——
+ * 把它当目标只会让每天的目标虚高,或者反过来在最后一天把缺口算成 0。
+ */
+export function activeChallenge(challenge) {
+    const usable = pickChallenges(challenge?.list ?? []).filter(
+        entry => !entry.done && Number(entry.remainDays) >= 0
+    )
+    return usable[0] ?? null
+}
+
 /** 派生值:canMiss 负数取 0;done 需天数与时长双达标。 */
 export function summarize(entry) {
     const readDays = Number(entry?.readDays) || 0

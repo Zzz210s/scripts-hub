@@ -97,6 +97,13 @@ export function buildReport(options) {
         lines.push('警告:剩余天数已不够凑齐有效天数,本轮无法完成,建议尽早开始下一轮')
     }
     if (plan.emergency) lines.push('注意:进度落后,已进入紧急模式,今天按每日上限跑')
+    // 进度来源与缺口写进日报:2026-10-30 那次,消息里看不出「统计口径」在哄人,发现时已经晚了。
+    if (plan.unreachable) {
+        lines.push(`警告:还差 ${plan.deficitMinutes} 分钟,按每日上限 ${config.dailyCapMinutes} 分钟也补不完`)
+    }
+    if (plan.progressSource === 'stats') lines.push('注意:挑战接口没读到,今日目标按统计口径算,可能偏乐观')
+    // 窗口不够时目标被下调,缺口会落到后面几天 —— 这正是「每天都差一点」的开端,必须说出来。
+    if (plan.windowCapped) lines.push(`注意:今日窗口只够 ${plan.windowMinutes} 分钟,目标已下调,缺口会摊到后面几天`)
     if (config.windowAssumed) lines.push('提醒:挑战起止日期用的是默认值,请核对')
     return lines.join('\n').trimEnd()
 }
