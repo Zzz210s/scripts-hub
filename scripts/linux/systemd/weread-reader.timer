@@ -1,0 +1,11 @@
+[Unit]
+Description=每 30 分钟检查一次微信读书读时长(达标即自动不再读)
+
+[Timer]
+# 白天半小时一次:一次运行可能读很久,所以用 Persistent 只保证错过的那次会补
+OnCalendar=*-*-* *:00/30:00
+Persistent=true
+Unit=weread-reader.service
+
+[Install]
+WantedBy=timers.target

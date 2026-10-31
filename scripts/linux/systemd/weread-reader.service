@@ -1,0 +1,18 @@
+[Unit]
+Description=微信读书读时长(独立循环,不占套件顺序)
+Documentation=https://github.com/Zzz210s/scripts-hub
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/apps/automation
+# 一次运行内会连着跑多个会话(间隔 5 分钟)直到挑战缺口补完;
+# 看门狗盖住整轮,超出就被 kill,下一次 timer 接着来。
+EnvironmentFile=-/srv/apps/automation/suite.env
+ExecStart=/srv/apps/automation/weread/run.sh
+# 这套东西永不"失败退出"到让人以为服务坏了:退出码交给日志与通知
+SuccessExitStatus=0 1
+TimeoutStartSec=infinity
+Nice=10

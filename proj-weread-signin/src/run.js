@@ -126,6 +126,7 @@ export async function runOnce(options = {}) {
     let sessions = 0
     let statsFailures = 0
     let stopReason = ''
+    let peerDetail = ''
     let bot = null
     let parsed = null
     let after = before
@@ -174,6 +175,13 @@ export async function runOnce(options = {}) {
         planNow = stats.ok ? await replan(stats.todaySeconds) : planNow
         if (planNow.runMinutes <= 0) { stopReason = 'done'; break }
         if (Date.now() - loopStartedAt + planNow.runMinutes * 60000 > budgetMs) { stopReason = 'budget'; break }
+        // 会话之间:先看同伴有没有起来要跑,有就让路;没有就间隔一会儿继续。
+        // 用户要求「不影响其它脚本运行」,所以让路优先于继续读。
+        const yieldTo = (deps.peerBusy ?? peerBusy)(config.busyPeers)
+        if (yieldTo.busy) { stopReason = 'peer-running'; peerDetail = yieldTo.detail ?? ''; break }
+        if (config.sessionGapMinutes > 0) {
+            await (deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))))(config.sessionGapMinutes * 60000)
+        }
 
         range = patchTargetDuration(path.join(cwd, config.botConfig), planNow.runMinutes)
     }
@@ -181,7 +189,7 @@ export async function runOnce(options = {}) {
 
     return (deps.finishRun ?? finishRun)({
         cwd, now, config, dryRun, accountName, credential, stats, plan, bot, parsed,
-        sessions, stopReason, before, after, creditedNote, planNow, range, state, deps
+        sessions, stopReason, peerDetail, before, after, creditedNote, planNow, range, state, deps
     })
 }
 

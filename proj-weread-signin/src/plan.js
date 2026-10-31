@@ -91,13 +91,18 @@ export function planDay(input) {
 
     const remainingMinutes = Math.max(0, requiredMinutes - minutesSoFar)
 
-    // 「理想目标」:把剩余量均摊到剩余天数。总量已达标时只保留最小有效时长,维持连续打卡。
-    // 只剩最后一天时不再分摊 —— 剩下的必须今天一次补齐,否则没有明天可以兜。
+    // 「理想目标」的两种口径:
+    //   readUntilDone(默认) —— 目标就是**全部缺口**,不按天分摊。用户的说法是「时长一开始就要达标」:
+    //     签到是每天要做的,时长不是每天领一点配额,而是有空就把总缺口往死里补。
+    //   旧口径 —— 均摊到剩余天数 + 余量,只在显式关掉 readUntilDone 时使用。
+    const readUntilDone = config.readUntilDone !== false
     const plannedRaw = remainingMinutes <= 0
         ? config.minValidMinutes
-        : remainingDays <= 1
+        : readUntilDone
             ? remainingMinutes
-            : Math.ceil(remainingMinutes / remainingDays) + config.slackMinutes
+            : remainingDays <= 1
+                ? remainingMinutes
+                : Math.ceil(remainingMinutes / remainingDays) + config.slackMinutes
     const planned = clamp(plannedRaw, config.minValidMinutes, config.dailyCapMinutes)
     // 分摊算出来的量超过了今天能读的上限:寄希望于「明天补」,而明天可能已经不存在。
     const unreachable = plannedRaw > config.dailyCapMinutes
@@ -133,6 +138,8 @@ export function planDay(input) {
     const emergency = afterToday / futureDays > EMERGENCY_MINUTES_PER_DAY
 
     return {
+        // 目标口径:全缺口(until-done)还是按天分摊(split)
+        goalMode: readUntilDone ? 'until-done' : 'split',
         today,
         // 计划依据的来源与缺口:日报与日志都要能直接看出「按谁的账、差多少」
         progressSource: fromChallenge ? 'challenge' : 'stats',

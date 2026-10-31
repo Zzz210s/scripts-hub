@@ -19,15 +19,20 @@ export const DEFAULTS = {
     // 完赛余量:目标按「挑战要求 + 这么多分钟」算。2026-10-30 差 11 分钟失败的教训 ——
     // 卡着线读,统计口径的毫厘之差就足以毁掉一个 30 天的挑战。
     marginMinutes: 30,
-    dailyCapMinutes: 120,
+    // 口径:时长目标 = 全部缺口,不按天分摊(见 plan.js 的 readUntilDone)
+    readUntilDone: true,
+    // 两个会话之间的间隔:给别的程序让路,也让阅读节奏不像机器
+    sessionGapMinutes: 5,
+    // 每日上限:用户要求「有空就把总缺口补满」,所以放宽到 10 小时,由窗口(安静时段/关机)兜底。
+    dailyCapMinutes: 600,
     sectionMinutes: 30,
     quietStart: '20:00',
     quietEnd: '23:00',
     shutdownTime: '02:00',
     shutdownGuardMinutes: 30,
-    maxAttemptsPerDay: 6,        // 每天最多跑几个**会话**(2026-10-05 起一次运行内会循环,见 maxSessionsPerRun)
-    maxSessionsPerRun: 3,        // 一次运行内最多跑几个底座会话(不达标就再来一个,直到达标或用完)
-    runBudgetMinutes: 330,       // 一次运行的总时长预算(与宿主看门狗一致;超出就不再开新会话)
+    maxAttemptsPerDay: 12,        // 每天最多跑几个**会话**(2026-10-05 起一次运行内会循环,见 maxSessionsPerRun)
+    maxSessionsPerRun: 12,        // 一次运行内最多跑几个底座会话(不达标就再来一个,直到达标或用完)
+    runBudgetMinutes: 660,       // 一次运行的总时长预算(与宿主看门狗一致;超出就不再开新会话)
     runTimeoutMinutes: 100,      // 单个会话的上限(底座自己的目标时长也受它夹逼)
     accountName: '微信读书',
     busyPeers: ''
@@ -72,6 +77,9 @@ export function loadConfig(envPath = '.env') {
         minValidMinutes: toInt(env.MIN_VALID_MINUTES, DEFAULTS.minValidMinutes),
         slackMinutes: toInt(env.SLACK_MINUTES, DEFAULTS.slackMinutes),
         marginMinutes: toInt(env.CHALLENGE_MARGIN_MINUTES, DEFAULTS.marginMinutes),
+        // 只有显式写 0 才回到「按天分摊」
+        readUntilDone: String(env.READ_UNTIL_DONE ?? '1') !== '0',
+        sessionGapMinutes: toInt(env.SESSION_GAP_MINUTES, DEFAULTS.sessionGapMinutes),
         dailyCapMinutes: toInt(env.DAILY_CAP_MINUTES, DEFAULTS.dailyCapMinutes),
         sectionMinutes: toInt(env.SECTION_MINUTES, DEFAULTS.sectionMinutes),
         quietStart: pick('QUIET_START', DEFAULTS.quietStart),

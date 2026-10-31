@@ -52,8 +52,9 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": true,
-      "linuxEnabled": true,
-      "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs"
+      "linuxEnabled": false,
+      "actionVbs": "%WEREAD_SIGNIN_DIR%\\scripts\\windows\\run-daily.vbs",
+      "linuxNote": "读时长改由 weread-reader.timer 每 30 分钟独立触发,不占套件的串行顺序"
     },
     "epic-free-games": {
       "taskName": "EpicFreeGames",

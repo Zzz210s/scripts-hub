@@ -15,6 +15,8 @@ const WINDOW_CONFIG = {
 }
 
 const CONFIG = {
+    // 这批用例钉的是「按天分摊」的口径与窗口下调数学
+    readUntilDone: false,
     challengeStart: '2026-10-01',
     challengeEndsOn: '2026-10-30',
     requiredMinutes: 1800,

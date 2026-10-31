@@ -539,3 +539,18 @@ run-lib.sh      93 行:rp_prepare / rp_run_container / rp_report / run_program
 
 服务器已生成账号级 SSH key 并加入 GitHub(`tencent-cloud-automation-20261029`),`origin` 已改为
 `git@github.com:...`,所以 `git pull` / `git push` 直接可用,不需要任何代理。
+
+## 14. 微信读书读时长:独立 timer,不占套件顺序
+
+时长目标的口径是**全缺口**:签到每天一次,时长不是每天领一点配额,而是一有空就把挑战总缺口补到 0。
+所以它没有走 `run-all.sh` 的串行顺序 —— 那样会把后面的贴吧/网易云/Epic 全堵住。
+
+- `weread-reader.timer`:每 30 分钟触发一次 `weread/run.sh`;一次运行内会连跑多个会话,
+  会话之间隔 `SESSION_GAP_MINUTES`(默认 5 分钟),直到缺口补完、用完尝试次数或窗口关闭。
+- 让路:`BUSY_PEERS` 列出全部同伴锁(`/peers/{rewards,epic,bilibili,tieba,netease}/run.lock`),
+  任何同伴在跑,它就在两个会话之间直接退出(timer 半小时后再来),不抢 CPU 与网络。
+- 窗口:`QUIET_START/QUIET_END`(20:00-23:00)不读;`DAILY_CAP_MINUTES` 默认 600 分钟兜底。
+- 套件里 `weread-signin` 的 `linuxEnabled` 已置 false,`program-enabled.mjs is-enabled` 返回 1;
+  日报与福利仍由 reader 那次运行负责,通知按天去重,不会刷屏。
+- 部署:`sudo cp scripts/linux/systemd/weread-reader.{service,timer} /etc/systemd/system/`
+  → `sudo systemctl daemon-reload` → `sudo systemctl enable --now weread-reader.timer`。

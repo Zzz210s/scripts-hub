@@ -26,7 +26,8 @@ function fixture() {
         'SHUTDOWN_TIME=23:59',
         'SHUTDOWN_GUARD_MINUTES=1',
         'CHALLENGE_START=2026-01-01',
-        'CHALLENGE_ENDS_ON=2026-01-30'
+        'CHALLENGE_ENDS_ON=2026-01-30',
+        'SESSION_GAP_MINUTES=0'
     ].join('\n'), 'utf8')
     return cwd
 }

@@ -28,6 +28,9 @@ function fixture(extraEnv = {}) {
         DAILY_CAP_MINUTES: '120',
         MIN_VALID_MINUTES: '5',
         MAX_SESSIONS_PER_RUN: '3',
+        SESSION_GAP_MINUTES: '0',
+        // 这批用例钉的是「按天分摊」那套数字;默认口径(全缺口)由下面单独的用例覆盖
+        READ_UNTIL_DONE: '0',
         ...extraEnv
     }
     fs.writeFileSync(path.join(cwd, '.env'), Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n'), 'utf8')
@@ -124,4 +127,22 @@ test('attempts 按会话累加,不因循环重复计数', async () => {
     assert.equal(state.attempts, result.sessions)
     assert.equal(state.done, true)
     assert.equal(state.todayMinutes, 67)
+})
+
+// 2026-10-31 用户口径:签到每日一次,时长「一开始就要达标」——
+// 有空就一直跑、多轮间隔,直到总缺口补完才停,而不是读满当天配额就收工。
+test('直到缺口补完才停:每轮都按剩余缺口排,不按天分摊', async () => {
+    const { result, botCalls } = await runLoop({
+        beforeSeconds: 600,
+        afterList: [1800, 3000, 4200], // 每轮读回都在涨
+        env: {
+            READ_UNTIL_DONE: '1',
+            REQUIRED_MINUTES: '600',
+            DAILY_CAP_MINUTES: '600',
+            MAX_SESSIONS_PER_RUN: '6'
+        }
+    })
+    // 缺口 630-10=620 分钟,受窗口与上限约束,至少跑两轮而不是读满 30 分钟就停
+    assert.ok(result.sessions >= 2, `应至少跑 2 个会话,实际 ${result.sessions}`)
+    assert.ok(botCalls.length >= 2)
 })

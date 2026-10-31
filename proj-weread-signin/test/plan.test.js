@@ -5,7 +5,10 @@ import { activeChallenge } from '../src/challenge.js'
 import { localDay, minutesInWindow, planDay, splitSections, windowFromChallenge } from '../src/plan.js'
 
 const day = iso => Math.floor(new Date(`${iso}T00:00:00`).getTime() / 1000)
+// 多数用例钉的是「按天分摊」那套数学,所以显式关掉 until-done;
+// 默认口径(全缺口)由后面单独的用例覆盖。
 const config = {
+    readUntilDone: false,
     challengeStart: '2026-10-01',
     challengeEndsOn: '2026-10-30',
     requiredMinutes: 1800,
@@ -225,4 +228,59 @@ test('会话循环重算也走挑战真值:统计口径说达标时不提前收�
     const plan = await replan(1900 * 60)
     assert.equal(plan.progressSource, 'challenge')
     assert.equal(plan.targetMinutes, 41) // 最后一天必须补齐缺口
+})
+
+// 2026-10-31 用户口径:签到是每日的,时长是「一开始就要达标」——
+// 有空就把总缺口补到 0,而不是每天领一点配额。
+test('不写 readUntilDone 时,默认就是全缺口', () => {
+    const plan = planDay({
+        now: new Date('2026-11-01T09:00:00'),
+        config: { ...config, readUntilDone: undefined, dailyCapMinutes: 600, marginMinutes: 30, maxAttemptsPerDay: 12, runTimeoutMinutes: 100, quietStart: '20:00', quietEnd: '23:00' },
+        buckets: [],
+        todaySeconds: 0,
+        challenge: { readSeconds: 0, targetSeconds: 108000, remainDays: 29 }
+    })
+    assert.equal(plan.goalMode, 'until-done')
+    assert.equal(plan.targetMinutes, 600)
+})
+
+test('默认按全缺口排,不按天分摊', () => {
+    const plan = planDay({
+        now: new Date('2026-11-01T09:00:00'),
+        config: { ...config, readUntilDone: true, dailyCapMinutes: 600, marginMinutes: 30, maxAttemptsPerDay: 12, runTimeoutMinutes: 100, quietStart: '20:00', quietEnd: '23:00' },
+        buckets: [],
+        todaySeconds: 0,
+        // 30 天挑战刚开始,已读 0
+        challenge: { readSeconds: 0, targetSeconds: 108000, remainDays: 29 }
+    })
+    assert.equal(plan.goalMode, 'until-done')
+    // 1830 分钟全缺口,受每日上限 600 截断
+    assert.equal(plan.deficitMinutes, 1830)
+    assert.equal(plan.targetMinutes, 600)
+    assert.equal(plan.unreachable, true) // 一天读不完,要后续多轮接着来
+})
+
+test('缺口小于上限时,目标就是缺口本身', () => {
+    const plan = planDay({
+        now: new Date('2026-11-02T09:00:00'),
+        config: { ...config, readUntilDone: true, dailyCapMinutes: 600, marginMinutes: 30, maxAttemptsPerDay: 12, runTimeoutMinutes: 100, quietStart: '20:00', quietEnd: '23:00' },
+        buckets: [],
+        todaySeconds: 0,
+        challenge: { readSeconds: 106500, targetSeconds: 108000, remainDays: 28 }
+    })
+    assert.equal(plan.deficitMinutes, 55) // 1830 - floor(106500/60)=1775
+    assert.equal(plan.targetMinutes, 55)
+    assert.equal(plan.unreachable, false)
+})
+
+test('显式关掉 readUntilDone 才回到按天分摊', () => {
+    const plan = planDay({
+        now: new Date('2026-11-01T09:00:00'),
+        config: { ...config, readUntilDone: false, dailyCapMinutes: 600, marginMinutes: 30 },
+        buckets: [],
+        todaySeconds: 0,
+        challenge: { readSeconds: 0, targetSeconds: 108000, remainDays: 29 }
+    })
+    assert.equal(plan.goalMode, 'split')
+    assert.equal(plan.targetMinutes, 67) // ceil(1830/30) + 6
 })

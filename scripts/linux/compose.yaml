@@ -48,8 +48,13 @@ services:
       - ./weread/secrets:/opt/weread/secrets
       - ./weread/data:/opt/weread/data
       - ./weread/logs:/opt/weread/logs
-      # 同伴(微软积分)的单实例锁:错峰判定要用(.env 的 BUSY_PEERS 指到这里)
+      # 同伴的单实例锁:错峰判定要用(.env 的 BUSY_PEERS 指到这里)。
+      # 微信读书一次会读几小时,所以它必须能看见**所有**同伴的锁,谁在跑就让路。
       - ./rewards/logs:/peers/rewards:ro
+      - ./epic/logs:/peers/epic:ro
+      - ./bilibili/logs:/peers/bilibili:ro
+      - ./tieba/logs:/peers/tieba:ro
+      - ./netease/logs:/peers/netease:ro
       - ./weread/deploy:/opt/deploy:ro
     security_opt:
       - no-new-privileges:true

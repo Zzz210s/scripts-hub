@@ -19,7 +19,7 @@ test('loadConfig 在缺少 .env 时给默认值', () => {
     const config = loadConfig(path.join(tmp(), 'missing.env'))
     assert.equal(config.requiredMinutes, 1800)
     assert.equal(config.minValidMinutes, 5)
-    assert.equal(config.dailyCapMinutes, 120)
+    assert.equal(config.dailyCapMinutes, 600)
 })
 
 test('ensureWindow 在未配日期时按 30 天兜底并标记', () => {
