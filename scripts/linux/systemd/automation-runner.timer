@@ -1,0 +1,12 @@
+[Unit]
+Description=每 30 分钟问一次 runner.sh:该跑谁
+
+[Timer]
+# 半小时一跳。跑哪个、跑多久,全部由 runner.sh 里的 PROGRAMS 表决定。
+OnCalendar=*-*-* *:00/30:00
+# 机器关过再开机:错过的那一跳补一次,不用等下一个半点
+Persistent=true
+Unit=automation-runner.service
+
+[Install]
+WantedBy=timers.target

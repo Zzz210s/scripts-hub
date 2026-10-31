@@ -554,3 +554,21 @@ run-lib.sh      93 行:rp_prepare / rp_run_container / rp_report / run_program
   日报与福利仍由 reader 那次运行负责,通知按天去重,不会刷屏。
 - 部署:`sudo cp scripts/linux/systemd/weread-reader.{service,timer} /etc/systemd/system/`
   → `sudo systemctl daemon-reload` → `sudo systemctl enable --now weread-reader.timer`。
+
+## 15. 启动控制:只有一个文件
+
+所有容器的启停判断都收进 `scripts/linux/runner.sh`(服务器上是 `/srv/apps/automation/runner.sh`),
+systemd 只剩一个定时器 `automation-runner.timer`,每 30 分钟问它一次。
+
+- **改程序看表**:文件顶部的 `PROGRAMS` 数组一行一个程序,字段依次是
+  `id | 显示名 | compose 服务 | 类别 | 钟点 | 星期 | 看门狗分钟 | 启用 | 一天几次`。
+  加一个程序 = 加一行;临时停掉 = 把那行的启用改成 0。
+- **类别**:`daily` 是每日任务,一跳里按表顺序串行跑完(与旧 `run-all.sh` 一致);
+  `reader` 是补时长的活(微信读书),只有 daily 都没得跑时才跑,一次一个会话。
+- **钟点**:`08:00,12:00,19:00` 表示到点后两小时内补跑;`00:00-19:59/30,23:00-23:59/30`
+  表示这两个区间内每 30 分钟一跳都算触发。
+- **两道锁**:`state/runner.lock` 保证同时只有一个控制进程;`state/<id>.flock` 保证同一个程序
+  不会有两个容器并跑(名字与旧 run.sh 一致,手工调用也受同一把锁保护)。
+- **自检**:`./runner.sh --plan` 只打印这一跳会启动谁;`./runner.sh weread` 强制跑某一个。
+- 旧的 `automation-suite.timer` 与 `weread-reader.timer` 已 disable,`run-all.sh` 已标注停用,
+  想回滚把旧的 enable 回来即可。

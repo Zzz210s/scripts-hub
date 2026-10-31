@@ -1,0 +1,15 @@
+[Unit]
+Description=自动化套件唯一启动控制(runner.sh)
+Documentation=https://github.com/Zzz210s/scripts-hub
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/apps/automation
+EnvironmentFile=-/srv/apps/automation/suite.env
+ExecStart=/srv/apps/automation/runner.sh
+SuccessExitStatus=0 1
+TimeoutStartSec=infinity
+Nice=5
