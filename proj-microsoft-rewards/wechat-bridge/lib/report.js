@@ -101,10 +101,20 @@ export function buildSummary(lines, { date = new Date(), past = null } = {}) {
         perAccount.set(email, entry)
     }
 
+    // 上一次见到这些账号时它们的余额。微软的积分是延迟入账的:一次运行结束时读到的
+    // balance 往往还没把本次的分算进去,于是推送里写着「本次 +0」,过一会儿余额才涨。
+    // 2026-11-01 实测:两次运行之间没有任何程序在跑,余额却从 58547 涨到 58967。
+    // 所以「本次」按上一次落盘的余额来算,而不是本次运行内的前后差值。
+    const lastSeen = new Map()
+    for (const row of past ?? readHistory()) {
+        if (row?.account) lastSeen.set(row.account, Number(row.balance))
+    }
+
     let totalGained = 0
     const deltas = new Map()
     for (const entry of perAccount.values()) {
-        const delta = Math.max(entry.gained, entry.after - entry.before)
+        const baseline = Number.isFinite(lastSeen.get(entry.email)) ? lastSeen.get(entry.email) : entry.before
+        const delta = Math.max(entry.gained, entry.after - baseline)
         deltas.set(entry.email, delta)
         totalGained += delta
         history.push({ account: entry.email, gained: delta, before: entry.before, balance: entry.after, day: stamp })
