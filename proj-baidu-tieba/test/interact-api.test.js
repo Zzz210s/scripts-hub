@@ -98,3 +98,39 @@ test('点赞请求带 obj_type=3 与 agree_type=1 —— 换个组合服务端�
   assert.match(body, /thread_id=111/);
   assert.match(body, /sign=[0-9A-F]{32}/);
 });
+
+// 2026-11-01 用户报的 bug:"+3" 回帖出现在别人的正常帖里。
+// 真凶是关键词里那条裸 `\+3` —— 「鸡哥5070ti+32G+2T不到一万二可以上车吗？」被判成水楼。
+test('水楼判定:真的水楼认,带 +3 字样的正常帖不认', async () => {
+    const { isWaterTitle } = await import('../src/interact-api.js')
+    // 真的水楼
+    for (const title of ['网文吧水楼', '【公告】治水需要引水渠,8月第二周扒皮吧专用水楼', '打卡贴（水贴专用）',
+        '这是一个正了八经儿的水经验求助贴', '+3。。。', '水经验+3专用楼']) {
+        assert.equal(isWaterTitle(title), true, `应认:${title}`)
+    }
+    // 正常帖:含 +3 字样但不是水楼
+    for (const title of ['鸡哥5070ti+32G+2T不到一万二可以上车吗？', 'C++3.0 新特性一览', '【吧规】202408修订',
+        '求助:+3 是什么意思', '水冷散热器推荐', '水果批发价']) {
+        assert.equal(isWaterTitle(title), false, `不应认:${title}`)
+    }
+})
+
+// 2026-11-01 实测:接口会少给(请求 30 条只回 11~15 条)。翻页必须按实际条数推进,
+// 按请求条数推进会跳过中间那段,水楼正好藏在那里 —— 网文吧的水楼就是这么漏掉的。
+test('翻页按实际返回条数推进:少给的那段不会被跳过', async () => {
+    const pages = [
+        { list: Array.from({ length: 15 }, (_, i) => ({ id: String(100000 + i), title: `普通帖${i}` })) },
+        { list: [{ id: '9205922382', title: '网文吧水楼', reply_num: 1061 }, ...Array.from({ length: 10 }, (_, i) => ({ id: String(200000 + i), title: `别的帖${i}` }))] },
+    ]
+    const seen = []
+    const fetchImpl = async (url) => {
+        const pn = Number(new URL(url).searchParams.get('pn'))
+        seen.push(pn)
+        const body = pages[seen.length - 1] ?? { list: [] }
+        return { status: 200, ok: true, text: async () => JSON.stringify({ error_code: 0, thread_list: body.list }), headers: { get: () => 'application/json' } }
+    }
+    const { findWaterThread } = await import('../src/interact-api.js')
+    const result = await findWaterThread({ kw: '网文', pages: 3, cookie: 'BDUSS=x', deps: { fetchImpl } })
+    assert.equal(result.tid, '9205922382')
+    assert.deepEqual(seen, [0, 15]) // 第二次从 15 开始,而不是 30
+})

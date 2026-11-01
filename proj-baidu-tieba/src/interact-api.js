@@ -113,7 +113,19 @@ export async function likeThread({ tid, tbs, cookie, deps } = {}) {
  * 水楼标题特征。宁可漏也不能错:发错帖子比不发更糟,所以只认明确写着「水」的标题。
  * 2026-10-30 在 20 个吧上扫过:约五分之一有这种贴(如 `打卡贴（水贴专用）` · `+3。。。`)。
  */
-const WATER_TITLE = /(水楼|水经验|水贴|水帖|经验\+?3|\+3|刷经验|经验贴|经验楼|打卡水|专用水)/;
+const WATER_TITLE = /(水楼|水经验|水贴|水帖|刷经验|经验贴|经验楼|打卡水|专用水|灌水)/;
+/**
+ * 只有 "+3。。。" 这种纯符号标题才算水楼。
+ * 以前把 `\+3` 当成通用关键词,于是「鸡哥5070ti+32G+2T不到一万二可以上车吗？」这种
+ * 正常帖子也被判成水楼,回帖就发到别人帖子底下(2026-11-01 用户报的 bug)。
+ */
+const WATER_ONLY_SYMBOLS = /^[+＋3\s。.…·~～!！?？]+$/;
+
+/** 标题是不是水楼:要么写着水/经验,要么整条标题就是 "+3" 这类符号。 */
+export function isWaterTitle(title) {
+    const text = String(title ?? '');
+    return WATER_TITLE.test(text) || WATER_ONLY_SYMBOLS.test(text);
+}
 
 /**
  * 在吧里找「水经验专门贴」。返回 `{ ok, tid, title }`;找不到时 `tid` 为 null。
@@ -122,34 +134,38 @@ const WATER_TITLE = /(水楼|水经验|水贴|水帖|经验\+?3|\+3|刷经验|�
  * 客户端两个搜索端点都回 200 空体 —— 搜索这条路走不通,翻页是唯一可行且无害的手段。
  */
 export async function findWaterThread({ kw, pages = 3, pageSize = 30, cookie, deps } = {}) {
-  let best = null;
-  for (let page = 0; page < Math.max(1, pages); page++) {
-    const params = {
-      kw: String(kw ?? ''),
-      rn: String(pageSize),
-      pn: String(page * pageSize),
-      _client_type: '2',
-      _client_version: '12.0.0'
-    };
-    params.sign = clientSign(params);
-    const res = await request(`${LIST_URL}?${new URLSearchParams(params)}`, {
-      cookie,
-      deps,
-      headers: { 'User-Agent': CLIENT_UA }
-    });
-    if (!res.ok) return { ok: false, tid: null, title: null, error: res.error, reason: res.reason };
-    const list = res.data?.thread_list;
-    if (!Array.isArray(list)) return { ok: false, tid: null, title: null, error: '响应里没有 thread_list', reason: 'parse' };
-    for (const item of list) {
-      const title = String(item?.title ?? '');
-      const tid = String(item?.id ?? item?.tid ?? '');
-      if (!WATER_TITLE.test(title) || !/^\d{6,}$/.test(tid)) continue;
-      // 命中多个时取回复数最多的那个:老水楼比新建的更稳,不容易被删。
-      const replies = Number(item?.reply_num) || 0;
-      if (!best || replies > best.replies) best = { tid, title, replies };
+    let best = null;
+    let offset = 0;
+    for (let page = 0; page < Math.max(1, pages); page++) {
+        const params = {
+            kw: String(kw ?? ''),
+            rn: String(pageSize),
+            pn: String(offset),
+            _client_type: '2',
+            _client_version: '12.0.0'
+        };
+        params.sign = clientSign(params);
+        const res = await request(`${LIST_URL}?${new URLSearchParams(params)}`, {
+            cookie,
+            deps,
+            headers: { 'User-Agent': CLIENT_UA }
+        });
+        if (!res.ok) return { ok: false, tid: null, title: null, error: res.error, reason: res.reason };
+        const list = res.data?.thread_list;
+        if (!Array.isArray(list)) return { ok: false, tid: null, title: null, error: '响应里没有 thread_list', reason: 'parse' };
+        for (const item of list) {
+            const title = String(item?.title ?? '');
+            const tid = String(item?.id ?? item?.tid ?? '');
+            if (!isWaterTitle(title) || !/^\d{6,}$/.test(tid)) continue;
+            // 命中多个时取回复数最多的那个:老水楼比新建的更稳,不容易被删。
+            const replies = Number(item?.reply_num) || 0;
+            if (!best || replies > best.replies) best = { tid, title, replies };
+        }
+        // 翻页按**实际返回条数**推进:接口会少给(实测 rn=30 只回 11~15 条),
+        // 按 rn 推进会跳过中间那段,水楼就藏在那里面(2026-11-01 网文吧就是这个原因没找到)。
+        offset += list.length;
+        if (list.length === 0) break;
+        if (best && best.replies > 1000) break;
     }
-    // 第一页就找到且回复数过千,不用再往下翻 —— 再翻只是多花请求。
-    if (best && best.replies > 1000) break;
-  }
   return { ok: true, tid: best?.tid ?? null, title: best?.title ?? null, replies: best?.replies ?? 0, error: null, reason: 'ok' };
 }

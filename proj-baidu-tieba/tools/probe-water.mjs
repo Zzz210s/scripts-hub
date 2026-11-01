@@ -17,7 +17,9 @@ const CLIENT_UA = 'bdtb for Android 12.0.0';
 const SALT = 'tiebaclient!!!';
 
 // 水楼标题里常见的关键词。宁可漏也不能错:发错帖子比不发更糟。
-const WATER_TITLE = /(水楼|水经验|经验\+?3|\+3|水贴|水帖|专用水|刷经验|经验专用|经验贴|签到水)/;
+const WATER_TITLE = /(水楼|水经验|水贴|水帖|刷经验|经验贴|经验楼|打卡水|专用水|灌水)/;
+// 纯符号标题("+3。。。")算水楼;带 "+3" 的正常帖不算(2026-11-01 实测踩过)。
+const WATER_ONLY_SYMBOLS = /^[+＋3\s。.…·~～!！?？]+$/;
 
 function sign(params) {
   const raw = Object.keys(params)
@@ -134,7 +136,7 @@ for (const kw of forums) {
   console.log(`\n=== ${kw}`);
   const threads = await listThreads(kw, 3);
   const top = threads.filter((t) => t.isTop);
-  const named = threads.filter((t) => WATER_TITLE.test(t.title));
+  const named = threads.filter((t) => WATER_TITLE.test(t.title) || WATER_ONLY_SYMBOLS.test(t.title));
   console.log(`  列表 ${threads.length} 条 · 置顶 ${top.length} 条 · 标题像水楼 ${named.length} 条`);
   for (const t of top.slice(0, 6)) console.log(`    [置顶] ${t.replyNum} 回复 · ${t.title.slice(0, 40)} · tid=${t.tid}`);
   for (const t of named.slice(0, 8)) console.log(`    [像水楼 p${t.page}] ${t.replyNum} 回复 · ${t.title.slice(0, 40)} · tid=${t.tid}`);
