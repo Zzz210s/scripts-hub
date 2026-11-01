@@ -104,48 +104,29 @@ stop_readers() {
         docker stop -t 30 $ids >/dev/null 2>&1 || true
     done
 }
-# 启动一次容器,带看门狗;直接调 docker compose,不经各程序的 run.sh。
+# 启动一次。实际执行交给各程序自己的 run.sh:日志轮转、尝试计数、企业微信汇总、
+# 崩溃兜底都在那里,绕过去就等于「跑是跑了,但没有任何消息」—— 2026-11-01 微软积分就是这样。
 run_container() {
     local minutes="${P_MIN:-30}" code=0 rotate="$STATE_DIR/$P_ID.log"
-    mkdir -p "$STATE_DIR"
-    # 每个程序一把锁:同一个程序不许两个容器并跑,否则两个进程同时写 data/ 会互相覆盖。
-    exec 8>"$SUITE_DIR/state/$P_ID.flock"
-    if ! flock -n 8; then note "$P_NAME 已有一处在跑,本跳跳过"; exec 8>&-; return 0; fi
-    : >"$rotate"
+    mkdir -p "$STATE_DIR"; : >"$rotate"
     [ "$P_KIND" = "daily" ] && stop_readers
     note "启动 $P_NAME · 看门狗 ${minutes} 分钟"
     if [ "$P_KIND" = "reader" ]; then
-        # 后台起:它一跑几小时,oneshot 会一直挂在 activating,后面的 30 分钟一跳全不触发
-        # —— 2026-11-01 整天没跑就是这么来的。
-        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
+        # 后台起:它一跑几小时,oneshot 会一直挂在 activating,后面的跳全不触发。
+        # 它自己的 run.sh 会拿 state/<id>.flock,所以下一跳自然看到「已有一处在跑」。
+        setsid nohup timeout -k 30 "${minutes}m" "$SUITE_DIR/$P_ID/run.sh" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
         bump_slot "${SLOT:-none}"
-        # 注意:fd 8 故意不关 —— flock 属于 open file description,子进程继承后锁一直
-        # 跟到阅读会话结束,下一跳才会看到「已有一处在跑」;关掉就等于放开了互斥。
         note "$P_NAME 已在后台开始,本跳立刻返回"
         return 0
     fi
-    docker compose -f "$SUITE_DIR/compose.yaml" run --rm -T "$P_SERVICE" </dev/null >>"$rotate" 2>&1 &
-    local pid=$!
-    (
-        exec </dev/null >/dev/null 2>&1; exec 8>&-; exec 9>&-
-        sleep $((minutes * 60))
-        kill -0 "$pid" 2>/dev/null || exit 0
-        echo "[WATCHDOG] ${minutes} 分钟未结束,强制停止" >>"$rotate"
-        docker ps -aq --filter "label=com.docker.compose.service=$P_SERVICE" | xargs -r docker rm -f >/dev/null 2>&1
-        kill "$pid" 2>/dev/null
-    ) &
-    local wd=$!
-    wait "$pid"; code=$?
-    pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
-    exec 8>&-
+    timeout -k 30 "${minutes}m" "$SUITE_DIR/$P_ID/run.sh" </dev/null >>"$rotate" 2>&1 9>&-
+    code=$?
     bump_slot "${SLOT:-none}"
     note "$P_NAME 退出码 $code"
-    if [ "$code" -ne 0 ] && ! grep -q "\[完成\]" "$rotate"; then
-        node "$SUITE_DIR/alert-fail.mjs" "$P_NAME" "退出码 $code" "$rotate" >>"$LOG" 2>&1 || true
-    fi
     return "$code"
 }
+
 # 计划模式只报,真跑就起容器
 launch() {
     if [ "$PLAN_ONLY" = "1" ]; then
