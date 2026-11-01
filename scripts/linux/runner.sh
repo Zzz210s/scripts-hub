@@ -6,6 +6,7 @@ set -uo pipefail
 # ─── 设置区:人改这里。一行一个程序,顺序就是执行顺序 ──────────────────────────
 #  字段依次: id | 显示名 | 服务 | daily/reader | 钟点 | 星期(1-7,空=每天) | 看门狗分钟 | 启用 | 一天几次
 #  daily 按表顺序串行跑完,次数建议 1(一天几档就写几档,写 3 会在一个窗口里连跑三遍)。
+#  reader=后台静默补时长;report=后台跑但要发消息(微信读书日报,一次跑一两小时,不能占着控制进程)。
 #  微软积分沿用 08:00/12:00/19:00 三档(用户 2026-11-01 要求恢复原设定)。钟点 "08:00" 到点后两小时内算触发,
 #  "00:00-19:59/30" 表示该区间每 30 分钟一跳都算。
 PROGRAMS=(
@@ -16,7 +17,7 @@ PROGRAMS=(
   "tieba    |百度贴吧    |tieba-run     |daily  |08:00,12:00,19:00            |     |75    |1    |1"
   "netease  |网易云      |netease-run   |daily  |08:00,12:00,19:00            |     |60    |1    |1"
   # 微信读书两行:report 只发每天一条带结果的日报;reader 在后台静默补时长(被让路停掉也不留半句话)。
-  "weread-report|微信读书日报|weread-run |daily  |19:00                        |     |120   |1    |1"
+  "weread-report|微信读书日报|weread-run |report |19:00                        |     |120   |1    |1"
   "weread   |微信读书    |weread-run    |reader |00:00-19:59/30,23:00-23:59/30|     |720   |1    |12"
 )
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
@@ -113,13 +114,16 @@ run_container() {
     mkdir -p "$STATE_DIR"; : >"$rotate"
     [ "$P_KIND" = "daily" ] && stop_readers
     note "启动 $P_NAME · 看门狗 ${minutes} 分钟"
-    if [ "$P_KIND" = "reader" ]; then
+    if [ "$P_KIND" = "reader" ] || [ "$P_KIND" = "report" ]; then
         # 后台补时长:静默(不发开始/结果),否则一被让路停掉就剩半句话 —— 2026-11-01 收了四条
         # 「开始自动阅读」没有一条结果。锁用 reader 自己的那份,名字与 weread/run.sh 相同,
         # 保证日报那次与补时长那次不会同时读。
         exec 7>"$SUITE_DIR/state/$dir.flock"
         if ! flock -n 7; then note "$P_NAME 已有一处在跑,本跳跳过"; exec 7>&-; return 0; fi
-        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T -e QUIET_NOTICES=1 "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
+        # reader 静默(被让路停掉也不留半句话);report 照常发消息
+        local quiet=""
+        [ "$P_KIND" = "reader" ] && quiet="-e QUIET_NOTICES=1"
+        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T $quiet "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
         bump_slot "${SLOT:-none}"
         note "$P_NAME 已在后台开始,本跳立刻返回"
