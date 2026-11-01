@@ -14,7 +14,8 @@ PROGRAMS=(
   "bilibili |B站任务     |bilibili-run  |daily  |08:00,12:00,19:00            |     |120   |1    |1"
   "tieba    |百度贴吧    |tieba-run     |daily  |08:00,12:00,19:00            |     |75    |1    |1"
   "netease  |网易云      |netease-run   |daily  |08:00,12:00,19:00            |     |60    |1    |1"
-  # 微信读书:时长要一直插空读到缺口补完(daily 都在忙时它让路),20:00-23:00 安静时段不读。
+  # 微信读书两行:report 只发每天一条带结果的日报;reader 在后台静默补时长(被让路停掉也不留半句话)。
+  "weread-report|微信读书日报|weread-run |daily  |19:00                        |     |120   |1    |1"
   "weread   |微信读书    |weread-run    |reader |00:00-19:59/30,23:00-23:59/30|     |720   |1    |12"
 )
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
@@ -107,20 +108,23 @@ stop_readers() {
 # 启动一次。实际执行交给各程序自己的 run.sh:日志轮转、尝试计数、企业微信汇总、
 # 崩溃兜底都在那里,绕过去就等于「跑是跑了,但没有任何消息」—— 2026-11-01 微软积分就是这样。
 run_container() {
-    local minutes="${P_MIN:-30}" code=0 rotate="$STATE_DIR/$P_ID.log"
+    local minutes="${P_MIN:-30}" code=0 rotate="$STATE_DIR/$P_ID.log" dir="${P_SERVICE%-run}"
     mkdir -p "$STATE_DIR"; : >"$rotate"
     [ "$P_KIND" = "daily" ] && stop_readers
     note "启动 $P_NAME · 看门狗 ${minutes} 分钟"
     if [ "$P_KIND" = "reader" ]; then
-        # 后台起:它一跑几小时,oneshot 会一直挂在 activating,后面的跳全不触发。
-        # 它自己的 run.sh 会拿 state/<id>.flock,所以下一跳自然看到「已有一处在跑」。
-        setsid nohup timeout -k 30 "${minutes}m" "$SUITE_DIR/$P_ID/run.sh" </dev/null >>"$rotate" 2>&1 9>&- &
+        # 后台补时长:静默(不发开始/结果),否则一被让路停掉就剩半句话 —— 2026-11-01 收了四条
+        # 「开始自动阅读」没有一条结果。锁用 reader 自己的那份,名字与 weread/run.sh 相同,
+        # 保证日报那次与补时长那次不会同时读。
+        exec 7>"$SUITE_DIR/state/$dir.flock"
+        if ! flock -n 7; then note "$P_NAME 已有一处在跑,本跳跳过"; exec 7>&-; return 0; fi
+        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T -e QUIET_NOTICES=1 "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
         bump_slot "${SLOT:-none}"
         note "$P_NAME 已在后台开始,本跳立刻返回"
         return 0
     fi
-    timeout -k 30 "${minutes}m" "$SUITE_DIR/$P_ID/run.sh" </dev/null >>"$rotate" 2>&1 9>&-
+    timeout -k 30 "${minutes}m" "$SUITE_DIR/$dir/run.sh" </dev/null >>"$rotate" 2>&1 9>&-
     code=$?
     bump_slot "${SLOT:-none}"
     note "$P_NAME 退出码 $code"

@@ -7,6 +7,8 @@ import { sendWecom } from './notify.js'
 
 /** 运行前一条:只说哪个程序开始跑;不再预览挑战与余额,省掉一次联网取数。 */
 export async function sendStartNotice({ cwd, config, date, accountName, dryRun, send = sendWecom }) {
+    // 静默模式:后台补时长的会话不发「开始」—— 它可能几分钟后就被让路停掉,发了就是半句话。
+    if (config.quiet === true) return { ok: true, skipped: true, silent: true }
     const text = buildStartMessage({ date, accountName })
     return send(text, { webhookFile: path.join(cwd, config.webhookFile), dryRun })
 }

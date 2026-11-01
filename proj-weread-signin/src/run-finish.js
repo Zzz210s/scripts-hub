@@ -42,7 +42,9 @@ export async function finishRun(ctx) {
         : plan
     const welfareLine = welfareForReport(welfare, { dataDir: path.join(cwd, 'data'), date: localDay(now) })
     const report = buildReport({ plan: refreshedPlan, run, config, date: localDay(now), accountName, welfare: welfareLine, weekly: weeklyForReport(weekly, { dataDir: path.join(cwd, 'data'), date: localDay(now) }), weeklyStatus: weeklyRecord(weekly), challenge, balance, memberCard })
-    const push = await sendWecom(report, { webhookFile: path.join(cwd, config.webhookFile), dryRun })
+    const push = config.quiet === true
+        ? { ok: true, skipped: true }
+        : await sendWecom(report, { webhookFile: path.join(cwd, config.webhookFile), dryRun })
 
     // 循环结束后用最终官方进度补记一次 minutes/done(不再累加 attempts —— 每个会话已经计过)
     const state = recordMinutes(stateIn, { minutes: after, targetMinutes: planNow.targetMinutes })

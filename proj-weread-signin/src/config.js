@@ -21,6 +21,9 @@ export const DEFAULTS = {
     marginMinutes: 30,
     // 口径:时长目标 = 全部缺口,不按天分摊(见 plan.js 的 readUntilDone)
     readUntilDone: true,
+    // 静默模式:后台补时长的会话不推送任何消息(只落日志与历史)。
+    // 2026-11-01 收到四条「开始自动阅读」却一条结果都没有 —— 那些会话是被让路停掉的。
+    quiet: false,
     // 两个会话之间的间隔:给别的程序让路,也让阅读节奏不像机器
     sessionGapMinutes: 5,
     // 每日上限:用户要求「有空就把总缺口补满」,所以放宽到 10 小时,由窗口(安静时段/关机)兜底。
@@ -79,6 +82,7 @@ export function loadConfig(envPath = '.env') {
         marginMinutes: toInt(env.CHALLENGE_MARGIN_MINUTES, DEFAULTS.marginMinutes),
         // 只有显式写 0 才回到「按天分摊」
         readUntilDone: String(env.READ_UNTIL_DONE ?? '1') !== '0',
+        quiet: String(env.QUIET_NOTICES ?? '0') === '1',
         sessionGapMinutes: toInt(env.SESSION_GAP_MINUTES, DEFAULTS.sessionGapMinutes),
         dailyCapMinutes: toInt(env.DAILY_CAP_MINUTES, DEFAULTS.dailyCapMinutes),
         sectionMinutes: toInt(env.SECTION_MINUTES, DEFAULTS.sectionMinutes),

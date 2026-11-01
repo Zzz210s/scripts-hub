@@ -166,3 +166,26 @@ test('until-done:缺口没清零时,窗口关闭也不把当天记成已完成',
     assert.ok(state.todayMinutes > 0)
     assert.equal(state.done, false)
 })
+
+// 2026-11-01:后台补时长的会话被让路停掉时,「开始」已经发了、「结果」永远没有。
+// 静默模式就是为它加的:这类会话不推送任何消息,只落日志与历史。
+test('静默模式:一条消息都不推,但照常读、照常落状态', async () => {
+    const sent = []
+    const cwd = fixture({ QUIET_NOTICES: '1', MAX_SESSIONS_PER_RUN: '1' })
+    const result = await runOnce({
+        cwd,
+        now: NOW,
+        deps: {
+            ensureCredential: async () => CREDENTIAL,
+            runBot: async () => BOT_OK,
+            readStatsWithRetry: async () => stats(600),
+            readChallengeOnly: async () => ({ ok: false, list: [] }),
+            sendWecom: async text => { sent.push(text); return { ok: true } },
+            collectRewards: async () => ({ reader: null, weekly: null, challenge: null, balance: null, memberCard: null })
+        }
+    })
+    assert.ok(result.sessions >= 1)
+    assert.deepEqual(sent, [])
+    const state = JSON.parse(fs.readFileSync(path.join(cwd, 'data', 'state.json'), 'utf8'))
+    assert.ok(state.todayMinutes > 0)
+})
