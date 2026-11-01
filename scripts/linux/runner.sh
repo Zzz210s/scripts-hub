@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 # 唯一的启动控制:所有程序容器都从这里起。改这一个文件就够了。
 #   runner.sh | runner.sh --plan | runner.sh <id>
-# systemd 每 30 分钟调一次(automation-runner.timer),每一跳自己决定跑谁:
-# 每日任务先跑(串行),都跑不了再补读时长。
+# systemd 每 30 分钟调一次(automation-runner.timer):每日任务先跑(串行),都跑不了再补读时长。
 set -uo pipefail
 # ─── 设置区:人改这里。一行一个程序,顺序就是执行顺序 ──────────────────────────
 #  字段依次: id | 显示名 | 服务 | daily/reader | 钟点 | 星期(1-7,空=每天) | 看门狗分钟 | 启用 | 一天几次
-#  daily 按表顺序串行跑完;reader 只在 daily 都闲时跑。钟点 "08:00" 到点后两小时内算触发,
+#  daily 按表顺序串行跑完,次数建议 1:一天三档(08/12/19)各一次,写 3 会在一个窗口里连跑三遍;钟点 "08:00" 到点后两小时内算触发,
 #  "00:00-19:59/30" 表示该区间每 30 分钟一跳都算。
 PROGRAMS=(
 # id        显示名       服务           类别    钟点                          星期  看门狗  启用  次数
-  "rewards  |微软积分    |rewards-run   |daily  |08:00,12:00,19:00            |     |150   |1    |3"
-  "epic     |Epic 限免   |epic-run      |daily  |08:00,12:00,19:00            |5    |40    |1    |3"
-  "bilibili |B站任务     |bilibili-run  |daily  |08:00,12:00,19:00            |     |120   |1    |3"
-  "tieba    |百度贴吧    |tieba-run     |daily  |08:00,12:00,19:00            |     |75    |1    |3"
-  "netease  |网易云      |netease-run   |daily  |08:00,12:00,19:00            |     |60    |1    |3"
+  "rewards  |微软积分    |rewards-run   |daily  |08:00,12:00,19:00            |     |150   |1    |1"
+  "epic     |Epic 限免   |epic-run      |daily  |08:00,12:00,19:00            |5    |40    |1    |1"
+  "bilibili |B站任务     |bilibili-run  |daily  |08:00,12:00,19:00            |     |120   |1    |1"
+  "tieba    |百度贴吧    |tieba-run     |daily  |08:00,12:00,19:00            |     |75    |1    |1"
+  "netease  |网易云      |netease-run   |daily  |08:00,12:00,19:00            |     |60    |1    |1"
   # 微信读书:时长要一直插空读到缺口补完(daily 都在忙时它让路),20:00-23:00 安静时段不读。
   "weread   |微信读书    |weread-run    |reader |00:00-19:59/30,23:00-23:59/30|     |720   |1    |12"
 )
@@ -36,35 +35,36 @@ day_ok() {
     [ -z "$P_DAYS" ] && return 0
     case ",$P_DAYS," in *",$(date +%u),"*) return 0 ;; *) return 1 ;; esac
 }
-# 当前是否落在某个触发窗口内
-time_ok() {
-    local now=$((10#$(date +%H) * 60 + 10#$(date +%M)))
-    local part start end step hh base
+# 当前命中的钟点(空=不在窗口):固定钟点看 2 小时窗口,区间写法看步长。
+slot_of() {
+    local now=$((10#$(date +%H) * 60 + 10#$(date +%M))) part start end step hh base
     IFS=',' read -ra parts <<<"$P_TIMES"
     for part in "${parts[@]}"; do
-        if [[ "$part" == *-* ]]; then                     # 区间/步长:05:00-19:30/30
+        if [[ "$part" == *-* ]]; then
             start=${part%%-*}; end=${part#*-}; step=30
             [[ "$end" == */* ]] && { step=${end#*/}; end=${end%%/*}; }
             hh=$((10#${start%%:*} * 60 + 10#${start#*:}))
             end=$((10#${end%%:*} * 60 + 10#${end#*:}))
             (( now < hh || now > end )) && continue
-            (( (now - hh) % step < 3 )) && return 0   # 容差 3 分钟:systemd 可能落在 :00:01
-        else                                               # 固定钟点:08:00 —— 到点后两小时内都算
+            (( (now - hh) % step < 3 )) && { echo "$part"; return 0; }
+        else
             base=$((10#${part%%:*} * 60 + 10#${part#*:}))
-            (( now >= base && now <= base + 120 )) && return 0
+            (( now >= base && now <= base + 120 )) && { echo "$part"; return 0; }
         fi
     done
     return 1
 }
+
 # 今天这个程序已经跑了几次(次数存在 state/runner/<id>.<日期>)
-runs_today() {
-    local f; f="$STATE_DIR/$P_ID.$(date +%F)"
+# 计数按「程序·日期·钟点」:同一个 08:00 档只跑一次,12:00 / 19:00 各再来一次。
+# 只按日期计会在 08:00-10:00 这个窗口里连跑三遍(2026-11-01 实测)。
+slot_file() { echo "$STATE_DIR/$P_ID.$(date +%F).${1:-none}"; }
+slot_runs() {
+    local f; f=$(slot_file "$1")
     if [ -f "$f" ]; then cat "$f"; else echo 0; fi
 }
-bump_today() {
-    local f; f="$STATE_DIR/$P_ID.$(date +%F)"
-    echo $(( $(runs_today) + 1 )) >"$f"
-}
+ran_today() { local f; f=$(slot_file none); [ -f "$f" ] && return 0; ls "$STATE_DIR/$P_ID.$(date +%F)."* >/dev/null 2>&1; }
+bump_slot() { local f; f=$(slot_file "$1"); echo $(( $(slot_runs "$1") + 1 )) >"$f"; }
 # 当天第一个钟点是否已过(补跑用:错过窗口也要跑一次,免得一整天白过)
 first_point_passed() {
     local now=$((10#$(date +%H) * 60 + 10#$(date +%M))) part base first=9999
@@ -81,14 +81,16 @@ first_point_passed() {
 should_run() {
     [ "$P_ON" = "1" ] || { note "跳过 $P_NAME:已停用"; return 1; }
     day_ok || { note "跳过 $P_NAME:今天不是运行日"; return 1; }
-    local used; used=$(runs_today)
-    [ "$used" -lt "${P_MAX:-3}" ] || { note "跳过 $P_NAME:今天已跑 $used 次"; return 1; }
-    if [ "$used" -eq 0 ]; then
+    if ! ran_today; then                       # 今天一次都没跑:过了第一个钟点就补跑
         first_point_passed || return 1
         note "$P_NAME 今天还没跑过,补跑"
+        SLOT=补跑
         return 0
     fi
-    time_ok
+    SLOT=$(slot_of) || return 1                # 其余情况只在窗口里跑
+    local used; used=$(slot_runs "$SLOT")
+    [ "$used" -lt "${P_MAX:-1}" ] || { note "跳过 $P_NAME:$SLOT 这一档已跑过"; return 1; }
+    return 0
 }
 # 让路:每日任务要跑时,把还在读的 reader 容器停掉(阅读进度按分钟落库,下一跳接着读)。
 stop_readers() {
@@ -115,10 +117,11 @@ run_container() {
     if [ "$P_KIND" = "reader" ]; then
         # 后台起:它一跑几小时,oneshot 会一直挂在 activating,后面的 30 分钟一跳全不触发
         # —— 2026-11-01 整天没跑就是这么来的。
-        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T "$P_SERVICE" </dev/null >>"$rotate" 2>&1 8>&- 9>&- &
+        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
-        bump_today
-        exec 8>&-
+        bump_slot "${SLOT:-none}"
+        # 注意:fd 8 故意不关 —— flock 属于 open file description,子进程继承后锁一直
+        # 跟到阅读会话结束,下一跳才会看到「已有一处在跑」;关掉就等于放开了互斥。
         note "$P_NAME 已在后台开始,本跳立刻返回"
         return 0
     fi
@@ -136,7 +139,7 @@ run_container() {
     wait "$pid"; code=$?
     pkill -P "$wd" 2>/dev/null; kill "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
     exec 8>&-
-    bump_today
+    bump_slot "${SLOT:-none}"
     note "$P_NAME 退出码 $code"
     if [ "$code" -ne 0 ] && ! grep -q "\[完成\]" "$rotate"; then
         node "$SUITE_DIR/alert-fail.mjs" "$P_NAME" "退出码 $code" "$rotate" >>"$LOG" 2>&1 || true
@@ -146,7 +149,7 @@ run_container() {
 # 计划模式只报,真跑就起容器
 launch() {
     if [ "$PLAN_ONLY" = "1" ]; then
-        note "计划:启动 $P_NAME · 今天已跑 $(runs_today) 次 / 上限 ${P_MAX}"
+        note "计划:启动 $P_NAME · 档位 ${SLOT:-补跑}"
     else
         run_container
     fi
