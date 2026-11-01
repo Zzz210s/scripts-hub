@@ -108,16 +108,27 @@ for marker in "flow failed for" "[ACCOUNT-ERROR]" "fatal error:" "[CLUSTER-WORKE
 done
 [ "$DONE" -eq 0 ] && FAIL=1
 
+# 本次到底赚了多少分(RUN-END 那行的 pointsGained 是权威值)
+GAINED=$(grep -oE "RUN-END\].*pointsGained=[0-9]+" "$LOG" 2>/dev/null | tail -1 | grep -oE "[0-9]+$" || true)
+GAINED="${GAINED:-0}"
+
 if [ "$FAIL" -eq 0 ]; then
-    printf '%s 9\n' "$TODAY" > "$STATE"
-    flog "=== run finished OK, exit code $CODE ==="
+    # 成功**不再**把当天关掉(以前写 9)。积分的「一天」按太平洋零点换,换成北京是 15-16 点:
+    # 上午那次收的是前一天的尾巴,真正的新一天要等晚上那档。写 9 会把 19:00 挡掉,
+    # 新一天的配额就没人领 —— 2026-11-01 一天只 +438 就是这么来的。
+    flog "=== run finished OK, exit code $CODE (本次 +${GAINED} 分) ==="
 else
     flog "=== run finished with FAILURES, exit code $CODE ==="
     [ "$CODE" -eq 0 ] && CODE=1
 fi
 
 # ---- 结束通知(解析本次日志;通知失败不影响退出码) ----
-node "$ROOT/wechat-bridge/notify-run.js" "$LOG" >> "$LOG" 2>&1
+# 同一天里第二次跑却一分没进,推给用户只是噪音(原因栏也只会写"已领完")。只记日志。
+if [ "$GAINED" = "0" ] && [ "${RUNS:-0}" -gt 1 ]; then
+    flog "本次 +0 分(同一天已领完),不推送"
+else
+    node "$ROOT/wechat-bridge/notify-run.js" "$LOG" >> "$LOG" 2>&1
+fi
 
 # 崩在发消息之前 = 企业微信里什么都没有,人只能靠"今天没消息"猜。补一条兜底提醒。
 # 判据:退出码非 0,且日志里既没有"企业微信"(程序试过发送)也没有 "[完成]"
