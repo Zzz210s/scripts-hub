@@ -6,7 +6,7 @@ set -uo pipefail
 # ─── 设置区:人改这里。一行一个程序,顺序就是执行顺序 ──────────────────────────
 #  字段依次: id | 显示名 | 服务 | daily/reader | 钟点 | 星期(1-7,空=每天) | 看门狗分钟 | 启用 | 一天几次
 #  daily 按表顺序串行跑完,次数建议 1(一天几档就写几档,写 3 会在一个窗口里连跑三遍)。
-#  reader=后台静默补时长;report=后台跑但要发消息(微信读书日报,一次跑一两小时,不能占着控制进程)。
+#  daily=前台串行;auto=后台跑且一天只发一条消息(微信读书);reader/report=后台静默 / 后台全发。
 #  微软积分沿用 08:00/12:00/19:00 三档(用户 2026-11-01 要求恢复原设定)。钟点 "08:00" 到点后两小时内算触发,
 #  "00:00-19:59/30" 表示该区间每 30 分钟一跳都算。
 PROGRAMS=(
@@ -16,9 +16,8 @@ PROGRAMS=(
   "bilibili |B站任务     |bilibili-run  |daily  |08:00,12:00,19:00            |     |120   |1    |1"
   "tieba    |百度贴吧    |tieba-run     |daily  |08:00,12:00,19:00            |     |75    |1    |1"
   "netease  |网易云      |netease-run   |daily  |08:00,12:00,19:00            |     |60    |1    |1"
-  # 微信读书两行:report 只发每天一条带结果的日报;reader 在后台静默补时长(被让路停掉也不留半句话)。
-  "weread-report|微信读书日报|weread-run |report |19:00                        |     |120   |1    |1"
-  "weread   |微信读书    |weread-run    |reader |00:00-19:59/30,23:00-23:59/30|     |720   |1    |12"
+  # 微信读书:后台插空读到达标,一天只发一条「开始」,结果只在达标或失败时发。
+  "weread   |微信读书    |weread-run    |auto   |00:00-19:59/30,23:00-23:59/30|     |720   |1    |12"
 )
 SUITE_DIR="${SUITE_DIR:-/srv/apps/automation}"
 STATE_DIR="$SUITE_DIR/state/runner"
@@ -49,7 +48,8 @@ slot_of() {
             hh=$((10#${start%%:*} * 60 + 10#${start#*:}))
             end=$((10#${end%%:*} * 60 + 10#${end#*:}))
             (( now < hh || now > end )) && continue
-            (( (now - hh) % step < 3 )) && { echo "$part"; return 0; }
+            # 区间写法每个 tick 都算独立一档:同一档只能跑一次会把它锁死在当天第一次。
+            (( (now - hh) % step < 3 )) && { echo "$part@$now"; return 0; }
         else
             base=$((10#${part%%:*} * 60 + 10#${part#*:}))
             (( now >= base && now <= base + 120 )) && { echo "$part"; return 0; }
@@ -61,7 +61,8 @@ slot_of() {
 # 今天这个程序已经跑了几次(次数存在 state/runner/<id>.<日期>)
 # 计数按「程序·日期·钟点」:同一个 08:00 档只跑一次,12:00 / 19:00 各再来一次。
 # 只按日期计会在 08:00-10:00 这个窗口里连跑三遍(2026-11-01 实测)。
-slot_file() { echo "$STATE_DIR/$P_ID.$(date +%F).${1:-none}"; }
+# 档位键里可能有 / 与 @(区间写法),落盘时换掉,否则建不出文件。
+slot_file() { echo "$STATE_DIR/$P_ID.$(date +%F).$(printf '%s' "${1:-none}" | tr '/@:' '---')"; }
 slot_runs() {
     local f; f=$(slot_file "$1")
     if [ -f "$f" ]; then cat "$f"; else echo 0; fi
@@ -84,7 +85,7 @@ first_point_passed() {
 should_run() {
     [ "$P_ON" = "1" ] || { note "跳过 $P_NAME:已停用"; return 1; }
     day_ok || { note "跳过 $P_NAME:今天不是运行日"; return 1; }
-    if ! ran_today; then                       # 今天一次都没跑:过了第一个钟点就补跑
+    if [ "$P_KIND" = "daily" ] && ! ran_today; then   # 每日任务今天一次都没跑:过了第一个钟点就补跑
         first_point_passed || return 1
         note "$P_NAME 今天还没跑过,补跑"
         # 落在哪一档就记哪一档:否则「补跑」会额外占掉一次,一天变成四跑。
@@ -115,14 +116,15 @@ run_container() {
     mkdir -p "$STATE_DIR"; : >"$rotate"
     [ "$P_KIND" = "daily" ] && stop_readers
     note "启动 $P_NAME · 看门狗 ${minutes} 分钟"
-    if [ "$P_KIND" = "reader" ] || [ "$P_KIND" = "report" ]; then
+    if [ "$P_KIND" != "daily" ]; then
         # 后台补时长:静默(不发开始/结果),否则一被让路停掉就剩半句话 —— 2026-11-01 收了四条
         # 「开始自动阅读」没有一条结果。锁用 reader 自己的那份,名字与 weread/run.sh 相同,
         # 保证日报那次与补时长那次不会同时读。
         exec 7>"$SUITE_DIR/state/$dir.flock"
         if ! flock -n 7; then note "$P_NAME 已有一处在跑,本跳跳过"; exec 7>&-; return 0; fi
-        # reader 静默(被让路停掉也不留半句话);report 照常发消息
+        # auto:一天一条开始、达标或失败才发结果;reader:全静默;report:全发
         local quiet=""
+        [ "$P_KIND" = "auto" ] && quiet="-e QUIET_NOTICES=daily"
         [ "$P_KIND" = "reader" ] && quiet="-e QUIET_NOTICES=1"
         setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T $quiet "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
@@ -182,7 +184,7 @@ if [ "$DID" = "0" ]; then
     for row in "${PROGRAMS[@]}"; do
         [ -z "$(trim "$row")" ] && continue
         parse_row "$row"
-        [ "$P_KIND" = "reader" ] || continue
+        [ "$P_KIND" = "daily" ] && continue
         should_run || continue
         launch; DID=1; break
     done

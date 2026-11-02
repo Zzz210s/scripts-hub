@@ -42,7 +42,9 @@ export async function finishRun(ctx) {
         : plan
     const welfareLine = welfareForReport(welfare, { dataDir: path.join(cwd, 'data'), date: localDay(now) })
     const report = buildReport({ plan: refreshedPlan, run, config, date: localDay(now), accountName, welfare: welfareLine, weekly: weeklyForReport(weekly, { dataDir: path.join(cwd, 'data'), date: localDay(now) }), weeklyStatus: weeklyRecord(weekly), challenge, balance, memberCard })
-    const push = config.quiet === true
+    // daily 模式下,中间那几轮读了几十分钟的会话不再各发一条结果 —— 达标或失败才推。
+    const settled = (refreshedPlan?.deficitMinutes ?? 1) <= 0 || run.ok !== true
+    const push = config.quiet === 'all' || (config.quiet === 'daily' && !settled)
         ? { ok: true, skipped: true }
         : await sendWecom(report, { webhookFile: path.join(cwd, config.webhookFile), dryRun })
 

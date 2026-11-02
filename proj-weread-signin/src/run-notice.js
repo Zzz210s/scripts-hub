@@ -6,9 +6,13 @@ import { buildSkipMessage, buildStartMessage, isSilentSkip, shouldNotifyOnce } f
 import { sendWecom } from './notify.js'
 
 /** 运行前一条:只说哪个程序开始跑;不再预览挑战与余额,省掉一次联网取数。 */
-export async function sendStartNotice({ cwd, config, date, accountName, dryRun, send = sendWecom }) {
-    // 静默模式:后台补时长的会话不发「开始」—— 它可能几分钟后就被让路停掉,发了就是半句话。
-    if (config.quiet === true) return { ok: true, skipped: true, silent: true }
+export async function sendStartNotice({ cwd, config, date, accountName, dryRun, send = sendWecom, notifyOnce = shouldNotifyOnce }) {
+    // all:后台静默会话,一条都不发(它随时会被让路停掉,发了就是半句话)
+    if (config.quiet === 'all') return { ok: true, skipped: true, silent: true }
+    // daily:一天只发第一条「开始」,后面几轮静默
+    if (config.quiet === 'daily' && !dryRun && !notifyOnce(path.join(cwd, 'data'), 'start', date)) {
+        return { ok: true, skipped: true, silent: true }
+    }
     const text = buildStartMessage({ date, accountName })
     return send(text, { webhookFile: path.join(cwd, config.webhookFile), dryRun })
 }

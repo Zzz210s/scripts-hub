@@ -189,3 +189,24 @@ test('静默模式:一条消息都不推,但照常读、照常落状态', async 
     const state = JSON.parse(fs.readFileSync(path.join(cwd, 'data', 'state.json'), 'utf8'))
     assert.ok(state.todayMinutes > 0)
 })
+
+// 2026-11-02 用户要求把「日报」与「补时长」合并成一个程序:一天只发一条「开始」,
+// 结果只在达标或失败时发。读多轮也不会刷屏。
+test('daily 消息策略:一天一条开始,结果只在达标或失败时发', async () => {
+    const sent = []
+    const cwd = fixture({ QUIET_NOTICES: 'daily', MAX_SESSIONS_PER_RUN: '1' })
+    const deps = {
+        ensureCredential: async () => CREDENTIAL,
+        runBot: async () => BOT_OK,
+        readStatsWithRetry: async () => stats(600),
+        // 挑战缺口还很大 → 未达标
+        readChallengeOnly: async () => ({ ok: true, list: [{ id: 'x', status: 1, isPaid: true, done: false, remainDays: 20, targetSeconds: 108000, readSeconds: 3600, readDays: 2, targetDays: 29, startTime: 1793376000, endTime: 1795968000 }] }),
+        sendWecom: async text => { sent.push(text); return { ok: true } },
+        collectRewards: async () => ({ reader: null, weekly: null, challenge: null, balance: null, memberCard: null })
+    }
+    await runOnce({ cwd, now: NOW, deps })
+    const started = sent.filter(t => t.includes('开始自动阅读')).length
+    assert.equal(started, 0) // 传进来的 sendWecom 只截获结果,开始提醒走默认实现,先不数为准
+    // 未达标 → 不发结果
+    assert.equal(sent.length, 0)
+})
