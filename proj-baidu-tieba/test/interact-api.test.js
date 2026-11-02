@@ -129,8 +129,8 @@ test('翻页按实际返回条数推进:少给的那段不会被跳过', async (
         const body = pages[seen.length - 1] ?? { list: [] }
         return { status: 200, ok: true, text: async () => JSON.stringify({ error_code: 0, thread_list: body.list }), headers: { get: () => 'application/json' } }
     }
-    const { findWaterThread } = await import('../src/interact-api.js')
-    const result = await findWaterThread({ kw: '网文', pages: 3, cookie: 'BDUSS=x', deps: { fetchImpl } })
-    assert.equal(result.tid, '9205922382')
-    assert.deepEqual(seen, [0, 15]) // 第二次从 15 开始,而不是 30
+    const { findWaterThreads } = await import('../src/interact-api.js')
+    const result = await findWaterThreads({ kw: '网文', pages: 3, cookie: 'BDUSS=x', deps: { fetchImpl } })
+    assert.equal(result.threads[0].tid, '9205922382')
+    assert.deepEqual(seen, [0, 15, 26]) // 每次按实际条数推进:15 → 26,不是 30
 })

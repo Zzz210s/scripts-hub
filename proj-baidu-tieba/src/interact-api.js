@@ -133,8 +133,8 @@ export function isWaterTitle(title) {
  * 只能靠自己翻帖子列表:真机实测 2026-10-30,web 站内搜索直接回 403 百度安全验证,
  * 客户端两个搜索端点都回 200 空体 —— 搜索这条路走不通,翻页是唯一可行且无害的手段。
  */
-export async function findWaterThread({ kw, pages = 3, pageSize = 30, cookie, deps } = {}) {
-    let best = null;
+export async function findWaterThreads({ kw, pages = 3, pageSize = 30, cookie, deps } = {}) {
+    const seen = new Map();
     let offset = 0;
     for (let page = 0; page < Math.max(1, pages); page++) {
         const params = {
@@ -150,22 +150,23 @@ export async function findWaterThread({ kw, pages = 3, pageSize = 30, cookie, de
             deps,
             headers: { 'User-Agent': CLIENT_UA }
         });
-        if (!res.ok) return { ok: false, tid: null, title: null, error: res.error, reason: res.reason };
+        if (!res.ok) return { ok: false, threads: [], error: res.error, reason: res.reason };
         const list = res.data?.thread_list;
-        if (!Array.isArray(list)) return { ok: false, tid: null, title: null, error: '响应里没有 thread_list', reason: 'parse' };
+        if (!Array.isArray(list)) return { ok: false, threads: [], error: '响应里没有 thread_list', reason: 'parse' };
         for (const item of list) {
             const title = String(item?.title ?? '');
             const tid = String(item?.id ?? item?.tid ?? '');
             if (!isWaterTitle(title) || !/^\d{6,}$/.test(tid)) continue;
-            // 命中多个时取回复数最多的那个:老水楼比新建的更稳,不容易被删。
             const replies = Number(item?.reply_num) || 0;
-            if (!best || replies > best.replies) best = { tid, title, replies };
+            // 同一个帖子会在多页里重复出现,按 tid 去重,回复数取最大。
+            if (!seen.has(tid) || replies > seen.get(tid).replies) seen.set(tid, { tid, title, replies });
         }
         // 翻页按**实际返回条数**推进:接口会少给(实测 rn=30 只回 11~15 条),
         // 按 rn 推进会跳过中间那段,水楼就藏在那里面(2026-11-01 网文吧就是这个原因没找到)。
         offset += list.length;
         if (list.length === 0) break;
-        if (best && best.replies > 1000) break;
     }
-  return { ok: true, tid: best?.tid ?? null, title: best?.title ?? null, replies: best?.replies ?? 0, error: null, reason: 'ok' };
+    // 按回复数降序:老水楼比新建的更稳,不容易被删。
+    const threads = [...seen.values()].sort((a, b) => b.replies - a.replies);
+    return { ok: true, threads, error: null, reason: 'ok' };
 }

@@ -46,10 +46,14 @@ test('整轮计划给出总量,并跳过没有吧名的条目', () => {
 function fakeApi(overrides = {}) {
     const calls = { waters: [], replies: [], likes: [] };
     const api = {
-        // 找水楼:默认每个吧都有一个,回复数过千(真实水楼的量级)
-        findWaterThread: async ({ kw }) => {
+        // 找水楼:默认每个吧有 4 个水楼,便于验证「一个贴一天只发一次」
+        findWaterThreads: async ({ kw }) => {
             calls.waters.push(kw);
-            return { ok: true, tid: `${kw}-water`, title: `${kw} 水经验专用贴`, replies: 12000, reason: 'ok' };
+            return {
+                ok: true,
+                threads: [1, 2, 3, 4].map((n) => ({ tid: `${kw}-water${n}`, title: `${kw} 水经验专用贴 ${n}`, replies: 1000 * n })),
+                reason: 'ok'
+            };
         },
         postReply: async ({ kw, tid }) => {
             calls.replies.push({ kw, tid });
@@ -81,9 +85,9 @@ test('一轮跑完:按计划发帖、每吧点一个赞,间隔等待可注入', 
     assert.equal(stats.likes, 2);
     assert.equal(stats.failures.length, 0);
     assert.equal(calls.replies.filter((one) => one.kw === 'a').length, 3);
-    // 四条都发在同一个水楼里,不再到处挑帖子
-    assert.deepEqual([...new Set(calls.replies.map((one) => one.tid))], ['a-water', 'b-water']);
-    assert.deepEqual(calls.likes, ['a-water', 'b-water']);
+    // 四条分别发到四个不同的水楼,绝不重复刷同一个贴
+    assert.equal(new Set(calls.replies.map((one) => one.tid)).size, calls.replies.length);
+    assert.equal(calls.likes.length, 2);
 });
 
 test('风控一出现就整体收手,不再发下一个吧', async () => {
@@ -141,7 +145,7 @@ test('已经点过赞算完成,不再占点赞预算', async () => {
 
 test('找水楼的请求失败就跳过这个吧,不当成发帖失败刷屏', async () => {
     const { api } = fakeApi({
-        findWaterThread: async () => ({ ok: false, tid: null, error: '超时', reason: 'network' })
+        findWaterThreads: async () => ({ ok: false, threads: [], error: '超时', reason: 'network' })
     });
     const stats = await runInteract({
         forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
@@ -297,7 +301,7 @@ test('已经点过赞算完成,不再占点赞预算', async () => {
 
 test('找水楼的请求失败就跳过这个吧,不当成发帖失败刷屏', async () => {
     const { api } = fakeApi({
-        findWaterThread: async () => ({ ok: false, tid: null, error: '超时', reason: 'network' })
+        findWaterThreads: async () => ({ ok: false, threads: [], error: '超时', reason: 'network' })
     });
     const stats = await runInteract({
         forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
@@ -390,7 +394,7 @@ test('点赞被限流不算失败:退避后继续,连续两次就停掉点赞,�
 
 test('没有水楼的吧一条都不发,只记一笔', async () => {
     const { api, calls } = fakeApi({
-        findWaterThread: async ({ kw }) => ({ ok: true, tid: null, title: null, replies: 0, reason: 'ok' })
+        findWaterThreads: async () => ({ ok: true, threads: [], reason: 'ok' })
     });
     const stats = await runInteract({
         forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
@@ -427,3 +431,35 @@ test('今天已经定位过的水楼不再重复翻列表,直接复用', async (
     assert.deepEqual(calls.waters, []); // 一次列表都没翻
     assert.equal(saved.b, undefined);
 });
+
+test('同一个水楼一天只发一次:用掉的 tid 从当天名单里摘掉,第二轮不重复', async () => {
+    const { api, calls } = fakeApi({
+        findWaterThreads: async ({ kw }) => ({
+            ok: true,
+            threads: [{ tid: `${kw}-w1`, title: `${kw} 水楼一`, replies: 900 }, { tid: `${kw}-w2`, title: `${kw} 水楼二`, replies: 100 }],
+            reason: 'ok'
+        })
+    })
+    const day = {}
+    // 第一轮:计划 4 条,但只有 2 个水楼 → 只发 2 条,各一次
+    await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs', cookie: 'BDUSS=x',
+        options: { waterToday: day, saveWater: async (kw, tids) => { day[kw] = tids } },
+        deps: { api, sleep: noSleep }
+    })
+    assert.equal(calls.replies.length, 2)
+    assert.deepEqual([...new Set(calls.replies.map(o => o.tid))].length, 2)
+    assert.equal(day.a, '')   // 两个都用掉了,今天这个吧再没有可发的贴
+
+    // 第二轮:名单空了 → 一条都不发
+    const before = calls.replies.length
+    const stats2 = await runInteract({
+        forums: [{ kw: 'a', fid: 1, level: 8, exp: 583 }],
+        tbs: 'tbs', cookie: 'BDUSS=x',
+        options: { waterToday: day, saveWater: async (kw, tids) => { day[kw] = tids } },
+        deps: { api, sleep: noSleep }
+    })
+    assert.equal(calls.replies.length, before)
+    assert.equal(stats2.noWater, 1)
+})

@@ -8,15 +8,13 @@
 // 所以每吧一次、按留痕对待,不参与经验预算。
 
 import { DEFAULTS, planForForum } from './interact-plan.js';
-import { findWaterThread, likeThread, postReply } from './interact-api.js';
+import { findWaterThreads, likeThread, postReply } from './interact-api.js';
 
-/** 这些错误说明「这个帖子没了」,换一个帖子继续就行,不该计入连续失败 —— 否则
- *  某个吧的头几个帖子恰好被删,整轮就会被误判成风控而停下(2026-10-30 就这么停过一次)。 */
+/** 「这个帖子没了」换个帖子继续,不计入连续失败 —— 否则某个吧头几个帖子恰好被删就会误判成风控。 */
 const STALE_THREAD = /(帖子不存在|帖子已被删除|已被删除|已被关闭)/;
 /** tbs 过期/被换掉时的两种文案:换一枚 tbs 重试一次,而不是把它当成账号被限。 */
 const STALE_TBS = /(TBS|tbs|用户没有权限|权限校验)/;
-/** 限流文案:点赞比回帖更容易撞上(实测连点二十来个就开始「您操作的太频繁了」)。
- *  它是「慢一点」而不是「这个号不能用」,所以退避后继续,并且不再把点赞算成失败。 */
+/** 限流:点赞更易撞上「您操作的太频繁了」。它是「慢一点」,退避后继续,不算失败。 */
 const THROTTLED = /(太频繁|操作太快|稍后再试|请求过于频繁)/;
 
 const sumExp = (forums) =>
@@ -28,12 +26,11 @@ const sumExp = (forums) =>
 /** 跑一轮互动。永不抛:失败进 `failures`,风控一出现就整体收手。`deps` 可注入 `sleep` / `api` 供测试。 */
 export async function runInteract({ forums = [], tbs, cookie, options = {}, deps = {} } = {}) {
   const opts = { ...DEFAULTS, ...options };
-  const api = deps.api ?? { findWaterThread, likeThread, postReply };
+  const api = deps.api ?? { findWaterThreads, likeThread, postReply };
   const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
-  // 一轮互动要跑三十多分钟。没有逐吧日志的话,中途卡住只能干瞪眼 —— 2026-10-30 就卡过一次。
+  // 一轮要跑三十多分钟,没有逐吧日志卡住只能干瞪眼。
   const say = typeof opts.log === 'function' ? opts.log : () => {};
-  // tbs 会失效:2026-10-30 实测,拿会话里那枚 tbs 去发帖,几分钟后整套返回
-  // 「用户没有权限 / TBS校验失败」。所以每进一个吧就换一枚新的,失败了再换一次重试。
+  // tbs 会失效:几分钟后整套返回「用户没有权限 / TBS校验失败」。每进一个吧换一枚新的。
   let tbsNow = tbs;
   const refresh = async () => {
     if (typeof opts.refreshTbs !== 'function') return false;
@@ -48,7 +45,7 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
     }
     return false;
   };
-  // 增量记账:只把「自上次提交以来」的条数交出去,避免同一个数被重复累加。
+  // 增量记账:只交「自上次提交以来」的条数,避免重复累加。
   const pending = {};
   const flush = async () => {
     if (typeof opts.onProgress !== 'function' || !Object.keys(pending).length) return;
@@ -72,12 +69,10 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
     likesThrottled: 0,
     alreadyLiked: 0,
     skipped: 0,
-    // 今天没有水楼、所以不发的吧数
-    noWater: 0,
+    noWater: 0,   // 今天没有水楼、所以不发的吧数
     unknownExp: 0,
     failures: [],
-    // 前几条失败原文:消息里只报条数,日志里要能看见到底哪一步崩的。
-    failureSamples: [],
+    failureSamples: [],   // 前几条失败原文,供日志定位
     risk: null,
     stopReason: null,
     perForum: {},
@@ -112,33 +107,35 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
       stats.stopReason = 'post-budget';
       break;
     }
-    // 单轮只处理若干个吧:剩下的留给下一次触发。一口气几百条会被判「发帖太快」。
+    // 单轮只处理若干个吧,剩下的留给下一次触发;一口气几百条会被判「发帖太快」。
     if (opts.maxForumsPerRun > 0 && forumsDone >= opts.maxForumsPerRun) {
       stats.stopReason = 'forum-budget';
       break;
     }
     say(`[互动] ${forum.kw} Lv${forum.level} exp=${forum.exp} 差 ${plan.gap} → ${plan.replies} 条`);
-    // 一律发在「水经验专门贴」里。找不到就不发 —— 需求就是宁可漏,也不去别人的正常帖子里灌水。
+    // 只发水经验贴。缓存存的是**今天还没用过的水楼 tid 列表**,用一个摘一个,
+    // 于是一个帖子一天最多被回一次 —— 用户要求不重复刷同一个贴。
     const cached = opts.waterToday?.[forum.kw];
-    let tid = typeof cached === 'string' && cached ? cached : null;
-    if (cached === undefined) {
+    let tids = cached === undefined ? null : String(cached).split(',').filter(Boolean);
+    if (tids === null) {
       await refresh();
-      const found = await api.findWaterThread({ kw: forum.kw, pages: opts.waterPages, cookie, deps });
+      const found = await api.findWaterThreads({ kw: forum.kw, pages: opts.waterPages, cookie, deps });
       if (!found.ok) {
         fail(forum.kw, `找水楼:${found.error ?? found.reason}`);
         continue;
       }
-      tid = found.tid;
-      // 空串记下「今天确认没有水楼」,省得每次触发都重翻三页列表。
-      await opts.saveWater?.(forum.kw, tid ?? '');
-      if (tid) say(`[互动] ${forum.kw} 水楼「${String(found.title).slice(0, 18)}」回复 ${found.replies} · tid=${tid}`);
+      tids = found.threads.map((one) => one.tid);
+      await opts.saveWater?.(forum.kw, tids.join(','));
+      if (tids.length) say(`[互动] ${forum.kw} 水楼 ${tids.length} 个:${found.threads.map((one) => one.title.slice(0, 12)).join(' / ')}`);
     }
-    if (!tid) {
+    if (!tids.length) {
       stats.noWater++;
       continue;
     }
+    let likedTid = '';
 
-    for (let index = 0; index < plan.replies && stats.posts < opts.maxPosts; index++) {
+    for (const tid of tids.slice(0, plan.replies)) {
+      if (stats.posts >= opts.maxPosts) break;
       const post = () =>
         api.postReply({ kw: forum.kw, fid: forum.fid, tid, content: opts.content, tbs: tbsNow, cookie, deps });
       let result = await post();
@@ -147,6 +144,10 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
         stats.posts++;
         stats.perForum[forum.kw] = (stats.perForum[forum.kw] ?? 0) + 1;
         pending[forum.kw] = (pending[forum.kw] ?? 0) + 1;
+        // 用掉就从今天的名单里摘掉:同一个贴今天不会再被发第二次。
+        tids = tids.filter((one) => one !== tid);
+        likedTid ||= tid;
+        await opts.saveWater?.(forum.kw, tids.join(','));
         if (result.risk) {
           stats.risk = result.risk;
           break;
@@ -158,20 +159,20 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
       if (opts.intervalMs > 0) await sleep(paced(opts));
     }
     if (stats.risk || stats.stopReason) break;
-    // 结算这个吧:一条都没发成算一次「坏吧」,连续 badForums 个就整体收手。
+    // 结算:一条都没发成的吧算「坏吧」,连续若干个收手。
     badForums = forumFails > 0 && (stats.perForum[forum.kw] ?? 0) === 0 ? badForums + 1 : 0;
     forumFails = 0;
     if (badForums >= opts.maxConsecutiveFailures) {
       stats.stopReason = 'too-many-failures';
       break;
     }
-    // 每个吧收尾时按批提交进度
     forumsDone++;
     if (opts.progressEvery > 0 && forumsDone % opts.progressEvery === 0) await flush();
 
-    // 点赞:每吧一个,挂在列表第一个帖子上。已经点过也算完成,不重复消耗预算。
-    if (!likeOff && stats.likes + stats.alreadyLiked < opts.maxLikes) {
-      const like = () => api.likeThread({ tid, tbs: tbsNow, cookie, deps });
+    // 点赞:每吧一个,挂在本轮第一个回过的水楼上。
+    const likeTid = likedTid || tids[0] || '';
+    if (!likeOff && likeTid && stats.likes + stats.alreadyLiked < opts.maxLikes) {
+      const like = () => api.likeThread({ tid: likeTid, tbs: tbsNow, cookie, deps });
       let liked = await like();
       if (!liked.ok && STALE_TBS.test(String(liked.error)) && (await refresh())) liked = await like();
       if (liked.ok) {
@@ -181,7 +182,7 @@ export async function runInteract({ forums = [], tbs, cookie, options = {}, deps
         stats.risk = liked.risk;
         break;
       } else if (THROTTLED.test(String(liked.error))) {
-        // 限流:这一轮剩下的点赞全部作废,回帖不受影响。
+        // 限流:本轮剩余点赞作废,回帖不受影响。
         stats.likesThrottled++;
         say(`[互动] 点赞被限流,本轮不再点赞 · ${liked.error}`);
         if (stats.likesThrottled >= opts.maxLikeThrottles) likeOff = true;
