@@ -87,7 +87,8 @@ should_run() {
     if ! ran_today; then                       # 今天一次都没跑:过了第一个钟点就补跑
         first_point_passed || return 1
         note "$P_NAME 今天还没跑过,补跑"
-        SLOT=补跑
+        # 落在哪一档就记哪一档:否则「补跑」会额外占掉一次,一天变成四跑。
+        SLOT=$(slot_of) || SLOT=补跑
         return 0
     fi
     SLOT=$(slot_of) || return 1                # 其余情况只在窗口里跑
