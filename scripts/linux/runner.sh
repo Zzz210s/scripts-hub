@@ -126,7 +126,14 @@ run_container() {
         local quiet=""
         [ "$P_KIND" = "auto" ] && quiet="-e QUIET_NOTICES=daily"
         [ "$P_KIND" = "reader" ] && quiet="-e QUIET_NOTICES=1"
-        setsid nohup timeout -k 30 "${minutes}m" docker compose -f "$SUITE_DIR/compose.yaml"             run --rm -T $quiet "$P_SERVICE" </dev/null >>"$rotate" 2>&1 9>&- &
+        # 起法落成脚本再执行:内联的 setsid … docker compose -f … 偶尔被解析成 `docker -f`。
+        local launch="$STATE_DIR/$P_ID.launch.sh"
+        {
+            echo '#!/bin/bash'
+            echo "exec timeout -k 30 ${minutes}m docker compose -f '$SUITE_DIR/compose.yaml' run --rm -T ${quiet} '$P_SERVICE'"
+        } >"$launch"
+        chmod +x "$launch"
+        setsid nohup "$launch" </dev/null >>"$rotate" 2>&1 9>&- &
         disown 2>/dev/null || true
         bump_slot "${SLOT:-none}"
         note "$P_NAME 已在后台开始,本跳立刻返回"
