@@ -11,5 +11,9 @@ WorkingDirectory=/srv/apps/automation
 EnvironmentFile=-/srv/apps/automation/suite.env
 ExecStart=/srv/apps/automation/runner.sh
 SuccessExitStatus=0 1
+# 关键:只有主进程退出时不要连坐整个 cgroup。
+# 后台起的任务(setsid … docker compose run)还在同一个 cgroup 里,默认的 control-group
+# 会在 tick 结束时把它们一起杀掉 —— 表现就是「日志说已启动,容器却没起来」。
+KillMode=process
 TimeoutStartSec=infinity
 Nice=5
