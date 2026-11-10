@@ -8,6 +8,14 @@ import { APP_BASE, appHeaders } from './app-auth.js'
 import { CLIENT_PF } from './weekly.js'
 // 2026-11-10 实测回包只有:balance / giftBalance / peerBalance / peerGiftBalance /
 // isPromoting / paperBalance / incentive —— **没有**任何「即将过期」字段。
+//
+// 同一天按同一思路找过期信息,把两边都试遍了(探针见 tools/probe-coin-expire.mjs):
+//   App 端 /pay/balance:换 pf(ios / weread_)都被 -2111 拒,只有 android 那个能用,字段不变
+//   App 端 30 条候选路径(/pay/coin/* · /pay/wallet* · /pay/expire* …):全部 404
+//   网页端 /web/pay/balance:多回一个 welfare 对象(status / expiredTime / showExpiredTime /
+//     remainCoupon / remainCount),那是体验卡福利券,不是书币过期
+//   /web/pay/coin* · /web/pay/expire* 一族:全部 404
+// 结论:书币过期信息当前没有可访问的接口,所以这里只能是 null,消息里写「未知」。
 // 以前拿 `Number(undefined) || 0` 填 0,于是消息里永远写「即将过期 0.00」,那是假读数。
 // 现在:接口给了就报,没给就报「未知」,绝不用 0 冒充。
 
