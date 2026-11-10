@@ -4,10 +4,10 @@ import test from 'node:test'
 import { BALANCE_PATH, buildBalanceBody, parseBalance, readBalance } from '../src/balance.js'
 import { CLIENT_PF } from '../src/weekly.js'
 
-// 2026-10-02 真实回包(design 2.2)。
+// 2026-11-10 实测回包:没有任何「即将过期」字段 —— 因此解析结果必须是 null,不能是 0。
 const sample = {
-    balance: 16.60, giftBalance: 16.60, peerBalance: 0, peerGiftBalance: 0,
-    expiryBalance: 0, peerExpiryBalance: 0, isPromoting: 0, paperBalance: 0, incentive: 0
+    balance: 68.0, giftBalance: 68.0, peerBalance: 0, peerGiftBalance: 0,
+    isPromoting: 0, paperBalance: 0, incentive: 0
 }
 
 function fetchCapturing(body, status = 200, sink = {}) {
@@ -27,14 +27,14 @@ test('buildBalanceBody 复用 weekly 的 CLIENT_PF', () => {
     assert.equal(buildBalanceBody().pf, 'wechat_wx-2001-android-100-weread')
 })
 
-test('parseBalance 解析真实回包的 balance / giftBalance / expiryBalance', () => {
-    assert.deepEqual(parseBalance(sample), { balance: 16.6, giftBalance: 16.6, expiryBalance: 0 })
-    assert.deepEqual(parseBalance({ balance: 16.6, giftBalance: 16.6, expiryBalance: 2.5 }), { balance: 16.6, giftBalance: 16.6, expiryBalance: 2.5 })
+test('parseBalance 解析真实回包:余额读得到,过期字段没有就是 null', () => {
+    assert.deepEqual(parseBalance(sample), { balance: 68, giftBalance: 68, expiryBalance: null })
+    assert.deepEqual(parseBalance({ balance: 68, giftBalance: 68, expiryBalance: 2.5 }), { balance: 68, giftBalance: 68, expiryBalance: 2.5 })
 })
 
-test('parseBalance 缺字段给 0', () => {
-    assert.deepEqual(parseBalance({ balance: 3 }), { balance: 3, giftBalance: 0, expiryBalance: 0 })
-    assert.deepEqual(parseBalance({}), { balance: 0, giftBalance: 0, expiryBalance: 0 })
+test('parseBalance 缺字段:余额给 0,即将过期给 null 不带假 0', () => {
+    assert.deepEqual(parseBalance({ balance: 3 }), { balance: 3, giftBalance: 0, expiryBalance: null })
+    assert.deepEqual(parseBalance({}), { balance: 0, giftBalance: 0, expiryBalance: null })
 })
 
 test('parseBalance 字符串数字转成数字', () => {
@@ -42,7 +42,7 @@ test('parseBalance 字符串数字转成数字', () => {
 })
 
 test('parseBalance 对 null / 非对象 / 非数字字段安全', () => {
-    const zero = { balance: 0, giftBalance: 0, expiryBalance: 0 }
+    const zero = { balance: 0, giftBalance: 0, expiryBalance: null }
     assert.deepEqual(parseBalance(null), zero)
     assert.deepEqual(parseBalance(undefined), zero)
     assert.deepEqual(parseBalance('<html>'), zero)
@@ -54,9 +54,9 @@ test('readBalance POST 到 /pay/balance,带 content-type 与 pf', async () => {
     const result = await readBalance({ token: { vid: 1, accessToken: 'x' }, fetchImpl: fetchCapturing(JSON.stringify(sample), 200, sink) })
 
     assert.equal(result.ok, true)
-    assert.equal(result.balance, 16.6)
-    assert.equal(result.giftBalance, 16.6)
-    assert.equal(result.expiryBalance, 0)
+    assert.equal(result.balance, 68)
+    assert.equal(result.giftBalance, 68)
+    assert.equal(result.expiryBalance, null) // 接口没给这个字段,必须是 null 而不是 0
     assert.equal(result.reason, null)
     assert.equal(result.raw.status, 200)
 
@@ -80,7 +80,7 @@ test('readBalance 非 JSON 的 200 响应也返回 0 余额而不是抛错', asy
     assert.equal(result.ok, true)
     assert.equal(result.balance, 0)
     assert.equal(result.giftBalance, 0)
-    assert.equal(result.expiryBalance, 0)
+    assert.equal(result.expiryBalance, null)
 })
 
 test('readBalance 网络异常返回失败对象而不是抛错', async () => {
@@ -88,7 +88,7 @@ test('readBalance 网络异常返回失败对象而不是抛错', async () => {
     assert.equal(result.ok, false)
     assert.equal(result.reason, 'query-failed')
     assert.equal(result.balance, 0)
-    assert.equal(result.expiryBalance, 0)
+    assert.equal(result.expiryBalance, null)
     assert.equal(result.raw.status, 0)
     assert.equal(result.raw.error, 'boom')
 })

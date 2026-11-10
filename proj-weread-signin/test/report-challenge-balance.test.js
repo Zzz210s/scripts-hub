@@ -173,3 +173,28 @@ test('首行是总进度:优先挑战接口的累计秒数', () => {
     assert.match(first, /^进度:3\.3 \/ 30\.0 小时 · 差 26\.7 小时 · 今日 204 分钟$/)
     assert.doesNotMatch(text, /阅读:今日/)
 })
+
+// 2026-11-10:接口根本没有「即将过期」字段,以前用 0 顶替,消息里天天写「即将过期 0.00」。
+test('过期字段读不到时写「未知」,不写假 0.00', () => {
+    const unknown = buildReport({
+        plan: { todayMinutes: 32, targetMinutes: 60, deficitMinutes: 100, progressSource: 'challenge', validNeeded: 0, failableDays: 1 },
+        run: null,
+        config: { dailyCapMinutes: 600, requiredMinutes: 1800, requiredValidDays: 29 },
+        date: '2026-11-10',
+        accountName: '账号 1',
+        data: { balance: { ok: true, balance: 68, giftBalance: 68, expiryBalance: null } }
+    })
+    assert.match(unknown, /书币余额 68\.00/)
+    assert.match(unknown, /即将过期 未知/)
+    assert.doesNotMatch(unknown, /即将过期 0\.00/)
+
+    const known = buildReport({
+        plan: { todayMinutes: 32, targetMinutes: 60, deficitMinutes: 100, progressSource: 'challenge', validNeeded: 0, failableDays: 1 },
+        run: null,
+        config: { dailyCapMinutes: 600, requiredMinutes: 1800, requiredValidDays: 29 },
+        date: '2026-11-10',
+        accountName: '账号 1',
+        data: { balance: { ok: true, balance: 68, giftBalance: 68, expiryBalance: 12.5 } }
+    })
+    assert.match(known, /即将过期 12\.50/)
+})

@@ -6,7 +6,10 @@
 // `balance` 是总余额,`giftBalance` 是赠币部分(实测两者相等)。
 import { APP_BASE, appHeaders } from './app-auth.js'
 import { CLIENT_PF } from './weekly.js'
-// 回包字段(2026-10-02 实测):balance 总余额、giftBalance 赠币、expiryBalance 即将过期。
+// 2026-11-10 实测回包只有:balance / giftBalance / peerBalance / peerGiftBalance /
+// isPromoting / paperBalance / incentive —— **没有**任何「即将过期」字段。
+// 以前拿 `Number(undefined) || 0` 填 0,于是消息里永远写「即将过期 0.00」,那是假读数。
+// 现在:接口给了就报,没给就报「未知」,绝不用 0 冒充。
 
 export const BALANCE_PATH = '/pay/balance'
 
@@ -17,13 +20,16 @@ export function buildBalanceBody() {
     return { pf: CLIENT_PF }
 }
 
-/** 字段缺失 / 非数字 / null / 非对象一律给 0,不抛错。 */
+const EXPIRY_KEYS = ['expiryBalance', 'expiringBalance', 'expireBalance', 'expireAmount']
+
+/** 余额缺失按 0;「即将过期」接口没给就是 null,由渲染层说「未知」。 */
 export function parseBalance(payload) {
     const source = payload && typeof payload === 'object' ? payload : {}
+    const expiry = EXPIRY_KEYS.map((key) => Number(source[key])).find((value) => Number.isFinite(value))
     return {
         balance: Number(source.balance) || 0,
         giftBalance: Number(source.giftBalance) || 0,
-        expiryBalance: Number(source.expiryBalance) || 0
+        expiryBalance: Number.isFinite(expiry) ? expiry : null
     }
 }
 
@@ -54,6 +60,6 @@ async function callBalance(ctx) {
  */
 export async function readBalance(ctx) {
     const raw = await callBalance(ctx)
-    if (!raw.ok) return { ok: false, balance: 0, giftBalance: 0, expiryBalance: 0, reason: 'query-failed', raw }
+    if (!raw.ok) return { ok: false, balance: 0, giftBalance: 0, expiryBalance: null, reason: 'query-failed', raw }
     return { ok: true, ...parseBalance(raw.body), reason: null, raw }
 }

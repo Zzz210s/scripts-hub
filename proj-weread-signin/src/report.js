@@ -66,7 +66,10 @@ export function renderWelfareLine({ welfare, weekly, balance, memberCard } = {})
     const parts = []
     if (balance?.ok) {
         parts.push(`书币余额 ${Number(balance.balance ?? 0).toFixed(2)}`)
-        parts.push(`即将过期 ${Number(balance.expiryBalance ?? 0).toFixed(2)}`)
+        // 接口没给这个字段就写「未知」:2026-11-10 实测 /pay/balance 根本没有过期字段
+        parts.push(balance.expiryBalance === null || balance.expiryBalance === undefined
+            ? '即将过期 未知'
+            : `即将过期 ${Number(balance.expiryBalance).toFixed(2)}`)
     }
     // 体验卡余额读不到就不显示;只有它没有书币余额时也照样单列
     if (memberCard?.ok) parts.push(`体验卡 ${Number(memberCard.freeCardDays ?? 0)} 天`)
