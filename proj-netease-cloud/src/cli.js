@@ -19,6 +19,7 @@ import { buildResult } from './messages.js'
 import { pace } from './pacing.js'
 import { loginWithCookie } from './login.js'
 import { runCheck, runProbe, runReport, sendViaWecom } from './commands.js'
+import { runFill } from './fill.js'
 import { runOnce } from './run.js'
 import { attemptsOn, doneToday, historyFile, readState } from './state.js'
 import { readAccounts, vipWord } from './probe.js'
@@ -30,6 +31,9 @@ const USAGE = `用法:node src/cli.js <命令> [--dry]
   check          只读体检:每个账号的 VIP 乐签状态与云贝余额
   probe          只读探针:VIP 状态读回与云贝查询,绝不调用签到接口
   report [--dry] 把当天的运行结果汇总出来;--dry 只打印
+  fill [--dry] [--count N]
+                 填充听歌量:随机挑今天没播过的免费曲目上报,再读回听歌量对比
+                 --dry 只打印本批会播哪些歌,不上报
   login --file <路径> | --cookie <内容>
                  换新的 MUSIC_U:写进 .env、清当天的熔断标记,再用只读接口自证
   help           显示本帮助`
@@ -79,6 +83,9 @@ export async function main(argv = process.argv.slice(2), options = {}) {
   if (command === 'probe') return runProbe({ config, deps: readDeps, now, log })
   if (command === 'report') return runReport({ config, deps, now, dry, log })
   if (command === 'login') return runLogin({ cwd, now, deps: readDeps, argv, log, err })
+  if (command === 'fill') {
+    return runFillCommand({ cwd, config, deps, argv, dry, log, err })
+  }
   err(USAGE)
   return 2
 }
@@ -154,4 +161,37 @@ async function verifyCookie({ cookie, deps }) {
   const state = await readVipState({ cookie, deps })
   if (state?.ok === false) return { ok: false, error: state.error ?? '请求失败' }
   return { ok: true, state: state?.todaySigned === true ? '今天已签' : '今天未签' }
+}
+
+/** fill 子命令:填充听歌量,只跑第一个账号;--count 覆盖本批数量,--dry 只列曲目。 */
+async function runFillCommand({ cwd, config, deps, argv, dry, log, err }) {
+  const account = config.accounts?.[0]
+  if (!account) {
+    err('没有可用凭据:先确认 .env 里的 ACCOUNT_1_MUSIC_U')
+    return 2
+  }
+  const index = argv.indexOf('--count')
+  const countArg = index >= 0 ? Number(argv[index + 1]) : undefined
+  const today = new Date().toISOString().slice(0, 10)
+  const result = await runFill({
+    cwd,
+    cookie: account.cookie,
+    config: {
+      today,
+      countPerRun: Number.isFinite(countArg) ? countArg : config.fillCountPerRun,
+      poolTarget: config.fillPoolTarget,
+      keywords: config.fillKeywords
+    },
+    deps,
+    log,
+    dryRun: dry
+  })
+  if (dry) {
+    for (const song of result.batch ?? []) log(`  将播 ${song.id} · ${song.name}`)
+  }
+  const before = result.before?.playCount ?? '未知'
+  const after = result.after?.playCount ?? '未知'
+  const gained = Number.isFinite(result.gained) ? ` · 增量 ${result.gained}` : ''
+  log(`[填充] 结果 · 上报 ${result.played?.length ?? 0} 首 · 听歌量 ${before} -> ${after}${gained}`)
+  return 0
 }

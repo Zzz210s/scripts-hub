@@ -11,6 +11,12 @@ export const DEFAULTS = {
   timeoutMs: 10000,
   boundaryHour: 4,
   stateDir: 'data',
+  // 填充器:每批上报多少首、池子目标大小、拉池子的关键词。默认关 —— 打点是否计入听歌量
+  // 还在等 2026-11-21 14:05 的读数,没结论前不该让它在生产里跑。
+  fillEnabled: false,
+  fillCountPerRun: 20,
+  fillPoolTarget: 200,
+  fillKeywords: '纯音乐,轻音乐,钢琴,古典,民谣,原声',
   // 单实例锁另放 logs/:套件约定是「每个程序把锁写在 logs/run.lock」,同伴按这条路径能找到。
   lockDir: 'logs',
   webhookFile: 'secrets/wecom-webhook.txt',
@@ -97,6 +103,13 @@ export function loadConfig(cwd = process.cwd(), { env = process.env, fsImpl = fs
     requestIntervalMs: int(pick(merged, 'NETEASE_REQUEST_INTERVAL_MS', null), DEFAULTS.requestIntervalMs),
     boundaryHour: int(pick(merged, 'NETEASE_DAY_BOUNDARY_HOUR', null), DEFAULTS.boundaryHour),
     stateDir: asPath(cwd, String(pick(merged, 'NETEASE_STATE_DIR', DEFAULTS.stateDir))),
+    fillEnabled: String(pick(merged, 'NETEASE_FILL_ENABLED', '0')) === '1',
+    fillCountPerRun: int(pick(merged, 'NETEASE_FILL_COUNT', null), DEFAULTS.fillCountPerRun, 1),
+    fillPoolTarget: int(pick(merged, 'NETEASE_FILL_POOL', null), DEFAULTS.fillPoolTarget, 1),
+    fillKeywords: String(pick(merged, 'NETEASE_FILL_KEYWORDS', DEFAULTS.fillKeywords))
+      .split(',')
+      .map((one) => one.trim())
+      .filter(Boolean),
     lockDir: asPath(cwd, String(pick(merged, 'NETEASE_LOCK_DIR', DEFAULTS.lockDir))),
     webhookFile: asPath(cwd, String(pick(merged, 'NETEASE_WEBHOOK_FILE', DEFAULTS.webhookFile))),
     busyPeers: String(pick(merged, 'BUSY_PEERS', '')).split(',').map((item) => item.trim()).filter(Boolean),
