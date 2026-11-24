@@ -185,15 +185,13 @@ else
     skip_note "网易云" netease netease-cloud
 fi
 
-run_plain_step 米游社签到 miyoushe miyoushe-signin; RC_MIYOUSHE=$STEP_RC
-
 COMPLETED=1
 note "=== 编排结束 ==="
 if [ -n "$BROKEN" ]; then
     # 跳过是「少跑了一个程序」而不是「跑失败」,不走各程序自己的通道,发到套件那条线上
     node "$SUITE_DIR/alert-fail.mjs" 服务器 "宿主布局不全,本次跳过:$BROKEN" >> "$SUITE_DIR/logs/suite-alert.log" 2>&1 || true
 fi
-if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ] && [ "$RC_MIYOUSHE" -eq 0 ]; then
+if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ]; then
     exit 0
 fi
 exit 1
