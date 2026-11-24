@@ -1,0 +1,80 @@
+# 米游社签到配置模板(部署到 /srv/apps/automation/miyoushe/data/config.yaml)
+#
+# 真源是这个文件;线上实例由一次扫码登录写入 accounts / device,以及 data/credentials.yaml。
+# 本模板故意留空账号与设备:device 由程序首次运行自动申请 server 签发的 fp,账号靠扫码写入。
+# 凭证永远不进仓库 —— 部署时只铺这个模板,真配置文件留在宿主。
+enable: true
+
+# 扫码登录后会自动追加,形如 {name: main, ltoken: v2_..., cookie_token: v2_..., region: cn}
+accounts: []
+
+storage:
+  data_dir: data
+  credentials_file: credentials.yaml
+  log_dir: logs
+  log_file: miyouqian.log
+
+# 留空即由程序首次运行时申请并长期保存(设备指纹一变就容易触发风控,不要每次随机)
+device:
+  id: ""
+  fp: ""
+  name: ""
+  model: ""
+
+features:
+  game_checkin: true          # 游戏社区签到(本套件只用这一项)
+  cloud_game_checkin: false   # 云原神 / 云绝区零
+  bbs_tasks: false            # 米游币任务(要打码服务,且官方在收紧)
+
+captcha:
+  enable: false
+  max_retries: 3
+  channels: []                # 只用游戏签到时不需要打码
+
+# 调度交给宿主 runner.sh,这里必须关掉,否则同一件事有两个写者
+schedule:
+  enable: false
+  time: "09:00"
+  jitter_minutes: 45
+  run_on_start: false
+
+games:
+  enabled:
+    - genshin
+    - starrail
+    - zzz
+  black_list:
+    genshin: []
+    starrail: []
+    zzz: []
+
+cloud_games:
+  enabled: []
+
+bbs:
+  forums: [5, 2]
+  checkin: false
+  read: false
+  like: false
+  share: false
+  cancel_like: false
+  post_limit: 5
+
+# 群机器人 webhook。线上值放宿主 miyoushe/secrets/wecom-webhook.txt(600),
+# 程序不读那个文件,所以这里也要有一份;两处同时换。
+push:
+  enable: true
+  error_only: false
+  channels:
+    - provider: wecombot
+      enable: true
+      webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=<填入群机器人 key>"
+      plain_text: false
+
+shop_exchange:
+  enable: false
+
+web:
+  host: 127.0.0.1            # 只在扫码登录时临时起,平时 compose 不发布端口
+  port: 5890
+  password: ""

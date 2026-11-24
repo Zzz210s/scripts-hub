@@ -572,3 +572,34 @@ systemd 只剩一个定时器 `automation-runner.timer`,每 30 分钟问它一�
 - **自检**:`./runner.sh --plan` 只打印这一跳会启动谁;`./runner.sh weread` 强制跑某一个。
 - 旧的 `automation-suite.timer` 与 `weread-reader.timer` 已 disable,`run-all.sh` 已标注停用,
   想回滚把旧的 enable 回来即可。
+
+## 16. 米游社签到(2026-11-24 加,第七个程序)
+
+底座是上游镜像 `ghcr.io/marchen-orz/miyouqian:latest`(MIT),本套件不带它的源码。选它的原因只有一条:
+2026-11-20 米游社把游戏签到接口改成 `/event/luna/<game_biz>/...` 并要求 `x-rpc-signgame` 与 V2 身份
+(`cookie_token_v2` / `ltoken_v2` / `account_id_v2`),网页登录签发的 v1 cookie 全系 -100;它 11-21 就按抓包改完了,
+同期的 MihoyoBBSTools 只修了 V2 cookie,国服签到路径没动。
+
+| 项 | 取值 |
+| --- | --- |
+| compose 服务 | `miyoushe-run`(一次性,覆盖镜像默认的常驻 `serve`) |
+| 容器命令 | `run --games-only`(只做游戏社区签到) |
+| 状态目录 | `miyoushe/data` → 容器内 `/app/state`(配置、v2 凭证、设备指纹) |
+| 调度 | `runner.sh` 的 PROGRAMS 表:`08:00` 一档,错过补跑 |
+| 看门狗 | `MIYOUSHE_RUN_TIMEOUT_MIN=15` |
+
+**镜像要绕道**:`ghcr.io` 国内实测约 2 KB/s,92 MB 的镜像拉不完。
+`docker pull ghcr.chenby.cn/marchen-orz/miyouqian:latest && docker tag … ghcr.io/marchen-orz/miyouqian:latest`。
+`ghcr.nju.edu.cn` 试过,拉到一半稳定 `httpReadSeeker … failed to do request`,不可靠。
+
+**登录**:`docker compose run --rm -T miyoushe-run python main.py --config /app/state/config.yaml login --account main --timeout 50`。
+二维码有效期只有一分钟上下(实测两次都是 `-3501 二维码已失效`),所以要么把 `qrcode.png` 每 5 秒同步到本机边扫边看,
+要么临时起 Web 面板走 SSH 隧道扫。成功标志:`data/data/credentials.yaml` 出现,
+`accounts[0]` 里是 `v2_` 前缀的 token。
+
+**排错对照**:`今日已签到` 算成功;`-100 请登录后重试` = 凭证不是 V2(重扫);
+`-3501` = 码过期;`游戏社区签到汇总:成功 N,失败 0` 是正常收尾。
+
+**注意(文档漂移)**:第 3、12 节写的 `run-all.sh` + `automation-suite.timer` + `schedule.json` 已经不是线上的调度真源。
+线上是 `automation-runner.timer`(每 30 分钟)调 `runner.sh`,程序表写在 `runner.sh` 顶部的 `PROGRAMS` 数组里;
+`automation-suite.timer` 自 2026-10-28 起为 disabled。加程序请改 `PROGRAMS` 表,不要改 `run-all.sh`。
