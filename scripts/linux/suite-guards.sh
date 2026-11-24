@@ -43,6 +43,20 @@ skip_note() {   # $1=显示名 $2=目录名 $3=程序 id
     fi
 }
 
+# 通用「跑一步」:闸门 + 布局体检 + 调宿主运行器,退出码写进 STEP_RC。
+# 2026-11-24 加米游社时抽出来的:再照抄一遍那份 if/else,run-all.sh 就会越过 200 行上限。
+run_plain_step() {   # $1=显示名 $2=目录名 $3=程序 id
+    STEP="$1"
+    if enabled_in_schedule "$3" && ! broken "$2"; then
+        "$SUITE_DIR/$2/run.sh" 7>&-
+        STEP_RC=$?
+        note "$1 退出码 $STEP_RC"
+    else
+        STEP_RC=0
+        skip_note "$1" "$2" "$3"
+    fi
+}
+
 # --- 中断兜底:编排半路被打断(内存耗尽、被 kill、某步自身报错)时补一条提醒 -------------
 # 用 EXIT trap 而不是只包某一步:任何位置退出都会经过它,并且能说清停在第几步。
 STEP="准备"

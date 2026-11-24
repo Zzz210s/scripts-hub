@@ -7,7 +7,8 @@
     "epic-free-games",
     "bilibili-tasks",
     "baidu-tieba",
-    "netease-cloud"
+    "netease-cloud",
+    "miyoushe-signin"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -114,6 +115,21 @@
       "enabled": false,
       "linuxEnabled": true,
       "actionVbs": ""
+    },
+    "miyoushe-signin": {
+      "taskName": "MiyousheSignIn",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 2,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": false,
+      "linuxEnabled": true,
+      "actionVbs": "",
+      "linuxNote": "只有 Linux 运行器:上游项目(MiyoQian)镜像在容器里跑一轮游戏社区签到"
     }
   }
 }

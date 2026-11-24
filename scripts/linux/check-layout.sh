@@ -27,6 +27,7 @@ PROGRAMS=(
   "bilibili:bilibili-run"
   "tieba:tieba-run"
   "netease:netease-run"
+  "miyoushe:miyoushe-run"
 )
 
 echo "== 布局体检: $SUITE_DIR"
