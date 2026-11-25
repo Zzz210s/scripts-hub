@@ -6,6 +6,15 @@
 enable: true
 
 # 扫码登录后会自动追加,形如 {name: main, ltoken: v2_..., cookie_token: v2_..., region: cn}
+# 云游戏签到另需每个游戏一条 token:
+#   - name: main
+#     ltoken: v2_...
+#     cookie_token: v2_...
+#     region: cn
+#     cloud_games:
+#       tokens:
+#         genshin: "<x-rpc-combo_token>"
+#         zzz: ""
 accounts: []
 
 storage:
@@ -23,7 +32,9 @@ device:
 
 features:
   game_checkin: true          # 游戏社区签到(本套件只用这一项)
-  cloud_game_checkin: false   # 云原神 / 云绝区零
+  # 云原神 / 云绝区零:要另配 x-rpc-combo_token(见 accounts[].cloud_games.tokens),
+  # 拿不到 token 时保持 false,否则每次都会印一行「未配置 token,已跳过」
+  cloud_game_checkin: false
   bbs_tasks: false            # 米游币任务(要打码服务,且官方在收紧)
 
 captcha:
@@ -48,6 +59,8 @@ games:
     starrail: []
     zzz: []
 
+# 打开 features.cloud_game_checkin 时,这里列具体游戏;没列就等于全不跑
+#   genshin = 云原神, zzz = 云绝区零(云星穹铁道不可选,版本更新直接送时长)
 cloud_games:
   enabled: []
 

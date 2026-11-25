@@ -66,3 +66,60 @@ docker tag  ghcr.chenby.cn/marchen-orz/miyouqian:latest ghcr.io/marchen-orz/miyo
 | `data/logs/` | 程序自己的日志 |
 | `logs/last-run.log` | 最近一次运行的完整输出(宿主侧) |
 | `secrets/wecom-webhook.txt` | 群机器人 webhook(600) |
+
+## 推送内容改造(Dockerfile + patch_notifier.py)
+
+上游的账号摘要是固定三段(游戏社区 / 云游戏 / 米游币),没跑的那段也印一行「本次未执行…」。
+本套件只开游戏社区签到,所以加了一处本地补丁,镜像 `miyoushe-signin:local` 由本目录的
+`Dockerfile`(`patch_local.py`)从上游镜像构建:
+
+- 账号摘要只输出本次真跑过的段;整段都没跑就不出现。
+- 推送不再带「详细日志」整段(2026-11-25 用户要求)—— 那是签到过程的逐行复述,群里没人看。
+  这一段是模板文件(`templates/push/*.md|txt|html`)里的静态内容,所以补丁顺手改四个模板。
+- 米游币的「跑过没有」判定改严。上游是 `any("米游币" in line or "社区签到" in line)`,
+  「游戏社区签到汇总」里含「社区签到」,于是永远判成跑过,印出一段全 0 的空摘要 ——
+  这正是第一条堵不住它的原因。改成只认真跑的痕迹(汇总行或任务计数)。
+
+补丁是整函数替换,替换前先断言锚点存在:上游一改结构,构建直接失败,不会出现
+「补丁静默失效、镜像照常起」。验证方式(不往群里发东西):
+
+```bash
+# 把最近一次运行日志洗成消息文本,交给容器渲染 markdown,肉眼确认段落
+sudo docker compose run --rm -T miyoushe-run python -c "
+import pathlib; from miyouqian.service import notifier
+print(notifier.build_push_markdown('米游签任务完成', pathlib.Path('/app/state/.test_msg.txt').read_text(), True))"
+```
+
+上游更新后要重建本镜像(上游镜像要先 `docker pull ghcr.chenby.cn/...` 再 tag 回 ghcr.io 名):
+
+```bash
+cd /srv/apps/automation && sudo docker compose build --pull=false miyoushe-run
+```
+
+## 云游戏签到(需另配 token)
+
+云游戏接口要的是 `x-rpc-combo_token`,不是米游社 cookie,而且云原神与云绝区零的 token 不通用。
+配置分三处:
+
+```yaml
+features:
+  cloud_game_checkin: true
+cloud_games:
+  enabled: [genshin, zzz]
+accounts:
+  - name: main
+    cloud_games:
+      tokens:
+        genshin: "<云原神的 x-rpc-combo_token>"
+        zzz: ""
+```
+
+获取(云原神):
+
+1. 浏览器打开 <https://ys.mihoyo.com/cloud/#/> 并登录同一账号。
+2. F12 → Network,过滤 `wallet/wallet/get`,刷新或进「钱包 / 时长」页。
+3. 点开成功的那条请求,请求头里复制 `X-Rpc-Combo_token` 的整段值。
+
+云绝区零没有网页版,只能抓包(App 或客户端),参考上游 README 里那条 bili33 的教程。
+未配置某个游戏的 token 时,那个游戏会被静默排除;两个都没配才会印一行「未配置 token，已跳过」。
+星穹铁道云游戏不可选(版本更新直接送 600 分钟,不需要每日签到)。

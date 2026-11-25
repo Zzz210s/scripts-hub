@@ -603,3 +603,22 @@ systemd 只剩一个定时器 `automation-runner.timer`,每 30 分钟问它一�
 **注意(文档漂移)**:第 3、12 节写的 `run-all.sh` + `automation-suite.timer` + `schedule.json` 已经不是线上的调度真源。
 线上是 `automation-runner.timer`(每 30 分钟)调 `runner.sh`,程序表写在 `runner.sh` 顶部的 `PROGRAMS` 数组里;
 `automation-suite.timer` 自 2026-10-28 起为 disabled。加程序请改 `PROGRAMS` 表,不要改 `run-all.sh`。
+
+**本地补丁(2026-11-25)**:上游推送模板固定输出三段(游戏社区 / 云游戏 / 米游币),没跑也印
+「本次未执行…」。本套件只开游戏社区签到,于是加了 `miyoushe/Dockerfile` + `miyoushe/patch_notifier.py`
+一处本地改造,镜像名改成 `miyoushe-signin:local`,由上游镜像构建:
+
+- 账号摘要只输出本次真跑过的段;
+- 米游币「跑过没有」的判定改严 —— 上游用 `"社区签到" in line` 子串匹配,
+  「游戏社区签到汇总」也会命中,所以光删段落堵不住,必须同时改判定。
+
+推送里的「详细日志」整段也已去掉(2026-11-25 用户要求):那是签到过程的逐行复述,群里没人看。
+这一段在模板文件里,补丁连 `templates/push/` 的四个模板一起改。
+
+补丁在构建期跑,锚点(被替换的函数、被替换的那一行、模板里的「详细日志」)不存在就让构建失败,避免"补丁静默失效"。
+上游更新后:`docker pull ghcr.chenby.cn/marchen-orz/miyouqian:latest` → tag 回 ghcr.io 名 →
+`sudo docker compose build --pull=false miyoushe-run`。
+
+云游戏签到要另配 `x-rpc-combo_token`(云原神从 <https://ys.mihoyo.com/cloud/#/> 的
+`wallet/wallet/get` 请求头里取;云绝区零无网页版,只能抓包),写在 `accounts[].cloud_games.tokens`,
+并把 `features.cloud_game_checkin` 打开、`cloud_games.enabled` 列出具体游戏。

@@ -187,7 +187,11 @@ services:
     # 残锁会被判成「还活着」,于是每次触发都静默跳过、退出码 0(跨容器判活那次的实测故障)。
   # 米游社每日签到:直接用上游镜像跑一轮(不开它的 Web 面板,也不用它的内置调度)
   miyoushe-run:
-    image: ghcr.io/marchen-orz/miyouqian:latest
+    # 上游镜像 + 一处本地补丁(推送里去掉没跑的段),补丁内容见 miyoushe/Dockerfile
+    image: miyoushe-signin:local
+    build:
+      context: ./miyoushe
+      dockerfile: Dockerfile
     container_name: miyoushe-run
     restart: "no"
     # 镜像默认 CMD 是常驻 Web 服务,这里覆盖成「跑一轮游戏社区签到就退出」
