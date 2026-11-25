@@ -74,6 +74,8 @@ docker tag  ghcr.chenby.cn/marchen-orz/miyouqian:latest ghcr.io/marchen-orz/miyo
 `Dockerfile`(`patch_local.py`)从上游镜像构建:
 
 - 账号摘要只输出本次真跑过的段;整段都没跑就不出现。
+- 结果段不印「进度 [####----] 100% 完成」那一行 —— 汇总行已经说了成功几个,进度条是重复信息
+  (2026-11-25 用户要求)。改的是文本渲染函数,HTML 通道的彩色进度条没动。
 - 推送不再带「详细日志」整段(2026-11-25 用户要求)—— 那是签到过程的逐行复述,群里没人看。
   这一段是模板文件(`templates/push/*.md|txt|html`)里的静态内容,所以补丁顺手改四个模板。
 - 米游币的「跑过没有」判定改严。上游是 `any("米游币" in line or "社区签到" in line)`,

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""对上游推送做三处本地改造(本套件只开游戏社区签到):
+"""对上游推送做四处本地改造(本套件只开游戏社区签到):
 
 1. 账号摘要只输出本次真跑过的段 —— 上游固定印三段,没跑也印「本次未执行…」。
 2. 米游币段的「跑过没有」判定改严 —— 上游用 "社区签到" 子串匹配,「游戏社区签到汇总」也会命中,
    于是没跑米游币也印出一段全 0 的空摘要(光删段落堵不住,必须同时改判定)。
-3. 推送里不再带「详细日志」整段 —— 那只是签到过程的逐行复述(2026-11-25 用户要求去掉)。
+3. 结果段不再印「进度 [####----] 100% 完成」那一行(2026-11-25 用户要求)—— 汇总行已经说了成功几个。
+4. 推送里不再带「详细日志」整段 —— 那只是签到过程的逐行复述(2026-11-25 用户要求去掉)。
 
-第 1、2 条改 Python 函数体:三段摘要先由 Python 拼好再交给模板,改模板治不了。
-第 3 条改模板文件。两种改法都先断言锚点存在 —— 上游一改结构就让构建失败,
+第 1、2、3 条改 Python 函数体(摘要先由 Python 拼好再交给模板,改模板治不了),
+第 4 条改模板文件。两种改法都先断言锚点存在 —— 上游一改结构就让构建失败,
 不允许"补丁静默失效、镜像照常起"。
 
 构建期执行:Dockerfile 里 `RUN python /tmp/patch_local.py`。
@@ -82,6 +83,18 @@ HTML_FN = '''def build_account_sections_html(summary: dict[str, Any]) -> str:
 
 '''
 
+RESULT_TEXT_FN = '''def build_result_section_text(result: dict[str, Any], fallback_summary: str) -> str:
+    """结果段(文本)。local patch:不印进度条那一行,只留汇总与逐项结果。"""
+    lines = [f"- {result['summary'] or fallback_summary}"]
+    for item in result["failed_items"][:6]:
+        lines.append(f"- 失败：{item}")
+    for item in result["items"][:6]:
+        lines.append(f"- 成功：{item}")
+    return "\\n".join(lines)
+
+
+'''
+
 BBS_PRESENT_OLD = (
     '    bbs_present = bool(bbs_summary or bbs_progress or '
     'any("米游币" in line or "社区签到" in line for line in lines))'
@@ -126,6 +139,7 @@ def patch_notifier() -> None:
     source = source.replace(BBS_PRESENT_OLD, BBS_PRESENT_NEW, 1)
     source = replace_function(source, "build_account_sections_text", TEXT_FN)
     source = replace_function(source, "build_account_sections_html", HTML_FN)
+    source = replace_function(source, "build_result_section_text", RESULT_TEXT_FN)
     NOTIFIER.write_text(source, encoding="utf-8")
 
 
@@ -154,7 +168,7 @@ def main() -> int:
         return 0
     patch_notifier()
     changed = patch_templates()
-    print("补丁完成:账号摘要只输出跑过的段;米游币判定已收紧;详细日志已从模板去掉"
+    print("补丁完成:账号摘要只输出跑过的段;米游币判定已收紧;结果段不印进度条;详细日志已从模板去掉"
           f"({', '.join(changed)})")
     return 0
 
