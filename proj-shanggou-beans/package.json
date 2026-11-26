@@ -1,0 +1,8 @@
+{
+  "name": "shanggou-beans",
+  "private": true,
+  "type": "module",
+  "description": "淘宝闪购吃货豆自动领取:真实页面点击,不逆向风控",
+  "engines": { "node": ">=22" },
+  "scripts": { "inspect": "node src/cli.js inspect", "claim": "node src/cli.js claim" }
+}

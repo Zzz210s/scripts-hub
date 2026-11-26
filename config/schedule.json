@@ -7,7 +7,8 @@
     "epic-free-games",
     "bilibili-tasks",
     "baidu-tieba",
-    "netease-cloud"
+    "netease-cloud",
+    "shanggou-beans"
   ],
   "stagger": {
     "baseStartTime": "08:00",
@@ -111,6 +112,20 @@
       "logonRetryWindowMinutes": 60,
       "runScript": "",
       "enabled": false,
+      "linuxEnabled": true,
+      "actionVbs": ""
+    },
+    "shanggou-beans": {
+      "taskName": "ShanggouBeans",
+      "startTime": "auto",
+      "intervalMinutes": 120,
+      "windowHours": 14,
+      "maxAttemptsPerDay": 3,
+      "logonDelayMinutes": "auto",
+      "logonRetryMinutes": 10,
+      "logonRetryWindowMinutes": 60,
+      "runScript": "",
+      "enabled": true,
       "linuxEnabled": true,
       "actionVbs": ""
     }

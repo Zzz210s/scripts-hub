@@ -175,6 +175,16 @@ else
     skip_note "百度贴吧" tieba baidu-tieba
 fi
 
+if enabled_in_schedule shanggou-beans && ! broken shanggou; then
+    STEP="淘宝闪购吃货豆"
+    "$SUITE_DIR/shanggou/run.sh" 7>&-
+    RC_SHANGGOU=$?
+    note "淘宝闪购吃货豆退出码 $RC_SHANGGOU"
+else
+    RC_SHANGGOU=0
+    skip_note "淘宝闪购吃货豆" shanggou shanggou-beans
+fi
+
 if enabled_in_schedule netease-cloud && ! broken netease; then
     STEP="网易云"
     "$SUITE_DIR/netease/run.sh" 7>&-
@@ -191,7 +201,7 @@ if [ -n "$BROKEN" ]; then
     # 跳过是「少跑了一个程序」而不是「跑失败」,不走各程序自己的通道,发到套件那条线上
     node "$SUITE_DIR/alert-fail.mjs" 服务器 "宿主布局不全,本次跳过:$BROKEN" >> "$SUITE_DIR/logs/suite-alert.log" 2>&1 || true
 fi
-if [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ]; then
+if [ "$RC_SHANGGOU" -eq 0 ] && [ "$RC_REWARDS" -eq 0 ] && [ "$RC_WEREAD" -eq 0 ] && [ "$RC_EPIC" -eq 0 ] && [ "$RC_BILIBILI" -eq 0 ] && [ "$RC_TIEBA" -eq 0 ] && [ "$RC_NETEASE" -eq 0 ]; then
     exit 0
 fi
 exit 1

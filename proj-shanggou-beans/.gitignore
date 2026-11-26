@@ -1,0 +1,5 @@
+# 运行产物与凭据:运行时生成,永不入库
+data/
+logs/
+secrets/
+.env
